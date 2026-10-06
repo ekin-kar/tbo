@@ -1,8 +1,8 @@
 {
-  "risk_pct": 7.5,
+  "risk_pct": 5.0,
   "short_risk_mult": 0.5,
-  "max_leverage": 12,
-  "exchange_leverage": 25,
+  "max_leverage": 8,
+  "exchange_leverage": 20,
   "poll_s": 5,
   "strategy": {
     "symbol": "BTCUSDT",
