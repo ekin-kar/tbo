@@ -1,47 +1,54 @@
-# TBO: BTCUSDT trend-breakout bot (Binance USD-M futures)
+# TBO v2: BTCUSDT trend-breakout bot (Binance USD-M futures)
 
-## Strategy (v1.0, Oct 2026)
+## Strategy (v2.0, Oct 2026) - long AND short
 
-4-hour candles, UTC, Binance last price. Long only by default.
+4-hour candles, UTC, Binance last price.
 
 | | |
 |---|---|
-| Trend filter | Longs only while the last **closed daily** close is above the daily **EMA50** |
-| Entry | At every 4h close while flat: a **stop-buy at the highest high of the last 20 closed 4h candles**. It is valid until the next 4h close, then cancelled and re-placed at the new level |
-| Stop loss | **1.5 x ATR14 (4h)** from the fill price, server-side (`closePosition` STOP_MARKET) |
-| Trailing exit | At a 4h close: exit if close < highest high of the last 12 candles - 2 x ATR14 |
-| Time exit | **120 hours (5 days)** after the fill at the latest. No take profit |
-| Size | `risk_pct` of account equity is lost if the stop is hit. Notional is capped at `max_leverage` x equity |
+| Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
+| Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
+| Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
+| Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
+| Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
+| Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
 
-Typical stop: 2% of price (0.6-7.5%), so 1% risk is about 0.5x leverage. About 38 trades a year,
-average hold 43 h, win rate ~32%. A few winners carry the result: a typical trend-following profile.
+About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
-## Backtest (fees 0.05% taker + 0.01% slippage per side, funding 0.01%/8h charged)
+## How v2 was found (Oct 2026)
 
-| Period | Trades | Win % | PF | Net | Max DD |
+`research/crypto/wf_grid.py` ran 3,000 settings around v1 (timeframe, channel, stop, hold, EMA, long/both,
+trail, EMA slope, weekend skip, breakeven); `wf_eval.py` does an **anchored walk-forward**: for each year
+2022-2026 the best return/drawdown setting on the years BEFORE it is traded in that year (out of sample).
+- v1.0 (fixed) 2022-26: 15.5R/year, DD 11.7R -> 2.0%/month at 2% risk, DD 21%.
+- Walk-forward picks 2022-26: 23.6R/year, DD 13.4R -> 3.3%/month at 2% risk, DD 24% (honest estimate).
+- Every yearly pick used: weekend skip, breakeven 1.5R, 4h, channel 20-30, EMA50, 5-day hold; the top 25
+  settings on all data agree (weekend skip 23/25, breakeven 24/25).
+- **ETH (never used for tuning)**, 2020-03..2026-09: v1 +88R DD 21.8R -> v2 +178R DD 17.0R, every year
+  positive, shorts +72R.
+- Rejected: "halve risk after a -3R/-5R drawdown" (worse than simply a lower risk: losing streaks come right
+  before the big trend trades), top-K averaging (small gain, needs several positions), trailing exits on ETH.
+
+## Backtest of v2 (fees: 0.05% taker + 0.01% slippage on stop/market fills, funding 0.01%/8h)
+
+| BTCUSDT 2020-03..2026-09 | Trades | PF | Net | Max DD | Longs / shorts |
 |---|---|---|---|---|---|
-| Dev 2020-03..2023 (tuned here) | 144 | 33 | 1.92 | +80R | 10.5R |
-| **Holdout 2024..Sep 2026** (one look) | 108 | 32 | 1.66 | +46R | 11.7R |
-| Holdout at 0.10%/side costs | 108 | 30 | 1.55 | +40R | 12.6R |
-| ETH, same rules, holdout | 98 | 31 | 1.55 | +35R | 21.8R |
+| v1.0 (long only) | 252 | 1.81 | +126R | 11.7R | +126R / - |
+| **v2.0** | 402 | 2.00 | +255R | 13.1R | +217R / +38R |
 
-By year (R): 2020 +41, 2021 +11, 2022 -7, 2023 +36, 2024 +28, 2025 +5, 2026 (to Sep) +12.
-Compounded 2020-03..2026-09: 1% risk -> CAGR ~19%, max DD ~11%; 2% risk -> CAGR ~37%, max DD ~21%.
-
-Checks: the real entries beat 20 of 20 random-entry runs (same filter and exits) on dev, and 19 of 20 on the
-holdout. The 4h / channel 20 / stop 1.5 ATR / EMA50 / 5-day cap area is a broad plateau (74% of 960 nearby
-settings pass). Profits are concentrated: without the 10 best trades the 6.5 years are about flat. Expect
-long flat or losing stretches (worst run: 9 losses in a row; 2022 and 2025 were weak), and the bot sits
-out bear markets (price under the daily EMA50). Shorts (`"sides": "both"`) added nothing net on BTC.
-Research code: `research/crypto/` (scans in `research/results/crypto_*`).
+By year (R): 2020 +75, 2021 +24, 2022 +19, 2023 +53, 2024 +35, 2025 +18, 2026 (to Sep) +31.
+$1,000 compounded over the 6.6 years: 2% risk -> 5.2%/month average, max DD 24%; 3% -> 7.0%/month, DD 34%.
+**These are in-sample (settings picked on this data): plan on the walk-forward figure, about 3-4% a month
+at 2% risk, with drawdowns up to 25-30%, and losing months (about 4 in 10).**
 
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
-  windows the bot downloads) vs the research engine: 230 / 230 trades, same minute, same prices.
+  windows the bot downloads) vs the research engine: v2 375 / 375 trades (2020-09..2026-09), same minute, same prices.
 - `python cryptobot/test_bot_sim.py BTCUSDT 2021-01-01 2026-09-30` - **`bot.py` itself** driven by a simulated
-  exchange on 1m history: 212 vs 212 trades, 210 on the same minute, entry price within 1 tick, exits within
-  1 minute, gross R 104.2 vs 104.6.
+  exchange on 1m history (v2): 353 vs 354 trades, 351 on the same minute, entry price within 1 tick, gross R
+  225.3 vs 224.9. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
+  minute (pessimistic); the bot places its stop a few seconds after the fill.
 
 ## Running it
 
@@ -58,7 +65,7 @@ Research code: `research/crypto/` (scans in `research/results/crypto_*`).
 5. Live: `python cryptobot/bot.py cryptobot/config_btc.json`. Logs: `cryptobot/logs/BTCUSDT.log`. State:
    `cryptobot/state_BTCUSDT.json` (keep it; it holds the entry time for the 5-day exit).
 
-Settings (`config_btc.json`): `risk_pct` (1.0 = 1% of equity per trade), `max_leverage` (notional cap, also
+Settings (`config_btc.json`): `risk_pct` (2.0 = 2% of equity per trade), `max_leverage` (notional cap, also
 set as the symbol leverage), `poll_s`, and the strategy block (keep the tested values).
 
 ### Behaviour notes
@@ -70,6 +77,8 @@ set as the symbol leverage), `poll_s`, and the strategy block (keep the tested v
 - Restart-safe: the position comes from Binance; a missing stop loss is re-placed (from the saved stop
   distance, or 1.5 x current ATR if the state file is lost); a 4h close missed while the bot was off is acted
   on when it comes back.
+- Breakeven: the bot reads the last 1m candles every poll; once a candle after the fill has reached +1.5R it
+  cancels the stop and places a new one at the entry price (logged as BREAKEVEN).
 - Conditional orders use Binance's Algo Order API (`/fapi/v1/algoOrder`, required since Dec 2025), triggered
   on the last price (`workingType=CONTRACT_PRICE`), as in the backtest.
 - Not yet run against the real API from here (the research machine cannot reach Binance): **run testnet /

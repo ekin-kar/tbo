@@ -41,7 +41,8 @@ def _ema_daily_side(m1, d, ema_n, at_idx):
 
 
 def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0, atr_n=14, sides="both",
-                     trail_m=0, trail_atr=0.0, rand_seed=None):
+                     trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
+                     vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -52,6 +53,32 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
     ok = (~np.isnan(hi)) & (~np.isnan(a)) & (np.arange(len(act)) > max(n, 3 * atr_n)) & (act < len(m1["t"]))
     d = resample(m1, 1440)
     tside = _ema_daily_side(m1, d, ema_n, act)
+    # ── optional entry filters (all known at the candle close) ──
+    if vol_lo > 0 or vol_hi < 1:                       # ATR/price percentile over the last 500 candles
+        rel = a / c["c"]
+        import pandas as pd
+        pct = pd.Series(rel).rolling(500, min_periods=200).rank(pct=True).to_numpy()
+        ok &= (pct >= vol_lo) & (pct <= vol_hi)
+    if slope_d > 0 or ema2_n > 0 or max_ext < 99:
+        d = resample(m1, 1440)
+        k = np.searchsorted(d["act"], act, side="right") - 1
+        kk = np.clip(k, 0, None)
+        if slope_d > 0:                                # daily EMA rising (long) / falling (short) over slope_d days
+            e = I.ema(d["c"], ema_n)
+            sl_sign = np.sign(e[kk] - e[np.clip(kk - slope_d, 0, None)])
+            tside = np.where(sl_sign == tside, tside, 0)
+        if ema2_n > 0:                                 # second, slower daily trend filter must agree
+            s2 = np.where(d["c"] > I.ema(d["c"], ema2_n), 1, -1)[kk]
+            tside = np.where(s2 == tside, tside, 0)
+        if max_ext < 99:                               # skip when price is too far above / below the daily EMA
+            e = I.ema(d["c"], ema_n); ad = I.atr(d["h"], d["l"], d["c"], 14)
+            ext = np.abs(d["c"][kk] - e[kk]) / ad[kk]
+            ok &= ext <= max_ext
+        tside = np.where(tside == 0, 2, tside)         # 2 = blocked (neither >=0 for shorts nor <=0 for longs)
+        tside = np.where(tside == 2, np.nan, tside)
+    if no_weekend:
+        wd = ((c["t"] + tf) // 1440 + 3) % 7           # weekday of the moment the order is placed
+        ok &= wd < 5
     o = E.Orders(m1)
     sl = sl_atr * a
     tp = tp_R * sl if tp_R > 0 else np.zeros(len(a))
@@ -73,13 +100,14 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
             o.place(act[pick], MKT, side, sl[pick], tp[pick], slot=slot)
         tr = run(m1, o, max_bars=int(hold_h * 60))
         return tr.sample(n=min(len(tr), len(real)), random_state=rand_seed).sort_values("entry_time")
+    buf = buffer_atr * a
     if sides in ("both", "long"):
         m = ok & (tside >= 0)
-        o.place(act[m], STP, 1, sl[m], tp[m], price=hi[m], expiry_min=tf, slot=0)
+        o.place(act[m], STP, 1, sl[m], tp[m], price=(hi + buf)[m], expiry_min=tf, slot=0)
     if sides in ("both", "short"):
         m = ok & (tside <= 0)
-        o.place(act[m], STP, -1, sl[m], tp[m], price=lo[m], expiry_min=tf, slot=1)
-    return run(m1, o, max_bars=int(hold_h * 60))
+        o.place(act[m], STP, -1, sl[m], tp[m], price=(lo - buf)[m], expiry_min=tf, slot=1)
+    return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker")
 
 
 def vol_breakout(m1, k=0.5, sl_k=0.5, tp_R=0.0, hold_h=24, ema_n=0, start_min=0, sides="both"):

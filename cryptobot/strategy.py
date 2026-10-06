@@ -1,15 +1,18 @@
 """
 Trend-breakout strategy ("TBO") - the pure decision logic, shared by the live bot and the parity test.
 
-Rules (4-hour candles, UTC, Binance last price):
+Rules (4-hour candles, UTC, Binance last price), v2 defaults:
   Trend      : last CLOSED daily close vs its EMA(ema_n). Above -> longs allowed, below -> shorts allowed
-               (shorts only if sides == "both").
+               (shorts only if sides == "both"). With slope_d > 0 the EMA must also be rising (longs) /
+               falling (shorts) versus slope_d days earlier, otherwise no order.
+  Weekend    : no_weekend -> no new orders placed on Saturday / Sunday (UTC).
   Entry      : at each 4h candle close, while flat: a stop order at the highest high of the last `n`
                closed 4h candles (long) / lowest low (short). The order lives until the next 4h close,
                where it is cancelled and re-placed at the new level.
   Stop loss  : sl_atr x ATR(atr_n) of the 4h candles, measured from the fill price (server-side order).
   Trail exit : at a 4h close, a long is closed if close < highest high of the last trail_m candles
                - trail_atr x ATR (mirror for shorts).
+  Breakeven  : once price has gone be_R x the stop distance in favour, the stop moves to entry + be_off x dist.
   Time exit  : closed max_hold_h hours after the fill. No take profit.
 
 Indicators match research/engine/indicators.py (cTrader style): EMA seeded with the first value,
@@ -26,12 +29,16 @@ class Params:
     tf_min: int = 240
     n: int = 20
     atr_n: int = 14
-    sl_atr: float = 1.5
+    sl_atr: float = 1.0
     ema_n: int = 50
-    trail_m: int = 12
-    trail_atr: float = 2.0
+    trail_m: int = 0
+    trail_atr: float = 0.0
     max_hold_h: float = 120.0
-    sides: str = "long"          # "long" or "both"
+    sides: str = "both"          # "long" or "both"
+    slope_d: int = 5
+    no_weekend: bool = True
+    be_R: float = 1.5
+    be_off: float = 0.0
 
     def to_dict(self):
         return asdict(self)
@@ -60,12 +67,16 @@ def atr(h, l, c, n):
     return out
 
 
-def trend_side(daily_close, ema_n):
-    """+1 / -1 from the CLOSED daily candles (oldest first); 0 if there is not enough history."""
-    if len(daily_close) <= ema_n:
+def trend_side(daily_close, ema_n, slope_d=0):
+    """+1 / -1 from the CLOSED daily candles (oldest first); 0 = no trade (not enough history, or the EMA
+    slope over slope_d days disagrees)."""
+    if len(daily_close) <= max(ema_n, slope_d):
         return 0
     e = ema(daily_close, ema_n)
-    return 1 if daily_close[-1] > e[-1] else -1
+    side = 1 if daily_close[-1] > e[-1] else -1
+    if slope_d > 0 and np.sign(e[-1] - e[-1 - slope_d]) != side:
+        return 0
+    return side
 
 
 @dataclass
@@ -79,14 +90,15 @@ class Decision:
     trend: int
 
 
-def decide(p: Params, h, l, c, daily_close) -> Decision:
-    """h, l, c: CLOSED 4h candles, oldest first (the last one has just closed)."""
+def decide(p: Params, h, l, c, daily_close, weekday=0) -> Decision:
+    """h, l, c: CLOSED 4h candles, oldest first (the last one has just closed).
+    weekday: UTC weekday (Mon=0) of the moment the order is placed (= the candle's close)."""
     h, l, c = (np.asarray(v, float) for v in (h, l, c))
     a = atr(h, l, c, p.atr_n)[-1]
     hi = h[-p.n:].max()
     lo = l[-p.n:].min()
-    side = trend_side(daily_close, p.ema_n)
-    ok = len(c) > max(p.n, 3 * p.atr_n) and np.isfinite(a) and a > 0
+    side = trend_side(daily_close, p.ema_n, p.slope_d)
+    ok = len(c) > max(p.n, 3 * p.atr_n) and np.isfinite(a) and a > 0 and not (p.no_weekend and weekday >= 5)
     long_t = hi if ok and side >= 0 and side != 0 else None
     short_t = lo if ok and side <= 0 and side != 0 and p.sides == "both" else None
     hh = h[-p.trail_m:].max() if p.trail_m > 0 else np.inf

@@ -36,7 +36,8 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE):
         j1 = c4["act"][k + 1] if k + 1 < len(c4["t"]) else n1
         sl_ = slice(k - LIVE_4H_CANDLES + 1, k + 1)
         nd = np.searchsorted(d1["act"], j0, side="right")  # daily candles closed by now
-        dec = S.decide(p, c4["h"][sl_], c4["l"][sl_], c4["c"][sl_], d1["c"][max(0, nd - LIVE_1D_CANDLES):nd])
+        wd = int(((c4["t"][k] + p.tf_min) // 1440 + 3) % 7)
+        dec = S.decide(p, c4["h"][sl_], c4["l"][sl_], c4["c"][sl_], d1["c"][max(0, nd - LIVE_1D_CANDLES):nd], wd)
 
         def close(j, px, why):
             nonlocal pos
@@ -74,11 +75,15 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE):
                     close(j, o, "SL")
                 elif l <= sl:
                     close(j, sl, "SL")
+                elif p.be_R > 0 and h - entry_px >= p.be_R * dist and sl < entry_px + p.be_off * dist:
+                    sl = entry_px + p.be_off * dist          # breakeven, from the next bar
             elif pos == -1:
                 if j > entry_i and o >= sl:
                     close(j, o, "SL")
                 elif h >= sl:
                     close(j, sl, "SL")
+                elif p.be_R > 0 and entry_px - l >= p.be_R * dist and sl > entry_px - p.be_off * dist:
+                    sl = entry_px - p.be_off * dist
     tr = pd.DataFrame(trades)
     tr["entry_time"] = C.D.to_datetime(tr["entry_time"]); tr["exit_time"] = C.D.to_datetime(tr["exit_time"])
     gross = (tr["exit"] - tr["entry"]) * tr["dir"]
@@ -96,7 +101,9 @@ if __name__ == "__main__":
     m = C.load(sym)
     live = replay(m, p, start, end)
     eng = C.between(F.channel_breakout(m, tf=p.tf_min, n=p.n, sl_atr=p.sl_atr, hold_h=p.max_hold_h, ema_n=p.ema_n,
-                                       atr_n=p.atr_n, sides=p.sides, trail_m=p.trail_m, trail_atr=p.trail_atr), start, end)
+                                       atr_n=p.atr_n, sides=p.sides, trail_m=p.trail_m, trail_atr=p.trail_atr,
+                                       slope_d=p.slope_d, no_weekend=p.no_weekend, be_R=p.be_R, be_off=p.be_off),
+                    start, end)
     a = live.set_index("entry_time"); b = eng.set_index("entry_time")
     both = a.join(b, how="inner", lsuffix="_live", rsuffix="_eng")
     print(f"live-logic replay: {len(live)} trades, {live['R'].sum():.1f}R | research engine: {len(eng)} trades, {eng['R'].sum():.1f}R")

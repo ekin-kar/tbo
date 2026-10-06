@@ -39,7 +39,16 @@ class FakeFutures:
     def exchange_info(self, sym):
         return dict(tick=0.1, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=120, min_notional=100, status="TRADING")
 
-    def klines(self, sym, interval, limit):
+    def klines(self, sym, interval, limit, start_ms=None):
+        if interval == "1m":                                      # closed bars + the forming one (open only)
+            j = self.j; m = self.m
+            i0 = max(0, j - limit + 1)
+            if start_ms is not None:
+                i0 = max(i0, int(np.searchsorted(m["t"], start_ms // 60_000)))
+            rows = [(int(m["t"][i]) * 60_000, m["o"][i], m["h"][i], m["l"][i], m["c"][i], int(m["t"][i]) * 60_000 + 59_999)
+                    for i in range(i0, j)]
+            o = m["o"][j]
+            return rows + [(int(m["t"][j]) * 60_000, o, o, o, o, int(m["t"][j]) * 60_000 + 59_999)]
         c = self.c4 if interval == "4h" else self.d1
         tf = 240 if interval == "4h" else 1440
         now_min = int(self.m["t"][self.j])
@@ -118,10 +127,10 @@ class FakeFutures:
 def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     m = C.load(sym)
     fx = FakeFutures(m)
-    cfg = dict(risk_pct=1.0, max_leverage=3, strategy=S.Params(symbol=sym).to_dict())
+    cfg = dict(risk_pct=2.0, max_leverage=5, strategy=S.Params(symbol=sym).to_dict())
     bot = B.Bot.__new__(B.Bot)
     bot.cfg, bot.dry = cfg, False
-    bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.01; bot.max_lev = 3; bot.poll = 0
+    bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.02; bot.max_lev = 5; bot.poll = 0
     bot.state_path = Path("/tmp/claude_tbo_sim_state.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
     bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))

@@ -88,9 +88,9 @@ class Futures:
                             status=s["status"])
         raise ValueError(f"symbol {symbol} not found")
 
-    def klines(self, symbol, interval, limit):
+    def klines(self, symbol, interval, limit, start_ms=None):
         """[(open_ms, o, h, l, c, close_ms), ...] oldest first, including the candle still forming."""
-        raw = self._req("GET", "/fapi/v1/klines", dict(symbol=symbol, interval=interval, limit=limit))
+        raw = self._req("GET", "/fapi/v1/klines", dict(symbol=symbol, interval=interval, limit=limit, startTime=start_ms))
         return [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), int(k[6])) for k in raw]
 
     def last_price(self, symbol):

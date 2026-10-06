@@ -27,7 +27,7 @@ sys.path.insert(0, str(HERE))
 import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 
-VERSION = "1.0"
+VERSION = "2.0"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -65,7 +65,8 @@ class Bot:
     def load_state(self):
         if self.state_path.exists():
             return json.loads(self.state_path.read_text())
-        return dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
+        return dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0,
+                    best=0.0, be_done=False)
 
     def save(self):
         tmp = self.state_path.with_suffix(".tmp")
@@ -113,7 +114,7 @@ class Bot:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
                           client_id=f"{PREFIX}_x_{int(time.time())}")
         self.cancel(self.st.get("sl_id"))
-        self.st.update(sl_id=None, entry_side=0, entry_ms=0)
+        self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
         self.save()
 
     def place_sl(self, amt, entry_px):
@@ -124,6 +125,8 @@ class Bot:
             dist = self.p.sl_atr * S.atr([k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4], self.p.atr_n)[-1]
             self.st["sl_dist"] = dist
         trig = entry_px - side * dist
+        if self.st.get("be_done"):                      # breakeven reached: stop at entry + be_off x dist
+            trig = entry_px + side * self.p.be_off * dist
         trig = floor_step(trig, self.f["tick"]) if side == 1 else math.ceil(trig / self.f["tick"]) * self.f["tick"]
         log.info(f"STOP LOSS for {amt} @ {entry_px:.2f}: {fmt(trig, self.f['tick'])} ({dist:.2f} away)")
         if self.dry:
@@ -146,10 +149,12 @@ class Bot:
             log.warning("latest closed 4h candle not served yet; retrying")
             return False
         h, l, c = [k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4]
-        dec = S.decide(self.p, h, l, c, [k[4] for k in k1])
+        weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
+        dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday)
         amt, entry_px = self.x.position(self.sym)
         log.info(f"4h close {utc(open_ms + 4 * 3600_000)}: close {c[-1]:.2f}  ATR {dec.atr:.2f}  trend "
-                 f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else '-'}  position {amt}")
+                 f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"
+                 f"{'  (weekend: no new orders)' if self.p.no_weekend and weekday >= 5 else ''}  position {amt}")
         # 1. trail exit
         if (amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short):
             self.close_position(amt, "trail")
@@ -163,7 +168,7 @@ class Bot:
                 self.cancel(o["algoId"])
         # 3. new entry order while flat
         if amt == 0:
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0)
+            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
                 if trig is None:
                     continue
@@ -214,19 +219,53 @@ class Bot:
         now = self.x.now_ms()
         if amt != 0:
             if not self.st.get("entry_ms"):
-                self.st["entry_ms"] = now
+                fill_ms = now - 60_000                  # fallback: the fill happened since the last poll
+                if self.st.get("entry_id") and not self.dry:
+                    try:
+                        trig = int(self.x.algo_order(algo_id=self.st["entry_id"]).get("triggerTime") or 0)
+                        if 0 < trig <= now:
+                            fill_ms = trig
+                    except BinanceError:
+                        pass
+                self.st["entry_ms"] = fill_ms
+                self.st["be_from"] = fill_ms - fill_ms % 60_000 + 60_000   # first full 1m candle after the fill
                 self.st["entry_id"] = None              # the entry order has triggered
                 log.info(f"FILLED {amt} @ {entry_px:.2f}")
                 self.save()
             if not self.sl_alive():
                 self.place_sl(amt, entry_px)
+            self.check_breakeven(amt, entry_px)
             if now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
                 self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)")
         elif self.st.get("entry_ms"):
             log.info("position closed (stop loss hit or closed by hand)")
             self.cancel(self.st.get("sl_id"))
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0)
+            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
             self.save()
+
+    def check_breakeven(self, amt, entry_px):
+        """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour."""
+        if self.p.be_R <= 0 or self.st.get("be_done") or not self.st.get("sl_dist"):
+            return
+        side = 1 if amt > 0 else -1
+        start = self.st.get("be_from") or (self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + 60_000)
+        bars = self.x.klines(self.sym, "1m", 1000, start_ms=start)    # every 1m candle not checked yet
+        if bars:
+            self.st["be_from"] = bars[-1][0]                            # the forming candle is re-read next time
+        if not bars:
+            return
+        ext = max(k[2] for k in bars) if side == 1 else min(k[3] for k in bars)
+        best = self.st.get("best") or entry_px
+        best = max(best, ext) if side == 1 else min(best, ext)
+        self.st["best"] = best
+        if side * (best - entry_px) >= self.p.be_R * self.st["sl_dist"]:
+            log.info(f"BREAKEVEN: price reached {best:.2f} (+{self.p.be_R}R): stop moves to entry")
+            self.st["be_done"] = True
+            old = self.st.get("sl_id")
+            self.cancel(old)
+            self.st["sl_id"] = None
+            self.place_sl(amt, entry_px)
+        self.save()
 
     def run(self):
         if not self.dry:
