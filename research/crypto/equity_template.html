@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TBO Equity Curves</title>
+<style>
+:root{--surface-0:#f4f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7972;
+--grid:#e6e5df;--axis:#bdbcb4;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--dd:#2a78d6;--btn:#ecebe6;--btn-on:#0b0b0b;--btn-on-text:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;
+--text-muted:#8f8e86;--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--btn:#2a2a28;--btn-on:#fff;--btn-on-text:#0b0b0b}}
+:root[data-theme="dark"]{--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;
+--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--s2:#d95926;--s3:#199e70;--btn:#2a2a28;--btn-on:#fff;--btn-on-text:#0b0b0b}
+*{box-sizing:border-box}body{margin:0;background:var(--surface-0);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}h1{font-size:20px;margin:0 0 4px}.sub{color:var(--text-secondary);margin:0 0 16px}
+.bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px}.grp{display:flex;gap:4px;align-items:center}
+.grp span{color:var(--text-secondary);font-size:12px;margin-right:4px}
+button{border:0;border-radius:6px;padding:6px 10px;background:var(--btn);color:var(--text-primary);font:inherit;font-size:13px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-text)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px}
+.tile{background:var(--surface-1);border-radius:10px;padding:12px 14px}.tile .k{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+.tile .v{font-size:22px;font-weight:600;margin-top:2px}.tile .m{font-size:12px;color:var(--text-secondary)}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.card{background:var(--surface-1);border-radius:10px;padding:12px 12px 6px;margin-bottom:12px;position:relative}
+.card h2{font-size:13px;font-weight:600;margin:0 0 4px 4px;color:var(--text-secondary)}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--text-muted);font-size:11px}
+.tip{position:absolute;pointer-events:none;background:var(--surface-0);border:1px solid var(--axis);border-radius:8px;padding:8px 10px;font-size:12px;
+display:none;min-width:170px;box-shadow:0 4px 14px rgba(0,0,0,.12);z-index:2}.tip .d{color:var(--text-secondary);margin-bottom:4px}
+.tip .r{display:flex;justify-content:space-between;gap:12px;align-items:center}.tip .r b{font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);margin:0 0 6px 4px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left}th{color:var(--text-secondary);font-weight:600}
+.note{color:var(--text-secondary);font-size:12px;margin-top:8px}details summary{cursor:pointer;color:var(--text-secondary);font-size:13px;margin:4px 4px 8px}
+</style></head><body><div class="wrap">
+<h1>TBO v2.1 backtest: $1,000 account</h1>
+<p class="sub">4h trend breakout, long and short, Mar 2020 to Sep 2026. Fees and funding included. Equity steps at each closed trade, compounding.</p>
+<div class="bar">
+ <div class="grp" id="gSeries"><span>Show</span><button data-s="BTC" aria-pressed="true">BTC</button><button data-s="ETH" aria-pressed="true">ETH</button><button data-s="BOTH" aria-pressed="false">BTC + ETH together</button></div>
+ <div class="grp" id="gRisk"><span>Risk per trade</span><button data-r="1">1%</button><button data-r="1.5">1.5%</button><button data-r="2" aria-pressed="true">2%</button><button data-r="3">3%</button></div>
+ <div class="grp" id="gScale"><span>Scale</span><button data-sc="log" aria-pressed="true">Log</button><button data-sc="lin">Linear</button></div>
+</div>
+<div class="tiles" id="tiles"></div>
+<div class="card"><h2>Account balance ($)</h2><div class="legend" id="legend"></div><svg id="eq" height="340"></svg><div class="tip" id="tip"></div></div>
+<div class="card"><h2>Drawdown from the previous peak (%)</h2><svg id="dd" height="150"></svg></div>
+<div class="card"><details><summary>Table: return by year</summary><table id="tbl"></table></details></div>
+<p class="note">Backtest, not a promise. The settings were chosen on this BTC data, so BTC is in-sample. ETH uses the same settings untouched. "Together" runs both bots on one account at the chosen risk each; it counts closed trades only, so real drawdowns would be a bit deeper. Plan on about 3–4% a month for BTC at 2% risk.</p>
+</div>
+<script>
+const DATA=/*DATA*/null;
+const COL={BTC:'--s1',ETH:'--s2',BOTH:'--s3'},NAME={BTC:'BTC',ETH:'ETH',BOTH:'BTC + ETH'};
+let st={show:{BTC:true,ETH:true,BOTH:false},risk:2,scale:'log'};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const T0=Date.UTC(2020,2,1),T1=Date.UTC(2026,9,1);
+function curve(key){let tr=key==='BOTH'?[...DATA.BTC,...DATA.ETH].sort((a,b)=>a[0]-b[0]):DATA[key];
+ let e=1000,pk=1000,pts=[[T0,1000,0]],mdd=0;for(const [t,r] of tr){e*=1+st.risk/100*r;pk=Math.max(pk,e);const dd=(e/pk-1)*100;mdd=Math.min(mdd,dd);pts.push([t,e,dd]);}
+ pts.push([T1,e,(e/pk-1)*100]);return {pts,final:e,mdd,n:tr.length};}
+function at(pts,t){let lo=0,hi=pts.length-1;while(lo<hi){const m=(lo+hi+1)>>1;if(pts[m][0]<=t)lo=m;else hi=m-1;}return pts[lo];}
+const fmt=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':v>=1e4?'$'+Math.round(v/1e3)+'k':'$'+Math.round(v).toLocaleString();
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+let cur={};
+function draw(){
+ const keys=Object.keys(st.show).filter(k=>st.show[k]);cur={};keys.forEach(k=>cur[k]=curve(k));
+ // tiles
+ document.getElementById('tiles').innerHTML=keys.map(k=>{const c=cur[k],mo=(Math.pow(c.final/1000,1/79)-1)*100;
+  return `<div class="tile"><div class="k"><span class="sw" style="background:var(${COL[k]})"></span>${NAME[k]} at ${st.risk}%${k==='BOTH'?' each':''}</div><div class="v">${fmt(c.final)}</div><div class="m">${mo.toFixed(1)}% / month avg · worst drop ${c.mdd.toFixed(0)}% · ${c.n} trades</div></div>`}).join('');
+ document.getElementById('legend').innerHTML=keys.map(k=>`<span><span class="sw" style="background:var(${COL[k]})"></span> ${NAME[k]}</span>`).join('');
+ // equity
+ const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=340,L=58,R=58,Tp=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const maxV=Math.max(...keys.map(k=>Math.max(...cur[k].pts.map(p=>p[1]))),2000),minV=Math.min(...keys.map(k=>Math.min(...cur[k].pts.map(p=>p[1]))),1000);
+ const x=t=>L+(t-T0)/(T1-T0)*(W-L-R);
+ const lg=st.scale==='log',lo=lg?Math.log10(minV*0.9):0,hi=lg?Math.log10(maxV*1.1):maxV*1.05;
+ const y=v=>Tp+(1-((lg?Math.log10(v):v)-lo)/(hi-lo))*(H-Tp-B);
+ let ticks=[];if(lg){for(let e=2;e<=8;e++)for(const m of[1,2,5]){const v=m*10**e;if(v>=minV*0.9&&v<=maxV*1.1)ticks.push(v);}}else{const s=niceStep(hi/5);for(let v=0;v<=hi;v+=s)ticks.push(v);}
+ for(const v of ticks){const yy=y(v);el('line',{x1:L,x2:W-R,y1:yy,y2:yy,stroke:css('--grid')},sv);const t=el('text',{x:L-8,y:yy+4,'text-anchor':'end'},sv);t.textContent=fmt(v);}
+ for(let yr=2021;yr<=2026;yr++){const xx=x(Date.UTC(yr,0,1));el('line',{x1:xx,x2:xx,y1:Tp,y2:H-B,stroke:css('--grid')},sv);const t=el('text',{x:xx,y:H-6,'text-anchor':'middle'},sv);t.textContent=yr;}
+ el('line',{x1:L,x2:W-R,y1:H-B,y2:H-B,stroke:css('--axis')},sv);
+ for(const k of keys){let d='';cur[k].pts.forEach((p,i)=>{const xx=x(p[0]).toFixed(1),yy=y(p[1]).toFixed(1);d+=i?`H${xx}V${yy}`:`M${xx},${yy}`;});
+  el('path',{d,fill:'none',stroke:css(COL[k]),'stroke-width':2,'stroke-linejoin':'round'},sv);
+  const last=cur[k].pts.at(-1);const t=el('text',{x:W-R+6,y:y(last[1])+4,style:'fill:var(--text-primary);font-weight:600'},sv);t.textContent=NAME[k];}
+ const hl=el('line',{y1:Tp,y2:H-B,stroke:css('--axis'),'stroke-dasharray':'3 3',visibility:'hidden'},sv);
+ const dots=keys.map(k=>el('circle',{r:4.5,fill:css(COL[k]),stroke:css('--surface-1'),'stroke-width':2,visibility:'hidden'},sv));
+ // drawdown
+ const dv=document.getElementById('dd');dv.innerHTML='';const DH=150;dv.setAttribute('viewBox',`0 0 ${W} ${DH}`);
+ const mdd=Math.min(...keys.map(k=>cur[k].mdd),-10),ylo=Math.floor(mdd/10)*10;const yd=v=>8+(v/ylo)*(DH-8-24);
+ for(let v=0;v>=ylo;v-=10){const yy=yd(v);el('line',{x1:L,x2:W-R,y1:yy,y2:yy,stroke:css('--grid')},dv);const t=el('text',{x:L-8,y:yy+4,'text-anchor':'end'},dv);t.textContent=v+'%';}
+ for(let yr=2021;yr<=2026;yr++){const xx=x(Date.UTC(yr,0,1));const t=el('text',{x:xx,y:DH-6,'text-anchor':'middle'},dv);t.textContent=yr;}
+ for(const k of keys){let d='';cur[k].pts.forEach((p,i)=>{const xx=x(p[0]).toFixed(1),yy=yd(p[2]).toFixed(1);d+=i?`H${xx}V${yy}`:`M${xx},${yy}`;});
+  el('path',{d,fill:'none',stroke:css(COL[k]),'stroke-width':1.5},dv);}
+ const hl2=el('line',{y1:8,y2:DH-24,stroke:css('--axis'),'stroke-dasharray':'3 3',visibility:'hidden'},dv);
+ // hover
+ const tip=document.getElementById('tip');
+ const move=ev=>{const r=sv.getBoundingClientRect();const px=(ev.clientX-r.left)*(W/r.width);if(px<L||px>W-R){hide();return;}
+  const t=T0+(px-L)/(W-L-R)*(T1-T0);hl.setAttribute('x1',px);hl.setAttribute('x2',px);hl.setAttribute('visibility','visible');
+  hl2.setAttribute('x1',px);hl2.setAttribute('x2',px);hl2.setAttribute('visibility','visible');
+  let rows='';keys.forEach((k,i)=>{const p=at(cur[k].pts,t);dots[i].setAttribute('cx',px);dots[i].setAttribute('cy',y(p[1]));dots[i].setAttribute('visibility','visible');
+   rows+=`<div class="r"><span><span class="sw" style="background:var(${COL[k]})"></span> ${NAME[k]}</span><b>${fmt(p[1])}</b><span>${p[2].toFixed(1)}%</span></div>`;});
+  tip.innerHTML=`<div class="d">${new Date(t).toISOString().slice(0,10)} · balance · from peak</div>${rows}`;tip.style.display='block';
+  const cr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-cr.left+14;if(lx>cr.width-200)lx=ev.clientX-cr.left-200;tip.style.left=lx+'px';tip.style.top=(ev.clientY-cr.top+10)+'px';};
+ const hide=()=>{tip.style.display='none';hl.setAttribute('visibility','hidden');hl2.setAttribute('visibility','hidden');dots.forEach(d=>d.setAttribute('visibility','hidden'));};
+ sv.onmousemove=move;sv.onmouseleave=hide;sv.ontouchmove=e=>{move(e.touches[0]);};
+ // table
+ let h='<tr><th>Year</th>'+keys.map(k=>`<th>${NAME[k]}</th>`).join('')+'</tr>';
+ for(let yr=2020;yr<=2026;yr++){h+=`<tr><td>${yr}${yr===2026?' (to Sep)':''}</td>`+keys.map(k=>{const p=cur[k].pts,a=at(p,Date.UTC(yr,0,1)-1)[1],b=at(p,Date.UTC(yr+1,0,1)-1)[1];return `<td>${((b/a-1)*100).toFixed(0)}%</td>`}).join('')+'</tr>';}
+ document.getElementById('tbl').innerHTML=h;}
+function niceStep(r){const p=10**Math.floor(Math.log10(r)),f=r/p;return (f<1.5?1:f<3?2:f<7?5:10)*p;}
+function bind(id,attr,fn){document.querySelectorAll(`#${id} button`).forEach(b=>b.onclick=()=>{fn(b.dataset[attr],b);draw();});}
+bind('gSeries','s',(s,b)=>{st.show[s]=!st.show[s];if(!Object.values(st.show).some(Boolean))st.show[s]=true;b.setAttribute('aria-pressed',st.show[s]);});
+bind('gRisk','r',(r,b)=>{st.risk=+r;document.querySelectorAll('#gRisk button').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+bind('gScale','sc',(s,b)=>{st.scale=s;document.querySelectorAll('#gScale button').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);draw();
+</script></body></html>
