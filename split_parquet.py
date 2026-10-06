@@ -2,10 +2,11 @@ import os
 import pandas as pd
 
 DATA_DIR = "data"
-FILES = [
-    "BTCUSDT_1m_2020_2026.parquet",
-    "ETHUSDT_1m_2020_2026.parquet"
+SYMBOLS = [
+    "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT",
+    "LINKUSDT", "AVAXUSDT", "LTCUSDT", "TRXUSDT", "DOTUSDT"
 ]
+FILES = [f"{s}_1m_2020_2026.parquet" for s in SYMBOLS]
 
 for filename in FILES:
     filepath = os.path.join(DATA_DIR, filename)
