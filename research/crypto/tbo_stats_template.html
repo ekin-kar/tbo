@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TBO Crypto Statistics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#ffffff;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;
+--btc:#eb6834;--eth:#2a78d6;--doge:#eda100;--ada:#1baf7a;--comb:#18212b;--neg:#b3432f;--pos:#1d6b5b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--btc:#d95926;--eth:#3987e5;--doge:#c98500;--ada:#199e70;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--btc:#d95926;--eth:#3987e5;--doge:#c98500;--ada:#199e70;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 22px;max-width:78ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:20px;margin:40px 0 4px;font-weight:600}h3{font-size:16px;margin:0 0 6px}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:80ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--eth);outline-offset:2px}
+.coinbtn{display:inline-flex;align-items:center;gap:7px}.coinbtn i{width:10px;height:10px;border-radius:3px;display:inline-block}
+label.risk{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.risk input{font:inherit;width:84px;padding:7px 9px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 16px 10px;position:relative}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 6px}.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:18px;height:3px;border-radius:2px;display:inline-block}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.chart-cap{font-size:13px;color:var(--muted);margin:6px 2px 4px}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
+tr.yr td{font-weight:600;background:var(--soft)}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.big div{background:var(--surface);padding:12px 14px}.big b{display:block;font-size:22px;font-weight:600}.big span{font-size:13px;color:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}
+.tip .r{display:flex;justify-content:space-between;gap:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.spec{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:8px 0 0;font-size:14px}dt{color:var(--muted)}dd{margin:0}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.notes li{margin-bottom:6px}
+details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
+</style></head><body><div class="wrap">
+<h1>TBO crypto bot statistics</h1>
+<p class="lede">Every trade of <b>TBO v2.2</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, DOGE and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: risk % of the balance at entry, shorts at the short-size factor. Pick coins, period, risk and starting balance; everything recalculates.</p>
+<div class="controls">
+ <div><div class="ctl-title">Coins</div><div class="seg" id="coins"></div></div>
+ <div><div class="ctl-title">Period</div><div class="seg" id="periods"></div></div>
+</div>
+<div class="controls" id="risks"></div>
+<div class="big" id="headline"></div>
+<p class="hint" id="caveat"></p>
+<div class="panel">
+ <div class="controls" style="margin-bottom:8px"><div class="seg" id="scale"></div><div class="legend" id="legend" style="margin:0"></div></div>
+ <svg id="eq" height="360" role="img" aria-label="Account balance"></svg><div class="tip" id="tip"></div>
+ <div class="chart-cap" id="eqcap"></div>
+ <svg id="dd" height="150" role="img" aria-label="Drawdown"></svg>
+ <div class="chart-cap">Drawdown of the combined account from its peak, counting every open trade as if it hit its stop at that moment (worst case; trades already at breakeven count as zero risk).</div>
+</div>
+<h2>Statistics for the selected period</h2>
+<p class="hint" id="periodnote"></p>
+<div class="scroll panel"><table id="stats"></table></div>
+<h2>The same numbers across periods</h2>
+<p class="hint">For "how did it do over the whole history, the last 3 years, the last 12 months". Choose the account to show.</p>
+<div class="controls"><div class="seg" id="which"></div></div>
+<div class="scroll panel"><table id="across"></table></div>
+<h2>Year by year</h2>
+<p class="hint">Result in R and win rate per coin, and the combined account's return at your risk. 2020 starts in March; 2026 ends in September.</p>
+<div class="scroll panel"><table id="years"></table></div>
+<h2>Month by month</h2>
+<p class="hint">The combined account for the selected coins, period, risk and starting balance.</p>
+<div class="panel months"><table id="months"></table></div>
+<h2>How the bot trades</h2>
+<div class="specs" id="specs"></div>
+<h2>Settings in the bot (config files)</h2>
+<div class="scroll panel"><table id="settings"></table></div>
+<h2>How these numbers were made</h2>
+<ul class="notes">
+<li>Trades come from a 1-minute backtest engine on Binance futures prices (last price, 1-minute candles). The bot's own code was run against a simulated exchange on the same history: on BTC 327 of 328 trades matched to the minute, on ETH 316 of 320 (the rest are minutes where the backtest assumes the stop is hit inside the fill minute, which is pessimistic).</li>
+<li>Costs: taker fee 0.05% per side, plus slippage 0.01% (BTC, ETH) or 0.03% (DOGE, ADA) on every stop or market fill; funding 0.01% per 8 hours charged on every open position (long or short), which is pessimistic.</li>
+<li>R figures (win rate, profit factor, net R, drawdown in R) are pure trade statistics: they do not depend on risk, coin weights or the short-size factor. The combined R columns add all selected coins' trades at 1R each.</li>
+<li>Dollar and percent figures run one account through time: each trade's size is its coin's risk % of the balance at entry (× the short-size factor for shorts); a trade's result is size × R at its exit. The worst-case drawdown counts every open trade not yet at breakeven as lost at its stop. No cap on total open risk (the bot has none; at the default settings all four open at once risk about 5%).</li>
+<li>A win is a trade closed above +0.2R, a loss below −0.2R, the rest are breakeven exits (the stop was moved to the entry at +1.5R).</li>
+<li>Honest caveats: the rules were tuned on BTC 2020–26, DOGE and ADA were picked after seeing 2020–23, and the coin weights and short size were chosen after seeing all years, so the full-history figures are optimistic. The 2024–26 period is the best guide; expect live results somewhat below it. In a test with 200 random-entry versions of the same rules, the real entries beat all 200 in both 2020–23 and 2024–26.</li>
+</ul>
+</div>
+<script>
+const D=/*DATA*/null;
+const COINS=D.coins,CV=['--btc','--eth','--doge','--ada'];
+const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
+const PERIODS=[['All (Mar 2020 – Sep 2026)',M(2020,2),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,2),Y(2024)]];
+let S={on:[1,1,1,1],per:0,risk:D.risk.slice(),smult:D.smult,start:500,scale:'log',which:-1};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const money=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:Math.abs(v)>=1000?0:2,minimumFractionDigits:Math.abs(v)>=1000?0:2});
+const pct=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+const sgn=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d);
+const cls=v=>v>0?'pos':v<0?'neg':'';
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+
+// ── one account trading the selected coins (same algorithm as the Python reference) ──
+function sim(on,risk,smult,start,t0,t1){
+ const tr=D.trades.filter(t=>on[t[0]]&&t[1]>=t0&&t[1]<t1);
+ const ev=[];tr.forEach((t,i)=>{ev.push([t[1],1,i],[Math.max(t[3],t[1]+1),0,i],[Math.max(t[2],t[1]+2),2,i]);});
+ ev.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+ let eq=start,open=new Map(),pkw=start,ddw=0,pkc=start,ddc=0;const curve=[[t0,start,start]],pnl=new Array(tr.length).fill(0);
+ for(const [t,k,i] of ev){const x=tr[i];
+  if(k===1){open.set(i,{a:risk[x[0]]/100*(x[4]<0?smult:1)*eq,be:false});}
+  else if(k===0){const o=open.get(i);if(o)o.be=true;}
+  else{const o=open.get(i);if(o){pnl[i]=o.a*x[5];eq+=pnl[i];open.delete(i);}}
+  let w=eq;for(const o of open.values())if(!o.be)w-=o.a;
+  pkw=Math.max(pkw,w);ddw=Math.max(ddw,1-w/pkw);pkc=Math.max(pkc,eq);ddc=Math.max(ddc,1-eq/pkc);curve.push([t,eq,w]);}
+ return {tr,pnl,curve,final:eq,ddw:ddw*100,ddc:ddc*100};}
+window.__sim=(on,risk,smult,start,t0,t1)=>{const r=sim(on,risk,smult,start,t0,t1);return {final:Math.round(r.final*100)/100,ddw:Math.round(r.ddw*100)/100,ddc:Math.round(r.ddc*100)/100,trades:r.tr.length};};
+
+function rstats(tr){const R=tr.map(t=>t[5]),n=R.length;if(!n)return null;
+ const w=R.filter(r=>r>0.2),l=R.filter(r=>r<-0.2),be=n-w.length-l.length,pos=R.filter(r=>r>0).reduce((a,b)=>a+b,0),neg=-R.filter(r=>r<0).reduce((a,b)=>a+b,0);
+ const ord=tr.slice().sort((a,b)=>a[2]-b[2]);let c=0,pk=0,dd=0,st=0,mx=0;for(const t of ord){c+=t[5];pk=Math.max(pk,c);dd=Math.max(dd,pk-c);if(t[5]<-0.2){st++;mx=Math.max(mx,st);}else if(t[5]>0.2)st=0;}
+ return {n,long:tr.filter(t=>t[4]>0).length,short:tr.filter(t=>t[4]<0).length,win:w.length/n*100,be:be/n*100,loss:l.length/n*100,
+  avgw:w.length?w.reduce((a,b)=>a+b,0)/w.length:0,avgl:l.length?l.reduce((a,b)=>a+b,0)/l.length:0,pf:neg?pos/neg:0,net:R.reduce((a,b)=>a+b,0),avg:R.reduce((a,b)=>a+b,0)/n,dd,streak:mx,hold:tr.reduce((a,t)=>a+t[6],0)/n};}
+function monthly(res,t0,t1,start){const out=[];let d=new Date(t0),prev=start,k=0;const cv=res.curve;let pk=start;
+ while(d.getTime()<t1){const a=d.getTime(),nd=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1)),b=nd.getTime();
+  while(k<cv.length&&cv[k][0]<b)k++;const end=cv[Math.max(0,k-1)][1];pk=Math.max(pk,end);
+  const trs=res.tr.map((t,i)=>[t,res.pnl[i]]).filter(([t])=>t[2]>=a&&t[2]<b);
+  out.push({a,start:prev,end,pct:(end/prev-1)*100,n:trs.length,w:trs.filter(([t])=>t[5]>0.2).length,l:trs.filter(([t])=>t[5]<-0.2).length,dd:(end/pk-1)*100});prev=end;d=nd;}
+ return out;}
+function acct(on,t0,t1){const res=sim(on,S.risk,S.smult,S.start,t0,t1),mo=monthly(res,t0,t1,S.start),months=mo.length,pos=mo.filter(m=>m.pct>0).length;
+ const days=[];let k=0,best=S.start,gap=0,last=t0;for(const [t,e] of res.curve){if(e>=best){gap=Math.max(gap,(t-last)/864e5);best=e;last=t;}}gap=Math.max(gap,(t1-last)/864e5);
+ return {res,mo,months,pos,ret:(res.final/S.start-1)*100,mavg:(Math.pow(res.final/S.start,1/months)-1)*100,ann:(Math.pow(res.final/S.start,12/months)-1)*100,
+  best:Math.max(...mo.map(m=>m.pct)),worst:Math.min(...mo.map(m=>m.pct)),flat:gap};}
+
+// ── controls ──
+function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}">${t}</button>`).join('');
+ e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
+function controls(){
+ seg('coins',COINS.map((c,i)=>`<span class="coinbtn"><i style="background:var(${CV[i]})"></i>${c}</span>`),i=>!!S.on[i],i=>{S.on[i]=S.on[i]?0:1;if(!S.on.some(Boolean))S.on[i]=1;});
+ seg('periods',PERIODS.map(p=>p[0]),i=>i===S.per,i=>S.per=i);
+ seg('scale',['Balance, log scale','Balance, linear'],i=>(i===0)===(S.scale==='log'),i=>S.scale=i?'lin':'log');
+ seg('which',['Combined'].concat(COINS),i=>i-1===S.which,i=>S.which=i-1);
+ const r=document.getElementById('risks');
+ r.innerHTML=COINS.map((c,i)=>`<label class="risk">${c} risk per trade (%)<input type="number" step="0.125" min="0.05" max="5" value="${S.risk[i]}" data-i="${i}"></label>`).join('')+
+  `<label class="risk" title="Shorts are sized at this fraction of the coin's risk (bot: short_risk_mult)">Short size ×<input type="number" step="0.25" min="0" max="1" value="${S.smult}" id="sm"></label>`+
+  `<label class="risk">Starting balance ($)<input type="number" step="100" min="100" value="${S.start}" id="sb"></label>`;
+ r.querySelectorAll('input[data-i]').forEach(e=>e.onchange=()=>{const v=parseFloat(e.value);if(v>0){S.risk[+e.dataset.i]=v;draw();}});
+ document.getElementById('sm').onchange=e=>{const v=parseFloat(e.target.value);if(v>=0&&v<=1){S.smult=v;draw();}};
+ document.getElementById('sb').onchange=e=>{const v=parseFloat(e.target.value);if(v>0){S.start=v;draw();}};}
+
+// ── drawing ──
+function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.map((c,i)=>i).filter(i=>on[i]);
+ const C0=acct(on,t0,t1),single=sel.map(i=>({i,a:acct(COINS.map((c,j)=>j===i?1:0),t0,t1)}));
+ const tr=C0.res.tr,rs=rstats(tr);
+ document.getElementById('headline').innerHTML=[
+  [money(C0.res.final),`balance from ${money(S.start)} (${pct(C0.ret,0)})`],[pct(C0.mavg,2),`average per month · ${pct(C0.ann,0)} a year`],
+  [`${C0.pos} of ${C0.months}`,`months positive · best ${pct(C0.best)} · worst ${pct(C0.worst)}`],[pct(-C0.res.ddw),`worst drawdown (closed balance ${pct(-C0.res.ddc)})`],
+  [(rs?rs.n/C0.months:0).toFixed(1),`trades per month · ${rs?rs.n:0} in total`],[rs?rs.win.toFixed(1)+'%':'-',`winning trades · ${rs?rs.be.toFixed(0):0}% breakeven · ${rs?rs.loss.toFixed(0):0}% losses`]]
+  .map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+ document.getElementById('caveat').innerHTML=t0<Y(2024)?`<b>Read with care:</b> this period includes the 2020–21 crypto boom and settings chosen with hindsight, and compounding turns that into very large numbers. Live results will be much lower. The <b>2024 – Sep 2026</b> view (fresh ${money(S.start)}) is the best guide.`:`This period was not used to design the rules or pick the coins; it is the most honest view. Expect live results somewhat below it.`;
+ // equity chart
+ const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=360,L=64,R=58,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const series=[{k:'comb',name:'Combined account',col:css('--comb'),cv:C0.res.curve,w:2.5}].concat(single.map(s=>({k:COINS[s.i],name:COINS[s.i]+' alone',col:css(CV[s.i]),cv:s.a.res.curve,w:1.5})));
+ const vals=series.flatMap(s=>s.cv.map(p=>p[1])),mn=Math.min(...vals),mx=Math.max(...vals),lg=S.scale==='log';
+ const lo=lg?Math.log10(mn*0.9):0,hi=lg?Math.log10(mx*1.1):mx*1.05,x=t=>L+(t-t0)/(t1-t0)*(W-L-R),y=v=>T+(1-((lg?Math.log10(v):v)-lo)/(hi-lo))*(H-T-B);
+ let ticks=[];if(lg){for(let e=1;e<=8;e++)for(const m of[1,2,5]){const v=m*10**e;if(v>=mn*0.9&&v<=mx*1.1)ticks.push(v);}}else{const st=Math.pow(10,Math.floor(Math.log10(hi/4)));const s2=hi/st>20?st*5:hi/st>8?st*2:st;for(let v=0;v<=hi;v+=s2)ticks.push(v);}
+ for(const v of ticks){el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--rule')},sv);el('text',{x:L-8,y:y(v)+4,'text-anchor':'end'},sv).textContent=money(v).replace('.00','');}
+ for(let yy=new Date(t0).getUTCFullYear()+1;Y(yy)<t1;yy++){el('line',{x1:x(Y(yy)),x2:x(Y(yy)),y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:x(Y(yy)),y:H-6,'text-anchor':'middle'},sv).textContent=yy;}
+ const step=(cv)=>{let d='';let px=null;for(const p of cv){const X=x(p[0]).toFixed(1),Yv=y(p[1]).toFixed(1);d+=px===null?`M${X},${Yv}`:`H${X}V${Yv}`;px=X;}d+=`H${x(t1).toFixed(1)}`;return d;};
+ for(const s of series.slice().reverse()){el('path',{d:step(s.cv),fill:'none',stroke:s.col,'stroke-width':s.w,'stroke-linejoin':'round'},sv);}
+ const ends=series.map(s=>({s,yv:y(s.cv[s.cv.length-1][1])})).sort((a,b)=>a.yv-b.yv);let lastY=-99;for(const e of ends){const yy=Math.max(e.yv+4,lastY+14);lastY=yy;el('text',{x:W-R+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='comb'?700:500}`},sv).textContent=e.s.k==='comb'?'All':e.s.k;}
+ document.getElementById('legend').innerHTML=series.map(s=>`<span><i style="background:${s.col};height:${s.k==='comb'?4:3}px"></i>${s.name}</span>`).join('');
+ document.getElementById('eqcap').textContent=`${lab}. "Alone" lines: the same coin traded on its own ${money(S.start)} account at its risk, for comparison. Closed-trade balance; hover for values.`;
+ const hl=el('line',{y1:T,y2:H-B,stroke:css('--muted'),'stroke-dasharray':'3 3',visibility:'hidden'},sv),tip=document.getElementById('tip');
+ const at=(cv,t)=>{let a=0,b=cv.length-1;while(a<b){const m=(a+b+1)>>1;if(cv[m][0]<=t)a=m;else b=m-1;}return cv[a];};
+ sv.onmousemove=ev=>{const rc=sv.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width);if(px<L||px>W-R){tip.style.display='none';hl.setAttribute('visibility','hidden');return;}
+  const t=t0+(px-L)/(W-L-R)*(t1-t0);hl.setAttribute('x1',px);hl.setAttribute('x2',px);hl.setAttribute('visibility','visible');
+  tip.innerHTML=`<div style="color:var(--muted);margin-bottom:3px">${new Date(t).toISOString().slice(0,10)}</div>`+series.map(s=>`<div class="r"><span><span class="dot" style="background:${s.col}"></span>${s.k==='comb'?'Combined':s.k+' alone'}</span><b>${money(at(s.cv,t)[1])}</b></div>`).join('');
+  tip.style.display='block';const pr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-pr.left+14;if(lx>pr.width-230)lx=ev.clientX-pr.left-230;tip.style.left=lx+'px';tip.style.top=(ev.clientY-pr.top+10)+'px';};
+ sv.onmouseleave=()=>{tip.style.display='none';hl.setAttribute('visibility','hidden');};
+ // drawdown chart (worst case, combined)
+ const dv=document.getElementById('dd');dv.innerHTML='';const DH=150;dv.setAttribute('viewBox',`0 0 ${W} ${DH}`);
+ let pk=S.start;const dds=C0.res.curve.map(p=>{pk=Math.max(pk,p[2]);return [p[0],(p[2]/pk-1)*100];});const md=Math.min(-10,...dds.map(p=>p[1])),ylo=Math.floor(md/10)*10,yd=v=>6+(v/ylo)*(DH-6-22);
+ for(let v=0;v>=ylo;v-=10){el('line',{x1:L,x2:W-R,y1:yd(v),y2:yd(v),stroke:css('--rule')},dv);el('text',{x:L-8,y:yd(v)+4,'text-anchor':'end'},dv).textContent=v+'%';}
+ let dpath='';dds.forEach((p,i)=>{dpath+=(i?'L':'M')+x(p[0]).toFixed(1)+','+yd(p[1]).toFixed(1);});el('path',{d:dpath,fill:'none',stroke:css('--neg'),'stroke-width':1.5},dv);
+ // stats table: combined + each coin alone
+ const cols=[{name:'Combined',a:C0,tr}].concat(single.map(s=>({name:COINS[s.i]+' alone',a:s.a,tr:s.a.res.tr,i:s.i})));
+ const rr=cols.map(c=>rstats(c.tr));
+ const row=(lab,f)=>`<tr><td>${lab}</td>${cols.map((c,j)=>`<td>${rr[j]?f(rr[j],c.a):'-'}</td>`).join('')}</tr>`;
+ document.getElementById('periodnote').textContent=`${lab}: ${C0.months} months. Risk per trade: ${sel.map(i=>COINS[i]+' '+S.risk[i]+'%').join(', ')}; shorts × ${S.smult}; start ${money(S.start)}.`;
+ document.getElementById('stats').innerHTML=`<thead><tr><th></th>${cols.map(c=>`<th>${c.i===undefined?c.name:`<span class="dot" style="background:var(${CV[c.i]})"></span>${c.name}`}</th>`).join('')}</tr></thead><tbody>`+
+  row('Trades',r=>r.n)+row('Trades per month',(r,a)=>(r.n/a.months).toFixed(1))+row('Longs / shorts',r=>`${r.long} / ${r.short}`)+
+  row('Win rate (closed above +0.2R)',r=>r.win.toFixed(1)+'%')+row('Breakeven exits',r=>r.be.toFixed(1)+'%')+row('Losses',r=>r.loss.toFixed(1)+'%')+
+  row('Average win / average loss',r=>`${sgn(r.avgw,2)}R / ${sgn(r.avgl,2)}R`)+row('Profit factor',r=>r.pf.toFixed(2))+
+  row('Net result',r=>`<span class="${cls(r.net)}">${sgn(r.net,1)}R</span>`)+row('Average per trade',r=>sgn(r.avg,3)+'R')+
+  row('Max drawdown (R, closed trades)',r=>r.dd.toFixed(1)+'R')+row('Net result ÷ max drawdown',r=>(r.net/r.dd).toFixed(2))+
+  row('Longest losing streak (breakevens in between ignored)',r=>r.streak)+row('Average holding time',r=>(r.hold/24).toFixed(1)+' days')+
+  row('Profitable months',(r,a)=>`${a.pos} of ${a.months}`)+row('Best / worst month',(r,a)=>`${pct(a.best)} / ${pct(a.worst)}`)+
+  row('Return at your risk',(r,a)=>`<span class="${cls(a.ret)}">${pct(a.ret,0)}</span> (${money(a.res.final)})`)+row('Average per month (compounded)',(r,a)=>pct(a.mavg,2))+
+  row('Annualised return',(r,a)=>pct(a.ann,0))+row('Max drawdown at your risk (worst case)',(r,a)=>pct(-a.res.ddw))+row('Max drawdown (closed balance)',(r,a)=>pct(-a.res.ddc))+
+  row('Longest time without a new high',(r,a)=>Math.round(a.flat)+' days')+'</tbody>';
+ // across periods
+ const onW=S.which<0?on:COINS.map((c,j)=>j===S.which?1:0);
+ document.getElementById('across').innerHTML='<thead><tr><th>Period</th><th>Trades</th><th>Per month</th><th>Win rate</th><th>Profit factor</th><th>Net R</th><th>Return at your risk</th><th>Per month</th><th>Max drawdown</th><th>Months positive</th></tr></thead><tbody>'+
+  PERIODS.map(([pl,a,b])=>{const A=acct(onW,a,b),r=rstats(A.res.tr);return r?`<tr><td>${pl}</td><td>${r.n}</td><td>${(r.n/A.months).toFixed(1)}</td><td>${r.win.toFixed(1)}%</td><td>${r.pf.toFixed(2)}</td><td class="${cls(r.net)}">${sgn(r.net,1)}R</td><td class="${cls(A.ret)}">${pct(A.ret,0)}</td><td>${pct(A.mavg,2)}</td><td>${pct(-A.res.ddw)}</td><td>${A.pos} of ${A.months}</td></tr>`:'';}).join('')+'</tbody>';
+ // years (full history, independent of the period buttons)
+ const yrs=[2020,2021,2022,2023,2024,2025,2026];
+ document.getElementById('years').innerHTML=`<thead><tr><th>Year</th>${sel.map(i=>`<th><span class="dot" style="background:var(${CV[i]})"></span>${COINS[i]} R</th><th>win %</th>`).join('')}<th>Combined R</th><th>Combined account</th><th>Max drawdown</th></tr></thead><tbody>`+
+  yrs.map(yy=>{const a=yy===2020?M(2020,2):Y(yy),b=yy===2026?M(2026,9):Y(yy+1),A=acct(on,a,b);
+   const cells=sel.map(i=>{const r=rstats(D.trades.filter(t=>t[0]===i&&t[1]>=a&&t[1]<b));return r?`<td class="${cls(r.net)}">${sgn(r.net,1)}</td><td>${r.win.toFixed(0)}%</td>`:'<td>-</td><td>-</td>';}).join('');
+   const rc=rstats(A.res.tr);return `<tr><td>${yy}${yy===2020?' (from Mar)':yy===2026?' (to Sep)':''}</td>${cells}<td class="${cls(rc?rc.net:0)}">${rc?sgn(rc.net,1):'-'}</td><td class="${cls(A.ret)}">${pct(A.ret,0)}</td><td>${pct(-A.res.ddw)}</td></tr>`;}).join('')+'</tbody>';
+ // months
+ let mh='<thead><tr><th>Month</th><th>Start</th><th>End</th><th>Change</th><th>Return</th><th>Trades closed</th><th>Wins / losses</th><th>From peak</th></tr></thead><tbody>',ly='';
+ for(const m of C0.mo){const yy=new Date(m.a).getUTCFullYear();if(yy!==ly){const ms=C0.mo.filter(q=>new Date(q.a).getUTCFullYear()===yy);const s0=ms[0].start,e0=ms[ms.length-1].end;
+   mh+=`<tr class="yr"><td>${yy}</td><td>${money(s0)}</td><td>${money(e0)}</td><td class="${cls(e0-s0)}">${money(e0-s0)}</td><td class="${cls(e0-s0)}">${pct((e0/s0-1)*100)}</td><td>${ms.reduce((a,q)=>a+q.n,0)}</td><td></td><td></td></tr>`;ly=yy;}
+  mh+=`<tr><td>${new Date(m.a).toISOString().slice(0,7)}</td><td>${money(m.start)}</td><td>${money(m.end)}</td><td class="${cls(m.end-m.start)}">${money(m.end-m.start)}</td><td class="${cls(m.pct)}">${pct(m.pct)}</td><td>${m.n}</td><td>${m.w} / ${m.l}</td><td>${pct(m.dd)}</td></tr>`;}
+ document.getElementById('months').innerHTML=mh+'</tbody>';}
+
+// ── static sections ──
+const st=D.strat;
+document.getElementById('specs').innerHTML=`
+<div class="spec"><h3>The trading rules (same for all four coins)</h3><p class="hint" style="margin:0">Trend breakout on 4-hour candles: wait for price to break out of its last ~3 days' range in the direction of the daily trend, then let the winners run for up to 5 days.</p><dl>
+<dt>Trend filter</dt><dd>Longs only while the last daily close is above the daily EMA${st.ema_n} <b>and</b> the EMA is higher than ${st.slope_d} days ago; shorts only when below and falling. Otherwise no orders.</dd>
+<dt>Don't chase</dt><dd>No new order while the daily close is more than ${st.max_ext} daily ATRs away from the EMA${st.ema_n}.</dd>
+<dt>Entry</dt><dd>At every 4-hour close (00, 04, 08, 12, 16, 20 UTC) while flat: a stop order at the highest high (long) or lowest low (short) of the last ${st.n} closed 4-hour candles. Valid until the next 4-hour close, then moved to the new level.</dd>
+<dt>Weekends</dt><dd>No new orders on Saturday or Sunday (UTC).</dd>
+<dt>Stop-loss</dt><dd>${st.sl_atr} × ATR${st.atr_n} of the 4-hour candles from the fill price, placed on Binance right after the fill.</dd>
+<dt>Breakeven</dt><dd>Once price has gone ${st.be_R}R in favour, the stop moves to the entry price.</dd>
+<dt>Exit</dt><dd>Stop, breakeven stop, or closed ${st.max_hold_h / 24} days (${st.max_hold_h} h) after the fill. No take-profit.</dd>
+<dt>Positions</dt><dd>One position per coin at a time; the coins trade independently.</dd></dl></div>
+<div class="spec"><h3>Position size</h3><p class="hint" style="margin:0">Each trade risks a fixed share of the account: if the stop is hit, you lose that share.</p><dl>
+<dt>Risk per trade</dt><dd>${COINS.map((c,i)=>`${c} ${D.risk[i]}%`).join(' · ')} of the balance (BTC weighted 2×, ETH 1×, DOGE and ADA ½×: BTC is the steadiest coin)</dd>
+<dt>Shorts</dt><dd>× ${D.smult} of that (shorts earn about a quarter of what longs earn on every coin)</dd>
+<dt>Size formula</dt><dd>quantity = balance × risk % ÷ stop distance, rounded down to Binance's step size</dd>
+<dt>Leverage</dt><dd>${D.maxlev}× set per coin (cap on one position's size); typical position 0.5–2× the balance; all four open at once risk about 5% of the account</dd>
+<dt>Expect</dt><dd>About 19 trades a month in total; ~1 in 6 is a winner, ~3 in 10 end at breakeven, the rest are small losses. About 2 big trades a month pay for everything.</dd></dl></div>
+<div class="spec"><h3>How the bot runs</h3><p class="hint" style="margin:0">One small Python process per coin (<code>cryptobot/bot.py config_xxx.json</code>), talking to Binance USD-M futures through its REST API.</p><dl>
+<dt>Every 5 s</dt><dd>Checks the position. A new fill gets its stop-loss at once; the breakeven move and the 5-day exit are checked from 1-minute candles.</dd>
+<dt>Every 4 h</dt><dd>After each 4-hour close: downloads 1,000 4-hour and 500 daily candles, decides, cancels the old entry order and places the new one.</dd>
+<dt>Orders</dt><dd>Conditional orders (entry stops, stop-losses) go through Binance's Algo Order API, triggered on the last price, like the backtest. Only orders whose id starts with "tbo" are touched.</dd>
+<dt>Restarts</dt><dd>The position always comes from Binance; a missing stop-loss is re-placed; a 4-hour close missed while off is handled when it comes back. State is in <code>state_COIN.json</code>, logs in <code>cryptobot/logs/</code>.</dd>
+<dt>Checks</dt><dd>The bot's code was replayed on 6 years of history against a simulated exchange and matched the backtest trade for trade (within 1 minute).</dd>
+<dt>Account</dt><dd>One-way position mode, cross margin; API key with futures only (no withdrawals), IP-restricted. Do not trade these coins by hand on the same account.</dd></dl></div>`;
+document.getElementById('settings').innerHTML='<thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead><tbody>'+[
+ ['risk_pct',COINS.map((c,i)=>`${c} ${D.risk[i]}`).join(' · '),'% of the balance lost if the stop is hit'],['short_risk_mult',D.smult,'shorts trade at this fraction of the risk'],
+ ['max_leverage',D.maxlev,'per-position notional cap and the leverage set on Binance'],['tf_min',st.tf_min,'candle size in minutes (4 hours)'],
+ ['n',st.n,'breakout channel: last n closed 4-hour candles'],['atr_n',st.atr_n,'ATR length for the stop'],['sl_atr',st.sl_atr,'stop distance in ATRs'],
+ ['ema_n',st.ema_n,'daily trend EMA'],['slope_d',st.slope_d,'EMA must rise / fall over this many days'],['max_ext',st.max_ext,'skip when more than this many daily ATRs from the EMA'],
+ ['no_weekend',st.no_weekend,'no new orders Sat / Sun'],['be_R',st.be_R,'move the stop to entry at this profit (in R)'],['be_off',st.be_off,'where the breakeven stop goes (0 = exactly the entry)'],
+ ['max_hold_h',st.max_hold_h,'close after this many hours'],['trail_m / trail_atr',`${st.trail_m} / ${st.trail_atr}`,'trailing exit: off'],['sides',st.sides,'long and short']]
+ .map(r=>`<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td style="text-align:left">${r[2]}</td></tr>`).join('')+'</tbody>';
+draw();addEventListener('resize',()=>draw());matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>draw());
+</script></body></html>
