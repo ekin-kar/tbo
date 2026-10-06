@@ -27,6 +27,7 @@ def resample(m1, tf, shift=0):
     return _rs(key, tf, shift)
 
 MKT, STP = E.MARKET, E.STOP
+E.Orders.SLOTS = 3                                  # slot 2: anticipation market orders
 
 
 def _ema_daily_side(m1, d, ema_n, at_idx):
@@ -44,7 +45,8 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                      trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
                      vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0,
                      early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
-                     er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0):
+                     er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0,
+                     antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -146,6 +148,36 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         sl_l = np.clip(hi + buf - sw_lo + 0.1 * a, 0.5 * a, 2.5 * a)
         sl_s = np.clip(sw_hi - (lo - buf) + 0.1 * a, 0.5 * a, 2.5 * a)
     tp_l = tp_R * sl_l if tp_R > 0 else np.zeros(len(a)); tp_s = tp_R * sl_s if tp_R > 0 else np.zeros(len(a))
+    if antic_d > 0:                                    # ANTICIPATION: enter at market before the level breaks
+        cl_ = c["c"]; h_ = c["h"]; l_ = c["l"]; v_ = c["v"]
+        r14 = I.rsi_wilder(cl_, 14)
+        obv = np.cumsum(np.sign(np.r_[0, np.diff(cl_)]) * v_)
+        obv_hi = I.rolling_max(obv, 20); obv_lo = I.rolling_min(obv, 20)
+        import pandas as pd
+        vb = pd.Series(v_).rolling(3).mean().to_numpy() / pd.Series(v_).rolling(20).mean().to_numpy()
+        lows_up = (pd.Series(l_).rolling(5).min() > pd.Series(l_).shift(5).rolling(5).min()).to_numpy()
+        highs_dn = (pd.Series(h_).rolling(5).max() < pd.Series(h_).shift(5).rolling(5).max()).to_numpy()
+        dl = (hi - cl_) / a; ds = (cl_ - lo) / a
+        def cond(sd):
+            if antic_cond == "none":
+                return np.ones(len(cl_), bool)
+            if antic_cond in ("rsi60", "rsi70"):
+                th = float(antic_cond[3:]); return (r14 >= th) if sd > 0 else (100 - r14 >= th)
+            if antic_cond == "obv_hl":
+                return ((obv >= obv_hi) & lows_up) if sd > 0 else ((obv <= obv_lo) & highs_dn)
+            if antic_cond == "volb":
+                return vb > 1.3
+            if antic_cond == "rsi60_volb":
+                return ((r14 >= 60) if sd > 0 else (r14 <= 40)) & (vb > 1.3)
+            raise ValueError(antic_cond)
+        sla = (antic_sl if antic_sl > 0 else sl_atr) * a
+        tpa = tp_R * sla if tp_R > 0 else np.zeros(len(a))
+        ml = ok & (tside > 0) & (dl > 0) & (dl <= antic_d) & cond(1)
+        ms = ok & (tside < 0) & (ds > 0) & (ds <= antic_d) & cond(-1) if sides == "both" else np.zeros(len(a), bool)
+        o.place(act[ml], MKT, 1, sla[ml], tpa[ml], slot=2)
+        o.place(act[ms], MKT, -1, sla[ms], tpa[ms], slot=2)
+        if antic_only:
+            return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker")
     if retest_h > 0:                                   # breakout happened in candle k -> limit back at the broken level
         prev_hi = np.r_[np.nan, hi[:-1]]; prev_lo = np.r_[np.nan, lo[:-1]]
         bl = ok & (tside >= 0) & (c["h"] > prev_hi) & (c["c"] > prev_hi) if sides in ("both", "long") else np.zeros(len(a), bool)
