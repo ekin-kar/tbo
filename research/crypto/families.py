@@ -46,7 +46,8 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                      vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0,
                      early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
                      er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0,
-                     antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0):
+                     antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0,
+                     trail_after_h=0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -204,7 +205,7 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
             o.place(act[m], STP, -1, sl_s[m], tp_s[m], price=(lo - buf)[m], expiry_min=tf, slot=1)
     return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker",
                trail_k=trail_k, trail_start=trail_start, early_bars=int(early_h * 60), early_R=early_R,
-               ext_bars=int(ext_h * 60), ext_R=ext_R)
+               ext_bars=int(ext_h * 60), ext_R=ext_R, trail_after=int(trail_after_h * 60))
 
 
 def vol_breakout(m1, k=0.5, sl_k=0.5, tp_R=0.0, hold_h=24, ema_n=0, start_min=0, sides="both"):

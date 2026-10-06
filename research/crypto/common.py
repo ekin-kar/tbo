@@ -61,7 +61,8 @@ def run(m1, orders, fee=None, funding=None, entry="taker", tp="taker", pad=0.000
                     orders.exit_short, D.day_index(m1["t"]), kw.get("max_trades_day", 0), kw.get("max_bars", 0),
                     np.zeros(n), m1["o"] * pad, kw.get("group_size", 0), kw.get("miss_if_crossed", False),
                     kw.get("be_R", 0.0), kw.get("be_off", 0.0), kw.get("trail_k", 0.0), kw.get("trail_start", 0.0),
-                    kw.get("early_bars", 0), kw.get("early_R", 0.0), kw.get("ext_bars", 0), kw.get("ext_R", 0.0))
+                    kw.get("early_bars", 0), kw.get("early_R", 0.0), kw.get("ext_bars", 0), kw.get("ext_R", 0.0),
+                    kw.get("trail_after", 0))
     e_idx, x_idx, dirs, e_px, x_px, dist, reason = res
     tr = pd.DataFrame({"entry_time": D.to_datetime(m1["t"][e_idx]), "exit_time": D.to_datetime(m1["t"][x_idx]),
                        "dir": dirs, "entry": e_px, "exit": x_px, "sl_dist": dist,

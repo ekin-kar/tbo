@@ -13,7 +13,7 @@ def _simulate(t, o, h, l, c,
               kind2, direction2, price2, sl_d2, tp_d2, expiry2,
               allow_entry, allow_fill, force_exit, exit_long, exit_short,
               day_id, max_trades_day, max_bars, spread_arr, limit_pad_arr, group_size, miss_if_crossed, be_R=0.0, be_off=0.0,
-              trail_k=0.0, trail_start=0.0, early_bars=0, early_R=0.0, ext_bars=0, ext_R=0.0):
+              trail_k=0.0, trail_start=0.0, early_bars=0, early_R=0.0, ext_bars=0, ext_R=0.0, trail_after=0):
     n = len(t)
     nslot = kind2.shape[1]
     cap = int((kind2 != 0).sum()) + 1
@@ -177,7 +177,7 @@ def _simulate(t, o, h, l, c,
             else:
                 if be_R > 0 and h[j] - entry_price >= be_R * dist and sl < entry_price + be_off * dist:
                     sl = entry_price + be_off * dist      # breakeven: effective from the next bar
-                if trail_k > 0 and h[j] - entry_price >= trail_start * dist:
+                if trail_k > 0 and h[j] - entry_price >= trail_start * dist and j - entry_i >= trail_after:
                     nsl = h[j] - trail_k * dist           # trailing stop: best price - trail_k x initial risk
                     if nsl > sl:
                         sl = nsl
@@ -199,7 +199,7 @@ def _simulate(t, o, h, l, c,
             else:
                 if be_R > 0 and entry_price - (l[j] + spread) >= be_R * dist and sl > entry_price - be_off * dist:
                     sl = entry_price - be_off * dist
-                if trail_k > 0 and entry_price - (l[j] + spread) >= trail_start * dist:
+                if trail_k > 0 and entry_price - (l[j] + spread) >= trail_start * dist and j - entry_i >= trail_after:
                     nsl = l[j] + spread + trail_k * dist
                     if nsl < sl:
                         sl = nsl
