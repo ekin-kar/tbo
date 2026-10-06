@@ -15,6 +15,9 @@ GRIDS = {
                                hold_h=[4, 24], trend_n=[0, 50])),
     "sq": (G4.squeeze, dict(tf=[5, 15], n=[20], bb_k=[2.0], kc_k=[1.5, 2.0], brk=[10, 20], sl_atr=[1.0, 2.0],
                             tp_R=[1.5, 3.0], hold_h=[4, 24], trend_n=[0, 50])),
+    "retest": (G4.ema_retest, dict(tf=[5, 15], fast=[9], slow=[21, 50], htf=[60, 240], sl_atr=[0.75, 1.5],
+                                   stop_tf=[60], tp_R=[1.0, 2.0, 4.0], hold_h=[6, 24], retest=["slow", "fast"],
+                                   exit_cross=[True, False], offset_atr=[0.0, 0.25])),
     "chan": (G2.intraday_channel, dict(tf=[5, 15], n=[20, 50, 100], sl_atr=[1.5, 3.0], tp_R=[0, 2, 4], hold_h=[4, 24],
                                        ema_n=[0, 50])),
 }
@@ -31,7 +34,7 @@ def one(args):
         return dict(sym=sym, **kw, trades=len(tr), R=np.nan, gross=np.nan, MAR=np.nan, yrs=0)
     r = tr.R.to_numpy(); eq = np.cumsum(r); dd = (np.maximum.accumulate(np.r_[0, eq])[1:] - eq).max()
     y = tr.groupby(tr.entry_time.dt.year).R.sum()
-    return dict(sym=sym, **kw, trades=len(tr), per_day=round(len(tr) / 1400, 2), win=round((r > 0).mean() * 100),
+    return dict(sym=sym, **kw, trades=len(tr), per_wk=round(len(tr) / 200, 1), win=round((r > 0).mean() * 100),
                 R=round(r.sum(), 1), gross=round(tr.R_gross.sum(), 1), avgR=round(r.mean(), 3),
                 MAR=round(r.sum() / 3.83 / max(dd, 3), 2), yrs=int((y > 0).sum()))
 

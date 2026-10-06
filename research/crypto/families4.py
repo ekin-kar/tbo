@@ -99,3 +99,43 @@ def squeeze(m1, tf=15, n=20, bb_k=2.0, kc_k=1.5, brk=20, sl_atr=1.5, tp_R=2.0, h
     m = ok & (side >= 0); o.place(act[m], STP, 1, sl[m], tp[m], price=hi[m], expiry_min=tf, slot=0)
     m = ok & (side <= 0); o.place(act[m], STP, -1, sl[m], tp[m], price=lo[m], expiry_min=tf, slot=1)
     return run(m1, o, max_bars=int(hold_h * 60), tp="maker")
+
+
+def ema_retest(m1, tf=5, fast=9, slow=21, htf=60, htf_ema=50, htf_slope=3, sl_atr=1.0, stop_tf=60, tp_R=2.0,
+               hold_h=12, retest="slow", exit_cross=True, hours=None, offset_atr=0.0):
+    """Intraday trend pullback ('EMA retest'):
+       trend  : htf candles - close above EMA(htf_ema) AND that EMA rising over htf_slope candles -> longs only
+                (mirror for shorts); otherwise no orders.
+       setup  : on tf candles EMA(fast) > EMA(slow) (long) / < (short).
+       entry  : resting LIMIT at the slow (or fast) EMA - offset_atr*ATR(stop_tf), re-placed every tf candle (maker).
+       stop   : sl_atr x ATR14 of stop_tf candles; TP = tp_R x stop (maker); exit at a tf close if the EMAs cross back.
+       hours  : optional (start, end) UTC hours in which orders may be placed."""
+    c = resample(m1, tf)
+    ef = I.ema(c["c"], fast); es = I.ema(c["c"], slow)
+    act = c["act"]; n1 = len(m1["t"])
+    H = resample(m1, htf)
+    he = I.ema(H["c"], htf_ema)
+    hside = np.where((H["c"] > he) & (he > np.r_[np.full(htf_slope, np.nan), he[:-htf_slope]]), 1,
+                     np.where((H["c"] < he) & (he < np.r_[np.full(htf_slope, np.nan), he[:-htf_slope]]), -1, 0))
+    kh = np.searchsorted(H["act"], act, side="right") - 1
+    side = np.where(kh >= 3 * htf_ema, hside[np.clip(kh, 0, None)], 0)
+    S = resample(m1, stop_tf)
+    sa = I.atr(S["h"], S["l"], S["c"], 14)
+    ks = np.clip(np.searchsorted(S["act"], act, side="right") - 1, 0, None)
+    a = sa[ks]
+    ok = np.isfinite(a) & (a > 0) & (act < n1) & (np.arange(len(act)) > 3 * slow)
+    if hours is not None:
+        hr = ((c["t"] + tf) % 1440) // 60
+        ok &= (hr >= hours[0]) & (hr < hours[1])
+    lvl = es if retest == "slow" else ef
+    o = E.Orders(m1)
+    sl = sl_atr * a; tp = tp_R * sl
+    m = ok & (side > 0) & (ef > es) & (c["c"] > lvl)          # limit below the market
+    o.place(act[m], LIM, 1, sl[m], tp[m], price=(lvl - offset_atr * a)[m], expiry_min=tf, slot=0)
+    m = ok & (side < 0) & (ef < es) & (c["c"] < lvl)
+    o.place(act[m], LIM, -1, sl[m], tp[m], price=(lvl + offset_atr * a)[m], expiry_min=tf, slot=1)
+    if exit_cross:
+        good = act < n1
+        o.exit_long[act[good & (ef < es)]] = True
+        o.exit_short[act[good & (ef > es)]] = True
+    return run(m1, o, max_bars=int(hold_h * 60), entry="maker", tp="maker")
