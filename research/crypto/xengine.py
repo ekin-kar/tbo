@@ -12,7 +12,8 @@ from engine.engine import R_SL, R_TP, R_SIGNAL, R_FORCED, R_TIME, R_END, MARKET,
 def _simulate(t, o, h, l, c,
               kind2, direction2, price2, sl_d2, tp_d2, expiry2,
               allow_entry, allow_fill, force_exit, exit_long, exit_short,
-              day_id, max_trades_day, max_bars, spread_arr, limit_pad_arr, group_size, miss_if_crossed, be_R=0.0, be_off=0.0):
+              day_id, max_trades_day, max_bars, spread_arr, limit_pad_arr, group_size, miss_if_crossed, be_R=0.0, be_off=0.0,
+              trail_k=0.0, trail_start=0.0):
     n = len(t)
     nslot = kind2.shape[1]
     cap = int((kind2 != 0).sum()) + 1
@@ -162,8 +163,13 @@ def _simulate(t, o, h, l, c,
                 e_px[k] = entry_price; x_px[k] = px
                 sl_dist[k] = dist; reason[k] = why; k += 1
                 pos = 0
-            elif be_R > 0 and h[j] - entry_price >= be_R * dist and sl < entry_price + be_off * dist:
-                sl = entry_price + be_off * dist          # breakeven: effective from the next bar
+            else:
+                if be_R > 0 and h[j] - entry_price >= be_R * dist and sl < entry_price + be_off * dist:
+                    sl = entry_price + be_off * dist      # breakeven: effective from the next bar
+                if trail_k > 0 and h[j] - entry_price >= trail_start * dist:
+                    nsl = h[j] - trail_k * dist           # trailing stop: best price - trail_k x initial risk
+                    if nsl > sl:
+                        sl = nsl
         elif pos == -1:
             px = 0.0; why = 0
             if ask_o >= sl and not opened_at_open:
@@ -179,8 +185,13 @@ def _simulate(t, o, h, l, c,
                 e_px[k] = entry_price; x_px[k] = px
                 sl_dist[k] = dist; reason[k] = why; k += 1
                 pos = 0
-            elif be_R > 0 and entry_price - (l[j] + spread) >= be_R * dist and sl > entry_price - be_off * dist:
-                sl = entry_price - be_off * dist
+            else:
+                if be_R > 0 and entry_price - (l[j] + spread) >= be_R * dist and sl > entry_price - be_off * dist:
+                    sl = entry_price - be_off * dist
+                if trail_k > 0 and entry_price - (l[j] + spread) >= trail_start * dist:
+                    nsl = l[j] + spread + trail_k * dist
+                    if nsl < sl:
+                        sl = nsl
 
     if pos != 0:
         e_idx[k] = entry_i; x_idx[k] = n - 1; dirs[k] = pos

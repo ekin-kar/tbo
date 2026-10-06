@@ -81,6 +81,15 @@ gross R 181.7 (bot) vs 178.8 (backtest): the differences are fills whose stop th
 fill minute (pessimistic), while the bot's stop goes on a few seconds later.
 Run: `python cryptobot/bot.py cryptobot/config_eth.json` (a second process next to the BTC one).
 
+## Trailing stops vs the 5-day close (Oct 2026, `research/crypto/trail_scan.py`)
+
+Tested on BTC and ETH: intrabar trailing stops 1-8R behind the best price (starting at +1.5/3/5R, max hold
+5/10/20 days), 4h-close chandelier trails (6/12/24 candles, 2-4 ATR) and longer holds alone (110 variants).
+None beats the 5-day close: tight trails (1-4R) cut the trend trades that dip mid-move; an 8R trail ties
+(BTC -9R, ETH +18R); longer holds add drawdown (ETH 28% -> 41% at 2%); the yearly walk-forward choice did
+worse than the 5-day close on both coins. Trades that reach the 5-day close keep 71% of their best point
+on average (best +10R, exit +7R). Kept: no trailing stop.
+
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
