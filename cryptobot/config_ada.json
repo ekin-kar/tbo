@@ -1,0 +1,22 @@
+{
+  "risk_pct": 0.5,
+  "max_leverage": 5,
+  "poll_s": 5,
+  "strategy": {
+    "symbol": "ADAUSDT",
+    "tf_min": 240,
+    "n": 20,
+    "atr_n": 14,
+    "sl_atr": 1.0,
+    "ema_n": 50,
+    "trail_m": 0,
+    "trail_atr": 0.0,
+    "max_hold_h": 120,
+    "sides": "both",
+    "slope_d": 5,
+    "no_weekend": true,
+    "be_R": 1.5,
+    "be_off": 0.0,
+    "max_ext": 4.0
+  }
+}

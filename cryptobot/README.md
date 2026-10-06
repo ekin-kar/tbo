@@ -90,6 +90,27 @@ None beats the 5-day close: tight trails (1-4R) cut the trend trades that dip mi
 worse than the 5-day close on both coins. Trades that reach the 5-day close keep 71% of their best point
 on average (best +10R, exit +7R). Kept: no trailing stop.
 
+## More coins (Oct 2026): `research/crypto/portfolio*.py`
+
+TBO v2.1 untouched on 12 coins (alts charged 0.03% slippage per taker fill): all 12 positive in 2020-23, 9 of 12 in
+2024-26 (LINK, LTC, DOT negative); trade results correlate only 0.21 between coins on average. But more coins did
+NOT give a better return per drawdown: on 2024-26 (coins chosen on 2020-23 only), in R units:
+
+| set | trades/week | return/DD 2024-26 | longest flat |
+|---|---|---|---|
+| BTC+ETH | 2.1 | 3.13 | 175 d |
+| **BTC+ETH+DOGE+ADA** (2020-23 return/DD >= 1) | 4.3 | 2.50 | 122 d |
+| top 6 by 2020-23 return/DD | 6.5 | 2.34 | 224 d |
+| all 12 | 13.6 | 1.34 | 421 d |
+
+One $1,000 account (risk per trade, 3% open-risk cap, drawdown on 'all open trades stopped' basis):
+- 2020-03..2026-09: BTC+ETH 1% each 4.9%/month, DD 25%; BTC+ETH+DOGE+ADA 0.6% each 5.3%/month, DD 25%,
+  months positive 59% vs 55%, worst month -12%.
+- 2024-01..2026-09 only: BTC+ETH 1% 4.4%/month DD 20%; 4 coins 0.6% 4.0%/month DD 22%, longest flat 156 d vs 296 d.
+With 4 coins at 0.5-0.6% the 3% cap never binds, so the bot runs one process per coin with no shared state.
+Configs: `config_btc.json`, `config_eth.json`, `config_doge.json`, `config_ada.json` (set the same risk_pct in all four).
+Parity: `replay.py DOGEUSDT` 334/335 from 2021 (2020 differences = DOGE's warm-up after listing), ADA 348/348.
+
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
