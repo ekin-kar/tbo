@@ -22,7 +22,7 @@ if __name__ == "__main__":
     out = {}
     for share in (0.12, 0.25):
         with Pool(4) as p:
-            res = p.map(job, [(s, sd, share) for sd in range(40) for s in FT.COINS])
+            res = p.map(job, chunksize=30, iterable= [(s, sd, share) for s in FT.COINS for sd in range(30)])
         by = {}
         for sd, sh, x in res:
             by.setdefault(sd, []).append(x)

@@ -49,10 +49,15 @@ FILTERS = {
 }
 
 
+_DATA = {}
+
+
 def job(args):
     sym, fname = args
     C.SLIP = 0.0001 if sym in ("BTCUSDT", "ETHUSDT") else 0.0003
-    m = C.load(sym)
+    if sym not in _DATA:
+        _DATA[sym] = C.load(sym)
+    m = _DATA[sym]
     x = C.between(F.channel_breakout(m, **dict(V21, skip_fn=FILTERS[fname])), "2020-03-01", "2026-10-01").copy()
     e = X.idx(m, x.entry_time); xi = X.idx(m, x.exit_time)
     be = X.first_reach(m["h"], m["l"], e, xi, x.dir.to_numpy(), x.entry.to_numpy(), x.sl_dist.to_numpy(), V21["be_R"])
