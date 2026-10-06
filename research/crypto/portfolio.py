@@ -29,7 +29,7 @@ def trades(args):
     return sym, slip, x[["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours"]]
 
 
-def simulate(T, risk=0.004, cap=0.03, dir_cap=99, start=A, end=B, eq0=1000.0, short_mult=1.0):
+def simulate(T, risk=0.004, cap=0.03, dir_cap=99, start=A, end=B, eq0=1000.0, short_mult=1.0, weights=None):
     """Event simulation over all coins' trades. Returns daily curve (closed equity, worst-case equity), taken trades."""
     tr = T[(T.entry_time >= start) & (T.entry_time < end)].sort_values("entry_time").reset_index(drop=True)
     ev = []
@@ -46,7 +46,7 @@ def simulate(T, risk=0.004, cap=0.03, dir_cap=99, start=A, end=B, eq0=1000.0, sh
                 continue
             at_risk = sum(v["amt"] for v in open_.values() if not v["be"])
             same = sum(1 for v in open_.values() if v["dir"] == tr.dir[i])
-            amt = risk * eq * (short_mult if tr.dir[i] < 0 else 1.0)
+            amt = risk * eq * (short_mult if tr.dir[i] < 0 else 1.0) * (weights[tr.sym[i]] if weights else 1.0)
             if at_risk + amt > cap * eq or same >= dir_cap:
                 continue
             open_[i] = dict(amt=amt, be=False, dir=tr.dir[i]); taken.append(i)

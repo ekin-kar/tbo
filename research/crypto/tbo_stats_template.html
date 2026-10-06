@@ -94,7 +94,7 @@ const D=/*DATA*/null;
 const COINS=D.coins,CV=['--btc','--eth','--doge','--ada'];
 const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
 const PERIODS=[['All (Mar 2020 – Sep 2026)',M(2020,2),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,2),Y(2024)]];
-let S={on:[1,1,1,1],per:0,risk:D.risk.slice(),smult:D.smult,start:500,scale:'log',which:-1};
+let S={on:[1,1,1,1],per:0,risk:D.risk.slice(),smult:D.smult,start:200,scale:'log',which:-1};
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const money=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:Math.abs(v)>=1000?0:2,minimumFractionDigits:Math.abs(v)>=1000?0:2});
 const pct=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';

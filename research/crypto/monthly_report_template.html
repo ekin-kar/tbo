@@ -29,9 +29,9 @@ tr.yr td{background:var(--row);font-weight:600}
 .kv{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:13px}.kv div:nth-child(odd){color:var(--text-secondary)}.kv div:nth-child(even){text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .months{max-height:520px;overflow:auto}.note{color:var(--text-secondary);font-size:12px;margin-top:6px}
 </style></head><body><div class="wrap">
-<h1>TBO v2.2 backtest: monthly report</h1>
-<p class="sub">BTC + ETH + DOGE + ADA on one $1,000 account · 0.75% risk per long, 0.375% per short · 3% cap on open risk · fees, slippage and funding included</p>
-<div class="bar"><span>Start</span><button data-s="2020" aria-pressed="true">Mar 2020 (full history)</button><button data-s="2024">Jan 2024 (fresh $1,000, unseen period)</button></div>
+<h1>TBO backtest: monthly report</h1>
+<p class="sub" id="sub"></p>
+<div class="bar"><span>Start</span><button data-s="2020" aria-pressed="true">Mar 2020 (full history)</button><button data-s="2024">Jan 2024 (fresh start, unseen period)</button></div>
 <div class="tiles" id="tiles"></div>
 <div class="grid2">
  <div class="card"><h2>Balance at each month end ($, log scale)</h2><svg id="bal" height="240"></svg><div class="tip" id="tip1"></div></div>
@@ -54,10 +54,11 @@ const $=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString(undefined,{maximumFractio
 const pct=v=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+'%';
 function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function tip(t,html,ev,svg){const r=svg.parentNode.getBoundingClientRect();t.innerHTML=html;t.style.display='block';let x=ev.clientX-r.left+12;if(x>r.width-170)x=ev.clientX-r.left-170;t.style.left=x+'px';t.style.top=(ev.clientY-r.top+8)+'px';}
-function draw(){const D=DATA[S],s=D.summary,rows=D.rows;
+function draw(){const D=DATA[S],s=D.summary,rows=D.rows,cf=DATA.cfg;
+ document.getElementById('sub').textContent=`BTC + ETH + DOGE + ADA on one ${$(cf.start)} account · risk per trade ${Object.entries(cf.risks).map(([c,r])=>c+' '+r+'%').join(', ')} (shorts × ${cf.smult}) · the bot's current settings · fees, slippage and funding included`;
  const tile=(k,v,m)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="m">${m}</div></div>`;
  document.getElementById('tiles').innerHTML=
-  tile('Final balance',$(s.final),`from $1,000 · ${pct(s.total)} total`)+
+  tile('Final balance',$(s.final),`from ${$(s.start)} · ${pct(s.total)} total`)+
   tile('Average per month',pct(s.mavg),`median month ${pct(s.mmed)} · ${pct(s.cagr)} a year`)+
   tile('Positive months',`${s.mpos} of ${s.mn}`,`best ${pct(s.mbest)} · worst ${pct(s.mworst)}`)+
   tile('Worst drawdown',pct(s.ddw),`closed trades ${pct(s.ddc)} · longest flat ${s.flat} days`)+
@@ -65,11 +66,11 @@ function draw(){const D=DATA[S],s=D.summary,rows=D.rows;
   tile('Winning trades',`${s.winp}%`,`${s.bep}% breakeven · ${s.lossp}% losses`);
  // balance chart
  const b=document.getElementById('bal');b.innerHTML='';const W=b.clientWidth,H=240,L=54,R=10,T=8,B=22;b.setAttribute('viewBox',`0 0 ${W} ${H}`);
- const vals=rows.map(r=>r.end).concat([1000]),lo=Math.log10(Math.min(...vals)*0.9),hi=Math.log10(Math.max(...vals)*1.1);
+ const vals=rows.map(r=>r.end).concat([D.summary.start]),lo=Math.log10(Math.min(...vals)*0.9),hi=Math.log10(Math.max(...vals)*1.1);
  const x=i=>L+(i+0.5)/rows.length*(W-L-R),y=v=>T+(1-(Math.log10(v)-lo)/(hi-lo))*(H-T-B);
- for(let e=2;e<=7;e++)for(const m of[1,2,5]){const v=m*10**e;if(v<10**lo||v>10**hi)continue;el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--grid')},b);el('text',{x:L-6,y:y(v)+4,'text-anchor':'end'},b).textContent=v>=1000?'$'+(v/1000)+'k':'$'+v;}
+ for(let e=1;e<=8;e++)for(const m of[1,2,5]){const v=m*10**e;if(v<10**lo||v>10**hi)continue;el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--grid')},b);el('text',{x:L-6,y:y(v)+4,'text-anchor':'end'},b).textContent=v>=1000?'$'+(v/1000)+'k':'$'+v;}
  rows.forEach((r,i)=>{if(r.month.endsWith('-01')){el('text',{x:x(i),y:H-6,'text-anchor':'middle'},b).textContent=r.month.slice(0,4);}});
- let d='M'+L+','+y(1000);rows.forEach((r,i)=>{d+=`L${x(i).toFixed(1)},${y(r.end).toFixed(1)}`;});
+ let d='M'+L+','+y(D.summary.start);rows.forEach((r,i)=>{d+=`L${x(i).toFixed(1)},${y(r.end).toFixed(1)}`;});
  el('path',{d,fill:'none',stroke:css('--s1'),'stroke-width':2,'stroke-linejoin':'round'},b);
  const dot=el('circle',{r:4.5,fill:css('--s1'),stroke:css('--surface-1'),'stroke-width':2,visibility:'hidden'},b);
  const t1=document.getElementById('tip1');
@@ -98,7 +99,7 @@ function draw(){const D=DATA[S],s=D.summary,rows=D.rows;
   ['Longest losing run (breakevens in between not counted as breaks)',s.streak+' losses'],['Average holding time',(s.hold/24).toFixed(1)+' days'],['Longest time without a new high',s.flat+' days'],['Worst drawdown (all open trades stopped)',pct(s.ddw)],['Worst drawdown (closed trades)',pct(s.ddc)]];
  document.getElementById('kv').innerHTML=kv.map(([k,v])=>`<div>${k}</div><div>${v}</div>`).join('');
  document.getElementById('coins').innerHTML='<tr><th>Coin</th><th>Trades</th><th>Win %</th><th>Profit</th><th>R</th><th>Best trade</th></tr>'+D.coins.map(c=>`<tr><td>${c.coin}</td><td>${c.trades}</td><td>${c.winp}%</td><td>${$(c.pnl)}</td><td>${c.R>0?'+':''}${c.R}</td><td>${$(c.best)}</td></tr>`).join('');
- document.getElementById('ls').innerHTML=`<tr><th>Side</th><th>Trades</th><th>Profit</th></tr><tr><td>Long (0.75% risk)</td><td>${s.longn}</td><td>${$(s.longpnl)}</td></tr><tr><td>Short (0.375% risk)</td><td>${s.shortn}</td><td>${$(s.shortpnl)}</td></tr>`;
+ document.getElementById('ls').innerHTML=`<tr><th>Side</th><th>Trades</th><th>Profit</th></tr><tr><td>Long</td><td>${s.longn}</td><td>${$(s.longpnl)}</td></tr><tr><td>Short (half size)</td><td>${s.shortn}</td><td>${$(s.shortpnl)}</td></tr>`;
  document.getElementById('tops').innerHTML='<tr><th>Entry date</th><th>Coin</th><th>Side</th><th>Result (R)</th><th>Profit</th><th>Held (days)</th></tr>'+D.tops.map(t=>`<tr><td>${t.date}</td><td>${t.coin}</td><td>${t.side}</td><td>+${t.R}</td><td>${$(t.pnl)}</td><td>${t.days}</td></tr>`).join('');}
 document.querySelectorAll('.bar button').forEach(b=>b.onclick=()=>{S=b.dataset.s;document.querySelectorAll('.bar button').forEach(x=>x.setAttribute('aria-pressed',x===b));draw();});
 addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);draw();
