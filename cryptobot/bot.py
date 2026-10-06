@@ -27,7 +27,7 @@ sys.path.insert(0, str(HERE))
 import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 
-VERSION = "2.0"
+VERSION = "2.1"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -150,7 +150,7 @@ class Bot:
             return False
         h, l, c = [k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4]
         weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
-        dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday)
+        dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday, [k[2] for k in k1], [k[3] for k in k1])
         amt, entry_px = self.x.position(self.sym)
         log.info(f"4h close {utc(open_ms + 4 * 3600_000)}: close {c[-1]:.2f}  ATR {dec.atr:.2f}  trend "
                  f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"

@@ -1,4 +1,4 @@
-# TBO v2: BTCUSDT trend-breakout bot (Binance USD-M futures)
+# TBO v2.1: BTCUSDT trend-breakout bot (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -7,6 +7,7 @@
 | | |
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
+| Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
@@ -29,6 +30,17 @@ trail, EMA slope, weekend skip, breakeven); `wf_eval.py` does an **anchored walk
 - Rejected: "halve risk after a -3R/-5R drawdown" (worse than simply a lower risk: losing streaks come right
   before the big trend trades), top-K averaging (small gain, needs several positions), trailing exits on ETH.
 
+## Round 3 tuning (v2.1, Oct 2026): `research/crypto/wf2.py`, `ext_check.py`
+
+- Stage A, 2,592 core settings around v2 (channel 15-30, stop 0.75-1.25 ATR, breakeven 1-3R / +0.2R, hold
+  72-168 h, EMA 30-75, slope 3-10 days): v2 is the best setting on all data AND the peak of every single
+  parameter; re-picking every year on this finer grid did worse out of sample (1.9%/month vs v2's) ->
+  finer tuning only fits noise. Core unchanged.
+- Stage B, filters on v2: take profit 5R/8R, breakout buffer, 200-day trend, volatility percentile, weekend
+  trading all worse; volume filter worse. **Distance from the daily EMA50 <= 4 daily ATR** helps: smooth
+  plateau 4-5 ATR, walk-forward picked it 3 of 5 years, and on ETH (untouched) return/DD 1.59 -> 1.85.
+  BTC 2020-26: +255R DD 13.1R -> +269R DD 12.2R (2% risk: 5.2 -> 5.6%/month in-sample, DD 24 -> 22%).
+
 ## Backtest of v2 (fees: 0.05% taker + 0.01% slippage on stop/market fills, funding 0.01%/8h)
 
 | BTCUSDT 2020-03..2026-09 | Trades | PF | Net | Max DD | Longs / shorts |
@@ -44,10 +56,10 @@ at 2% risk, with drawdowns up to 25-30%, and losing months (about 4 in 10).**
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
-  windows the bot downloads) vs the research engine: v2 375 / 375 trades (2020-09..2026-09), same minute, same prices.
+  windows the bot downloads) vs the research engine: v2.1 347 / 347 trades (2020-09..2026-09), same minute, same prices.
 - `python cryptobot/test_bot_sim.py BTCUSDT 2021-01-01 2026-09-30` - **`bot.py` itself** driven by a simulated
-  exchange on 1m history (v2): 353 vs 354 trades, 351 on the same minute, entry price within 1 tick, gross R
-  225.3 vs 224.9. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
+  exchange on 1m history (v2.1): 327 vs 328 trades, 326 on the same minute, entry price within 1 tick, gross R
+  234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
 
 ## Running it

@@ -6,6 +6,7 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
                (shorts only if sides == "both"). With slope_d > 0 the EMA must also be rising (longs) /
                falling (shorts) versus slope_d days earlier, otherwise no order.
   Weekend    : no_weekend -> no new orders placed on Saturday / Sunday (UTC).
+  Stretch    : no new order while the daily close is more than max_ext x daily ATR14 away from the daily EMA.
   Entry      : at each 4h candle close, while flat: a stop order at the highest high of the last `n`
                closed 4h candles (long) / lowest low (short). The order lives until the next 4h close,
                where it is cancelled and re-placed at the new level.
@@ -39,6 +40,7 @@ class Params:
     no_weekend: bool = True
     be_R: float = 1.5
     be_off: float = 0.0
+    max_ext: float = 4.0         # in daily ATR14 from the daily EMA; 99 = off
 
     def to_dict(self):
         return asdict(self)
@@ -90,15 +92,19 @@ class Decision:
     trend: int
 
 
-def decide(p: Params, h, l, c, daily_close, weekday=0) -> Decision:
+def decide(p: Params, h, l, c, daily_close, weekday=0, daily_high=None, daily_low=None) -> Decision:
     """h, l, c: CLOSED 4h candles, oldest first (the last one has just closed).
-    weekday: UTC weekday (Mon=0) of the moment the order is placed (= the candle's close)."""
+    daily_*: CLOSED daily candles. weekday: UTC weekday (Mon=0) of the moment the order is placed."""
     h, l, c = (np.asarray(v, float) for v in (h, l, c))
     a = atr(h, l, c, p.atr_n)[-1]
     hi = h[-p.n:].max()
     lo = l[-p.n:].min()
     side = trend_side(daily_close, p.ema_n, p.slope_d)
     ok = len(c) > max(p.n, 3 * p.atr_n) and np.isfinite(a) and a > 0 and not (p.no_weekend and weekday >= 5)
+    if ok and p.max_ext < 99 and daily_high is not None and len(daily_close) > p.ema_n:
+        dc = np.asarray(daily_close, float)
+        ad = atr(daily_high, daily_low, dc, 14)[-1]
+        ok = bool(abs(dc[-1] - ema(dc, p.ema_n)[-1]) <= p.max_ext * ad)
     long_t = hi if ok and side >= 0 and side != 0 else None
     short_t = lo if ok and side <= 0 and side != 0 and p.sides == "both" else None
     hh = h[-p.trail_m:].max() if p.trail_m > 0 else np.inf

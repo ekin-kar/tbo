@@ -37,7 +37,8 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE):
         sl_ = slice(k - LIVE_4H_CANDLES + 1, k + 1)
         nd = np.searchsorted(d1["act"], j0, side="right")  # daily candles closed by now
         wd = int(((c4["t"][k] + p.tf_min) // 1440 + 3) % 7)
-        dec = S.decide(p, c4["h"][sl_], c4["l"][sl_], c4["c"][sl_], d1["c"][max(0, nd - LIVE_1D_CANDLES):nd], wd)
+        ds = slice(max(0, nd - LIVE_1D_CANDLES), nd)
+        dec = S.decide(p, c4["h"][sl_], c4["l"][sl_], c4["c"][sl_], d1["c"][ds], wd, d1["h"][ds], d1["l"][ds])
 
         def close(j, px, why):
             nonlocal pos
@@ -102,7 +103,8 @@ if __name__ == "__main__":
     live = replay(m, p, start, end)
     eng = C.between(F.channel_breakout(m, tf=p.tf_min, n=p.n, sl_atr=p.sl_atr, hold_h=p.max_hold_h, ema_n=p.ema_n,
                                        atr_n=p.atr_n, sides=p.sides, trail_m=p.trail_m, trail_atr=p.trail_atr,
-                                       slope_d=p.slope_d, no_weekend=p.no_weekend, be_R=p.be_R, be_off=p.be_off),
+                                       slope_d=p.slope_d, no_weekend=p.no_weekend, be_R=p.be_R, be_off=p.be_off,
+                                       max_ext=p.max_ext),
                     start, end)
     a = live.set_index("entry_time"); b = eng.set_index("entry_time")
     both = a.join(b, how="inner", lsuffix="_live", rsuffix="_eng")

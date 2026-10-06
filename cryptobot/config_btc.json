@@ -16,6 +16,7 @@
     "slope_d": 5,
     "no_weekend": true,
     "be_R": 1.5,
-    "be_off": 0.0
+    "be_off": 0.0,
+    "max_ext": 4.0
   }
 }
