@@ -125,6 +125,17 @@ months positive 62%, worst month -11%; 2024-26 alone 4.5%/month, DD 20% (vs 0.6%
 Configs: all four at `risk_pct` 0.75, `short_risk_mult` 0.5. Note: BTCUSDT quantities step 0.001 BTC, so on a
 $1k account BTC positions round down (shorts ~20% smaller than intended); DOGE/ADA have fine steps.
 
+## Coin weights and risk for a $500 account (Oct 2026): `research/crypto/weights.py`, `risk_mc.py`
+
+BTC is the steadiest coin in both periods (return/DD 4.83 | 3.78), DOGE/ADA the bumpiest. Weights BTC 2x, ETH 1x,
+DOGE 0.5x, ADA 0.5x: 4-coin return/DD 4.31 | 4.44 vs equal weights 3.64 | 3.11 (2020-23 | 2024-26).
+Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 start), base risk = 1x coin:
+1.25% (BTC 2.5%): P(hit $100) 0.01%, P(< $250) 2.4%, max drop typical 37% / 1-in-20 58%, $1k typically in 8 months.
+1.5%: P(< $250) 5%, 1-in-20 drop 65%. Above 1.5% the bad cases stop improving (volatility drag).
+**Configs now: BTC 2.5%, ETH 1.25%, DOGE 0.625%, ADA 0.625% (shorts half).** With all four open: up to ~5% of
+equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
+The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
+
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
