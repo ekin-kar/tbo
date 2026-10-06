@@ -6,8 +6,15 @@ import common as C, families as F
 from wf2 import V21
 
 COINS = ["BTCUSDT", "ETHUSDT", "DOGEUSDT", "ADAUSDT"]
-GRID = dict(n=[15, 20, 30, 40], sl_atr=[0.75, 1.0, 1.25, 1.5], be_R=[0.0, 1.0, 1.5, 2.0], hold_h=[72, 120, 168],
-            ema_n=[30, 50, 100], slope_d=[0, 5, 10])
+GRIDS = {
+    "wide": dict(n=[15, 20, 30, 40], sl_atr=[0.75, 1.0, 1.25, 1.5], be_R=[0.0, 1.0, 1.5, 2.0], hold_h=[72, 120, 168],
+                 ema_n=[30, 50, 100], slope_d=[0, 5, 10]),
+    "quality": dict(n=[20, 30, 35, 40, 45, 50, 60], sl_atr=[1.0, 1.25, 1.5], be_R=[1.0, 1.5, 2.0], hold_h=[120, 168],
+                    ema_n=[50, 75, 100, 150], slope_d=[0, 5, 10]),
+}
+import os
+GNAME = os.environ.get("PGRID", "wide")
+GRID = GRIDS[GNAME]
 DATA = {}
 
 
@@ -30,5 +37,5 @@ if __name__ == "__main__":
             out[(s, i)] = tr
             if k % 500 == 0:
                 print(k, "of", len(jobs), round(time.time() - t0), "s", flush=True)
-    pickle.dump(dict(cfgs=cfgs, trades=out), open(C.D.CACHE / "portfolio_grid.pkl", "wb"))
+    pickle.dump(dict(cfgs=cfgs, trades=out), open(C.D.CACHE / ("portfolio_grid.pkl" if GNAME == "wide" else f"portfolio_grid_{GNAME}.pkl"), "wb"))
     print("saved", len(out), round(time.time() - t0), "s")
