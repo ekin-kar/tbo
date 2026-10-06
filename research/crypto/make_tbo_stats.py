@@ -41,7 +41,7 @@ def ref_sim(on, risks, smult, start_bal, t0, t1):
 if __name__ == "__main__":
     data = dict(trades=rows, coins=[s[:-4] for s in COINS],
                 risk=[cfg[s]["risk_pct"] for s in COINS], smult=cfg["BTCUSDT"]["short_risk_mult"],
-                strat=cfg["BTCUSDT"]["strategy"], maxlev=cfg["BTCUSDT"]["max_leverage"])
+                strat=cfg["BTCUSDT"]["strategy"], maxlev=cfg["BTCUSDT"]["max_leverage"], exlev=cfg["BTCUSDT"].get("exchange_leverage", cfg["BTCUSDT"]["max_leverage"]))
     html = open(ROOT / "research" / "crypto" / "tbo_stats_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
     (ROOT / "cryptobot" / "tbo_statistics.html").write_text(html)
     (ROOT / "stats" / "tbo_crypto_statistics.html").write_text(html)
