@@ -60,7 +60,7 @@ total_risk = 0.0; total_notional = 0.0
 for c in cfgs:
     p = S.Params(**c["strategy"]); sym = p.symbol; risk = c["risk_pct"] / 100; sm = c.get("short_risk_mult", 1.0)
     total_risk += risk
-    print(f" {sym}: risk {c['risk_pct']}% (shorts x{sm}), max leverage {c.get('max_leverage')}")
+    print(f" {sym}: risk {c['risk_pct']}% (shorts x{sm}), size cap {c.get('max_leverage')}x balance, Binance leverage {c.get('exchange_leverage', c.get('max_leverage'))}x")
     try:
         f = x.exchange_info(sym); res(f["status"] == "TRADING", f"{sym} listed and trading")
         k4 = [k for k in x.klines(sym, "4h", 1001) if k[5] < x.now_ms()][-1000:]
