@@ -27,7 +27,7 @@ sys.path.insert(0, str(HERE))
 import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 
-VERSION = "2.1"
+VERSION = "2.2"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -52,6 +52,7 @@ class Bot:
         self.p = S.Params(**cfg["strategy"])
         self.sym = self.p.symbol
         self.risk = float(cfg["risk_pct"]) / 100
+        self.short_mult = float(cfg.get("short_risk_mult", 1.0))   # shorts earn less: trade them smaller
         self.max_lev = float(cfg.get("max_leverage", 3))
         self.poll = float(cfg.get("poll_s", 5))
         self.state_path = path.parent / f"state_{self.sym}{'_testnet' if testnet else ''}.json"
@@ -96,9 +97,9 @@ class Bot:
         except BinanceError as e:
             log.info(f"cancel {algo_id}: {e.msg} (already gone)")
 
-    def size(self, sl_dist, price):
+    def size(self, sl_dist, price, side=1):
         eq = self.equity()
-        qty = eq * self.risk / sl_dist
+        qty = eq * self.risk * (self.short_mult if side < 0 else 1.0) / sl_dist
         qty = min(qty, eq * self.max_lev / price, self.f["mkt_max"])
         qty = floor_step(qty, max(self.f["step"], self.f["mkt_step"]))
         if qty < self.f["min_qty"] or qty * price < self.f["min_notional"]:
@@ -173,7 +174,7 @@ class Bot:
                 if trig is None:
                     continue
                 trig = math.ceil(trig / self.f["tick"]) * self.f["tick"] if side == 1 else floor_step(trig, self.f["tick"])
-                qty = self.size(dec.sl_dist, trig)
+                qty = self.size(dec.sl_dist, trig, side)
                 if qty <= 0:
                     continue
                 log.info(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
@@ -274,7 +275,7 @@ class Bot:
             self.x.set_leverage(self.sym, max(1, math.ceil(self.max_lev)))
         eq = self.equity()
         log.info(f"TBO v{VERSION} {self.sym} {'DRY RUN ' if self.dry else ''}on {self.x.base} | equity {eq:.2f} USDT | "
-                 f"risk {self.risk * 100:.2f}% | max leverage {self.max_lev} | {self.p.to_dict()}")
+                 f"risk {self.risk * 100:.2f}% (shorts x{self.short_mult}) | max leverage {self.max_lev} | {self.p.to_dict()}")
         tf_ms = self.p.tf_min * 60_000
         while True:
             try:

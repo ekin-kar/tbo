@@ -1,4 +1,4 @@
-# TBO v2.1: BTCUSDT trend-breakout bot (Binance USD-M futures)
+# TBO v2.2: trend-breakout bot (BTC, ETH, DOGE, ADA) (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -110,6 +110,20 @@ One $1,000 account (risk per trade, 3% open-risk cap, drawdown on 'all open trad
 With 4 coins at 0.5-0.6% the 3% cap never binds, so the bot runs one process per coin with no shared state.
 Configs: `config_btc.json`, `config_eth.json`, `config_doge.json`, `config_ada.json` (set the same risk_pct in all four).
 Parity: `replay.py DOGEUSDT` 334/335 from 2021 (2020 differences = DOGE's warm-up after listing), ADA 348/348.
+
+## Winners vs losers (Oct 2026): `research/crypto/trade_features.py`, `sizing_rules.py` -> v2.2
+
+1,474 trades of BTC/ETH/DOGE/ADA compared by the conditions when the order was placed (hour, weekday, volatility,
+channel width, level age, EMA distance/slope, volume, move into the breakout, previous trade, BTC agreement, side).
+Consistent in 2020-23 AND 2024-26 on all 4 coins: shorts earn ~+0.2R vs longs ~+0.8-1.1R; trades in 'wild' weeks
+(7d/90d vol >= 0.87) and in very steep trends earn little. Hour, weekday, volume, previous result: noise.
+Tested as sizing (4-coin portfolio, return/DD 2020-23 | 2024-26): v2.1 3.15 | 2.60; **shorts at half size
+3.58 | 3.20** (the only rule better in both periods); half size when wild 3.00-3.14 | 2.55-2.85; half size when steep
+2.97 | 3.10; skip wild 3.14 | 1.71.
+**v2.2 = v2.1 + `short_risk_mult` 0.5.** $1,000, 4 coins, 0.75% longs / 0.375% shorts: 2020-26 6.0%/month, DD 27%,
+months positive 62%, worst month -11%; 2024-26 alone 4.5%/month, DD 20% (vs 0.6% full-size shorts: 4.0%, DD 22%).
+Configs: all four at `risk_pct` 0.75, `short_risk_mult` 0.5. Note: BTCUSDT quantities step 0.001 BTC, so on a
+$1k account BTC positions round down (shorts ~20% smaller than intended); DOGE/ADA have fine steps.
 
 ## Parity tests
 

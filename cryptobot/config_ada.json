@@ -1,5 +1,6 @@
 {
-  "risk_pct": 0.5,
+  "risk_pct": 0.75,
+  "short_risk_mult": 0.5,
   "max_leverage": 5,
   "poll_s": 5,
   "strategy": {

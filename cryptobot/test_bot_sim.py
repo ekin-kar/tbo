@@ -134,7 +134,7 @@ def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     bot.cfg, bot.dry = cfg, False
     bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.02; bot.max_lev = 5; bot.poll = 0
     bot.state_path = Path("/tmp/claude_tbo_sim_state.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
-    bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
+    bot.short_mult = 1.0; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))
     tf_ms = 240 * 60_000
     for j in range(j0, j1):
