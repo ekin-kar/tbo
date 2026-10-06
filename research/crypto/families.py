@@ -44,13 +44,17 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                      trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
                      vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0,
                      early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
-                     er_n=0, er_min=0.0, co_m1=None, entry_mask=None):
+                     er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
     same count and side mix (filters kept)."""
     c = resample(m1, tf)
     hi = I.rolling_max(c["h"], n); lo = I.rolling_min(c["l"], n); a = I.atr(c["h"], c["l"], c["c"], atr_n)
+    if atr_tf and atr_tf != tf:                        # stop sized from ATR of atr_tf candles (last closed one)
+        ca = resample(m1, atr_tf); aa = I.atr(ca["h"], ca["l"], ca["c"], atr_n)
+        ka = np.searchsorted(ca["act"], c["act"], side="right") - 1
+        a = np.where(ka >= 0, aa[np.clip(ka, 0, None)], np.nan)
     act = c["act"]
     ok = (~np.isnan(hi)) & (~np.isnan(a)) & (np.arange(len(act)) > max(n, 3 * atr_n)) & (act < len(m1["t"]))
     d = resample(m1, 1440)
@@ -142,6 +146,14 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         sl_l = np.clip(hi + buf - sw_lo + 0.1 * a, 0.5 * a, 2.5 * a)
         sl_s = np.clip(sw_hi - (lo - buf) + 0.1 * a, 0.5 * a, 2.5 * a)
     tp_l = tp_R * sl_l if tp_R > 0 else np.zeros(len(a)); tp_s = tp_R * sl_s if tp_R > 0 else np.zeros(len(a))
+    if retest_h > 0:                                   # breakout happened in candle k -> limit back at the broken level
+        prev_hi = np.r_[np.nan, hi[:-1]]; prev_lo = np.r_[np.nan, lo[:-1]]
+        bl = ok & (tside >= 0) & (c["h"] > prev_hi) & (c["c"] > prev_hi) if sides in ("both", "long") else np.zeros(len(a), bool)
+        bs = ok & (tside <= 0) & (c["l"] < prev_lo) & (c["c"] < prev_lo) if sides in ("both", "short") else np.zeros(len(a), bool)
+        o.place(act[bl], E.LIMIT, 1, sl_l[bl], tp_l[bl], price=(prev_hi + retest_off * a)[bl], expiry_min=int(retest_h * 60), slot=0)
+        o.place(act[bs], E.LIMIT, -1, sl_s[bs], tp_s[bs], price=(prev_lo - retest_off * a)[bs], expiry_min=int(retest_h * 60), slot=1)
+        return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker", entry="maker",
+                   early_bars=int(early_h * 60), early_R=early_R, ext_bars=int(ext_h * 60), ext_R=ext_R)
     if confirm_tf > 0:                                 # enter at market after a confirm_tf candle CLOSES beyond the level
         cf = resample(m1, confirm_tf)
         k4 = np.searchsorted(act, cf["act"], side="right") - 1       # governing 4h decision for each small candle
