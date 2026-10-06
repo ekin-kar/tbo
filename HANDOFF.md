@@ -1,3 +1,17 @@
+# Crypto (Binance futures) - Oct 2026
+
+The prop-firm work below is history. The user now trades **Binance USD-M futures** with their own bots.
+Data: `data/BTCUSDT_1m_2020_2026_part*.parquet`, `data/ETHUSDT_...` (Binance 1m, 2020-01 .. 2026-09).
+**BTC bot = TBO v1.0** (`cryptobot/`, see `cryptobot/README.md`): 4h 20-candle breakout, long only above the
+daily EMA50, SL 1.5 ATR, trail exit (12-candle high - 2 ATR), max hold 120 h. Holdout 2024..2026: PF 1.66,
++46R, DD 11.7R. Research: `research/crypto/` (`common.py` costs/split, `families.py`, `scan1.py` grids,
+`bench.py` random entries, `holdout.py`). Dev = 2020-03..2023, holdout = 2024..2026-09 (already used once
+for TBO). Tested and rejected on BTC dev: hourly VOLC (-140R), RSI(2) dip-buying (-123R, costs), hourly
+seasonality (edges < costs). Williams volatility breakout: long-only works mildly, weaker than TBO.
+Next: ETH bot (TBO rules already +35R on the ETH holdout, untuned).
+
+---
+
 # Trading handoff (v8, 5 Oct 2026)
 
 Two cTrader bots trade prop-firm accounts: **PDAYT on gold** and **VOLC on USDJPY**. **v7 = v6 + risk scaling below the starting
