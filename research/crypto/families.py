@@ -42,7 +42,7 @@ def _ema_daily_side(m1, d, ema_n, at_idx):
 
 def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0, atr_n=14, sides="both",
                      trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
-                     vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0):
+                     vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -76,6 +76,13 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
             ok &= ext <= max_ext
         tside = np.where(tside == 0, 2, tside)         # 2 = blocked (neither >=0 for shorts nor <=0 for longs)
         tside = np.where(tside == 2, np.nan, tside)
+    if vr_max < 99:                                    # 7-day vs 90-day daily-return volatility (study: wild = worse)
+        import pandas as pd
+        d_ = resample(m1, 1440)
+        lr = pd.Series(np.r_[np.nan, np.diff(np.log(d_["c"]))])
+        vr = (lr.rolling(7).std() / lr.rolling(90).std()).to_numpy()
+        kd = np.clip(np.searchsorted(d_["act"], act, side="right") - 1, 0, None)
+        ok &= ~(vr[kd] > vr_max)
     if vratio > 0:                                     # last closed candle's volume vs its 20-candle average
         import pandas as pd
         va = pd.Series(c["v"]).rolling(20).mean().to_numpy()
