@@ -309,7 +309,9 @@ class Bot:
         if not self.dry:
             if self.x.hedge_mode():
                 raise SystemExit("Account is in Hedge mode; switch Binance Futures to One-way mode first.")
-            self.x.set_leverage(self.sym, max(1, math.ceil(self.max_lev)))
+            # exchange leverage only sets the margin locked per position (cross margin); position size is still
+            # capped at max_leverage x equity by size(). Higher here = less margin locked when all coins are open.
+            self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
         eq = self.equity()
         log.info(f"TBO v{VERSION} {self.sym} {'DRY RUN ' if self.dry else ''}on {self.x.base} | equity {eq:.2f} USDT | "
                  f"risk {self.risk * 100:.2f}% (shorts x{self.short_mult}) | max leverage {self.max_lev} | {self.p.to_dict()}")

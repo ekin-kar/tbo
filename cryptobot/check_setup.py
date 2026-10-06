@@ -56,7 +56,7 @@ try:
     res(not x.multi_assets(), "single-asset margin (USDT)" if not x.multi_assets() else "multi-assets mode is ON (fine, but sizing uses total margin balance)", warn=True)
 except Exception:
     pass
-total_risk = 0.0
+total_risk = 0.0; total_notional = 0.0
 for c in cfgs:
     p = S.Params(**c["strategy"]); sym = p.symbol; risk = c["risk_pct"] / 100; sm = c.get("short_risk_mult", 1.0)
     total_risk += risk
@@ -71,6 +71,8 @@ for c in cfgs:
             qty = min(qty, bal * c.get("max_leverage", 5) / px)
             qr = int(qty / max(f["step"], f["mkt_step"]) + 1e-9) * max(f["step"], f["mkt_step"])
             okq = qr >= f["min_qty"] and qr * px >= f["min_notional"]
+            if side == "long":
+                total_notional += qr * px / c.get("exchange_leverage", c.get("max_leverage", 5))
             res(okq, f"{side}: stop {dist / px * 100:.2f}% away -> {qr:g} {sym[:-4]} (${qr * px:,.0f} notional, risk ${qr * dist:.2f}; "
                      f"min {f['min_qty']:g} / ${f['min_notional']:g})" + ("" if okq else " -> too small: this trade would be skipped"), warn=not okq)
             if okq and qr * dist < 0.75 * bal * risk * m:
@@ -84,4 +86,7 @@ for c in cfgs:
     except BinanceError as e:
         res(False, f"{sym}: {e}")
 print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${bal * total_risk:.2f})")
+if bal > 0:
+    res(total_notional < 0.8 * bal, f"margin locked if all four are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
+        + ("" if total_notional < 0.8 * bal else " (raise exchange_leverage in the configs)"), warn=True)
 print("RESULT:", "ready" if ok_all else "fix the FAIL lines first")
