@@ -47,7 +47,7 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                      early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
                      er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0,
                      antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0,
-                     trail_after_h=0, rand_p=0.0, rand_seed2=0):
+                     trail_after_h=0, rand_p=0.0, rand_seed2=0, skip_fn=None):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -204,11 +204,13 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         o.place(cf["act"][gl], MKT, 1, sl_l[k4c][gl], tp_l[k4c][gl], slot=0)
         o.place(cf["act"][gs], MKT, -1, sl_s[k4c][gs], tp_s[k4c][gs], slot=1)
     else:
+        skl = skip_fn(c, a, hi, lo, 1) if skip_fn else np.zeros(len(a), bool)   # research: skip orders where True
+        sks = skip_fn(c, a, hi, lo, -1) if skip_fn else np.zeros(len(a), bool)
         if sides in ("both", "long"):
-            m = ok & (tside >= 0)
+            m = ok & (tside >= 0) & ~skl
             o.place(act[m], STP, 1, sl_l[m], tp_l[m], price=(hi + buf)[m], expiry_min=tf, slot=0)
         if sides in ("both", "short"):
-            m = ok & (tside <= 0)
+            m = ok & (tside <= 0) & ~sks
             o.place(act[m], STP, -1, sl_s[m], tp_s[m], price=(lo - buf)[m], expiry_min=tf, slot=1)
     return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker",
                trail_k=trail_k, trail_start=trail_start, early_bars=int(early_h * 60), early_R=early_R,
