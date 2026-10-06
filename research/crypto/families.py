@@ -47,7 +47,7 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                      early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
                      er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0,
                      antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0,
-                     trail_after_h=0):
+                     trail_after_h=0, rand_p=0.0, rand_seed2=0):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -149,6 +149,13 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         sl_l = np.clip(hi + buf - sw_lo + 0.1 * a, 0.5 * a, 2.5 * a)
         sl_s = np.clip(sw_hi - (lo - buf) + 0.1 * a, 0.5 * a, 2.5 * a)
     tp_l = tp_R * sl_l if tp_R > 0 else np.zeros(len(a)); tp_s = tp_R * sl_s if tp_R > 0 else np.zeros(len(a))
+    if rand_p > 0:                                     # BENCHMARK: random entry candles, identical filters and exits
+        rg = np.random.default_rng(rand_seed2)
+        pick = rg.random(len(act)) < rand_p
+        ml = ok & (tside > 0) & pick; ms = ok & (tside < 0) & pick if sides == "both" else np.zeros(len(act), bool)
+        o.place(act[ml], MKT, 1, sl_l[ml], tp_l[ml], slot=0); o.place(act[ms], MKT, -1, sl_s[ms], tp_s[ms], slot=1)
+        return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker",
+                   early_bars=int(early_h * 60), early_R=early_R, ext_bars=int(ext_h * 60), ext_R=ext_R)
     if antic_d > 0:                                    # ANTICIPATION: enter at market before the level breaks
         cl_ = c["c"]; h_ = c["h"]; l_ = c["l"]; v_ = c["v"]
         r14 = I.rsi_wilder(cl_, 14)
