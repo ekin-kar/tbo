@@ -26,15 +26,21 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
+import notify                                          # noqa: E402
 
-VERSION = "2.2"
+VERSION = "2.3"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
 
 
 def floor_step(x, step):
-    return math.floor(x / step + 1e-9) * step
+    return round(math.floor(x / step + 1e-9) * step, 12)
+
+
+def ceil_step(x, step):
+    """Round UP to the step, without floating-point noise pushing an exact multiple one step higher."""
+    return round(math.ceil(x / step - 1e-9) * step, 12)
 
 
 def fmt(x, step):
@@ -128,9 +134,14 @@ class Bot:
         trig = entry_px - side * dist
         if self.st.get("be_done"):                      # breakeven reached: stop at entry + be_off x dist
             trig = entry_px + side * self.p.be_off * dist
-        trig = floor_step(trig, self.f["tick"]) if side == 1 else math.ceil(trig / self.f["tick"]) * self.f["tick"]
+        trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
         log.info(f"STOP LOSS for {amt} @ {entry_px:.2f}: {fmt(trig, self.f['tick'])} ({dist:.2f} away)")
         if self.dry:
+            return
+        last = self.x.last_price(self.sym)
+        if (side == 1 and last <= trig) or (side == -1 and last >= trig):
+            log.warning(f"price {last} already beyond the stop {fmt(trig, self.f['tick'])}: closing at market")
+            self.close_position(amt, "SL (price already past the stop)")
             return
         try:
             r = self.x.stop_market(self.sym, "SELL" if side == 1 else "BUY", fmt(trig, self.f["tick"]),
@@ -167,13 +178,22 @@ class Bot:
         for o in self.my_algo_orders():                 # stray entry orders (e.g. after a crash)
             if "_in_" in o["clientAlgoId"]:
                 self.cancel(o["algoId"])
-        # 3. new entry order while flat
-        if amt == 0:
+        # 3. new entry order while flat (re-read: the old entry order may have filled in the meantime)
+        if amt == 0 and not self.dry:
+            amt, _ = self.x.position(self.sym)
+            if amt != 0:
+                log.info(f"the previous entry order filled just now ({amt}): no new order")
+        if self.paused():
+            log.info("PAUSE file present: no new entry orders (open positions are still managed)")
+        if amt == 0 and not self.paused():
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
                 if trig is None:
                     continue
-                trig = math.ceil(trig / self.f["tick"]) * self.f["tick"] if side == 1 else floor_step(trig, self.f["tick"])
+                trig = ceil_step(trig, self.f["tick"]) if side == 1 else floor_step(trig, self.f["tick"])
+                if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
+                    log.warning(f"invalid level {trig} / stop distance {dec.sl_dist}: no order")
+                    continue
                 qty = self.size(dec.sl_dist, trig, side)
                 if qty <= 0:
                     continue
@@ -182,6 +202,12 @@ class Bot:
                          f"valid until the next 4h close)")
                 self.st.update(sl_dist=dec.sl_dist, entry_side=side)
                 if self.dry:
+                    break
+                last = self.x.last_price(self.sym)
+                if (side == 1 and last >= trig) or (side == -1 and last <= trig):
+                    log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
+                    self.x.market(self.sym, "BUY" if side == 1 else "SELL", fmt(qty, self.f["step"]),
+                                  client_id=f"{PREFIX}_mk_{int(time.time())}")
                     break
                 try:
                     r = self.x.stop_market(self.sym, "BUY" if side == 1 else "SELL", fmt(trig, self.f["tick"]),
@@ -208,11 +234,22 @@ class Bot:
             status = self.x.algo_order(algo_id=sid).get("algoStatus")
         except BinanceError:
             return any(o["algoId"] == sid for o in self.my_algo_orders())
-        if status in ("NEW", "TRIGGERING", "TRIGGERED", "FINISHED"):
+        if status in ("NEW", "TRIGGERING"):
+            self.st.pop("sl_done_ms", None)
             return True
+        if status in ("TRIGGERED", "FINISHED"):           # executed: the position should be gone within seconds
+            first = self.st.setdefault("sl_done_ms", self.x.now_ms())
+            if self.x.now_ms() - first < 60_000:
+                return True
+            log.warning(f"stop loss {sid} is {status} but the position is still open after 60 s: placing a new one")
+            self.st.pop("sl_done_ms", None); self.st["sl_id"] = None
+            return False
         log.warning(f"stop loss {sid} is {status}: placing a new one")
         self.st["sl_id"] = None
         return False
+
+    def paused(self):
+        return (HERE / "PAUSE").exists()
 
     def check_position(self):
         """Every poll: protect a new fill, time exit, clean up after a stop-out."""
@@ -277,8 +314,11 @@ class Bot:
         log.info(f"TBO v{VERSION} {self.sym} {'DRY RUN ' if self.dry else ''}on {self.x.base} | equity {eq:.2f} USDT | "
                  f"risk {self.risk * 100:.2f}% (shorts x{self.short_mult}) | max leverage {self.max_lev} | {self.p.to_dict()}")
         tf_ms = self.p.tf_min * 60_000
+        last_sync = time.time()
         while True:
             try:
+                if time.time() - last_sync > 3600:
+                    self.x.sync_time(); last_sync = time.time()
                 now = self.x.now_ms()
                 last_open = (now // tf_ms) * tf_ms - tf_ms           # open time of the last CLOSED 4h candle
                 if self.st["last_candle"] < last_open and now - (last_open + tf_ms) >= 3000:
@@ -305,12 +345,25 @@ def main():
     a = ap.parse_args()
     path = Path(a.config).resolve()
     cfg = json.loads(path.read_text())
+    notify.load_env(path.parent / ".env")
     logdir = path.parent / "logs"; logdir.mkdir(exist_ok=True)
     sym = cfg["strategy"]["symbol"]
     logging.basicConfig(level=logging.INFO, format="%(asctime)s UTC  %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
                         handlers=[logging.StreamHandler(), logging.FileHandler(logdir / f"{sym}.log", encoding="utf-8")])
     logging.Formatter.converter = time.gmtime
-    Bot(cfg, path, testnet=a.testnet, dry=a.dry_run).run()
+    logging.getLogger("tbo").addHandler(notify.TelegramHandler(sym + (" TESTNET" if a.testnet else "") + (" DRY" if a.dry_run else "")))
+    while True:                                         # start-up: retry calmly while Binance is unreachable
+        try:
+            bot = Bot(cfg, path, testnet=a.testnet, dry=a.dry_run)
+            break
+        except BinanceError as e:
+            if e.code in (-2014, -2015, -1022):
+                raise SystemExit(f"API key / permission problem: {e}")
+            logging.getLogger("tbo").warning(f"Binance error at start-up: {e}; retrying in 30 s")
+        except Exception as e:
+            logging.getLogger("tbo").warning(f"cannot reach Binance ({type(e).__name__}); retrying in 30 s")
+        time.sleep(30)
+    bot.run()
 
 
 if __name__ == "__main__":

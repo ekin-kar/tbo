@@ -1,5 +1,10 @@
 # Crypto (Binance futures) - Oct 2026
 
+**Live setup (v2.3):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
+(keys, optional Telegram), configs BTC 2.5% / ETH 1.25% / DOGE 0.625% / ADA 0.625% risk, shorts x0.5; step-by-step
+guide in `cryptobot/README.md` ("GO LIVE"). Pages: `stats/tbo_crypto_statistics.html`, `cryptobot/robustness.html`,
+`cryptobot/monthly_report.html`.
+
 The prop-firm work below is history. The user now trades **Binance USD-M futures** with their own bots.
 Data: `data/BTCUSDT_1m_2020_2026_part*.parquet`, `data/ETHUSDT_...` (Binance 1m, 2020-01 .. 2026-09).
 **BTC bot = TBO v2.1** (v2.0 + no new order when the daily close is > 4 daily ATR from the daily EMA50) (`cryptobot/`, see `cryptobot/README.md`): 4h 20-candle breakout, long AND short with the

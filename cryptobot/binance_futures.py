@@ -107,6 +107,24 @@ class Futures:
         entry = next((float(r["entryPrice"]) for r in rows if float(r["positionAmt"]) != 0), 0.0)
         return amt, entry
 
+    def api_restrictions(self):
+        """Spot API (api.binance.com): enableWithdrawals, enableFutures, ipRestrict ... (live keys only)."""
+        if self.base != LIVE:
+            raise BinanceError(0, None, "not available on testnet")
+        q = f"timestamp={self.now_ms()}&recvWindow={self.recv_window}"
+        sig = hmac.new(self.secret, q.encode(), hashlib.sha256).hexdigest()
+        r = self.s.get(f"https://api.binance.com/sapi/v1/account/apiRestrictions?{q}&signature={sig}", timeout=15)
+        if r.status_code != 200:
+            raise BinanceError(r.status_code, None, r.text[:200])
+        return r.json()
+
+    def multi_assets(self):
+        return bool(self._req("GET", "/fapi/v1/multiAssetsMargin", signed=True).get("multiAssetsMargin"))
+
+    def symbol_config(self, symbol):
+        r = self._req("GET", "/fapi/v1/symbolConfig", dict(symbol=symbol), signed=True)
+        return r[0] if isinstance(r, list) and r else r
+
     def hedge_mode(self):
         return bool(self._req("GET", "/fapi/v1/positionSide/dual", signed=True)["dualSidePosition"])
 

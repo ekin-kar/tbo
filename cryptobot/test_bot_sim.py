@@ -23,7 +23,9 @@ from binance_futures import BinanceError             # noqa: E402
 class FakeFutures:
     base, key = "sim", "x"
 
-    def __init__(self, m):
+    def __init__(self, m, tick=None):
+        if tick:                                    # serve tick-exact prices like Binance (the history is float32)
+            m = dict(m, **{k: np.round(np.round(m[k] / tick) * tick, 10) for k in ("o", "h", "l", "c")})
         self.m = m
         self.c4 = F.resample(m, 240); self.d1 = F.resample(m, 1440)
         self.j = 0
@@ -37,6 +39,10 @@ class FakeFutures:
         return int(self.m["t"][self.j]) * 60_000 + 3000
 
     def exchange_info(self, sym):
+        if sym == "DOGEUSDT":                                 # Binance USD-M filters (tick / step / min notional)
+            return dict(tick=0.00001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=30_000_000, min_notional=5, status="TRADING")
+        if sym == "ADAUSDT":
+            return dict(tick=0.0001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=3_000_000, min_notional=5, status="TRADING")
         if sym == "ETHUSDT":                                  # Binance USD-M ETHUSDT filters
             return dict(tick=0.01, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=2000, min_notional=20, status="TRADING")
         return dict(tick=0.1, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=120, min_notional=100, status="TRADING")
@@ -58,6 +64,12 @@ class FakeFutures:
         rows = [(int(c["t"][i]) * 60_000, c["o"][i], c["h"][i], c["l"][i], c["c"][i], (int(c["t"][i]) + tf) * 60_000 - 1)
                 for i in range(max(0, k - limit), k)]
         return rows
+
+    def last_price(self, sym):
+        return float(self.m["o"][self.j])
+
+    def sync_time(self):
+        pass
 
     def account(self):
         return {"totalMarginBalance": "10000"}
@@ -128,13 +140,13 @@ class FakeFutures:
 
 def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     m = C.load(sym)
-    fx = FakeFutures(m)
+    fx = FakeFutures(m, tick=FakeFutures.exchange_info(None, sym)["tick"])
     cfg = dict(risk_pct=2.0, max_leverage=5, strategy=S.Params(symbol=sym).to_dict())
     bot = B.Bot.__new__(B.Bot)
     bot.cfg, bot.dry = cfg, False
     bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.02; bot.max_lev = 5; bot.poll = 0
     bot.state_path = Path("/tmp/claude_tbo_sim_state.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
-    bot.short_mult = 1.0; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
+    bot.short_mult = 1.0; bot.cfg = cfg; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))
     tf_ms = 240 * 60_000
     for j in range(j0, j1):

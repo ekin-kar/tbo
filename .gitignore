@@ -3,3 +3,5 @@ __pycache__/
 cryptobot/state_*.json
 cryptobot/logs/
 *.tmp
+cryptobot/.env
+cryptobot/PAUSE

@@ -145,7 +145,55 @@ The simulation reshuffles months independently and uses closed trades: real draw
   234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
 
-## Running it
+## GO LIVE: step by step (v2.3)
+
+**Where to run it.** Recommended: a small Linux VPS (~$5/month, e.g. Hetzner in Germany/Finland), **not in the USA**
+(Binance.com blocks US IPs). It runs 24/7 without sleep, updates or power cuts. Your Windows PC also works if it
+never sleeps. If the bot is offline, open trades stay protected (the stop-loss sits on Binance); you only miss new
+entries, breakeven moves and the 5-day exit until it is back.
+
+1. **Binance account (website/app):** open a USD-M Futures account and move the USDT you want to trade into the
+   USD-M Futures wallet. Futures settings: **Position Mode = One-way**. Margin mode **Cross** for BTCUSDT, ETHUSDT,
+   DOGEUSDT, ADAUSDT. Do not trade these four coins by hand on this account.
+2. **API key:** API Management -> create a key (system generated). Tick **Enable Futures**. **Do NOT enable
+   withdrawals.** Restrict it to your server's IP address (on a home PC: your home IP, if it is fixed).
+3. **Install** (Python 3.10+): `git clone` this repo (branch `claude/sweet-meitner-lubkf9`), then
+   `pip install -r cryptobot/requirements.txt`.
+4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
+   token + chat id for phone alerts (fills, stops, breakeven, exits, warnings).
+5. **Risk:** set in `config_btc.json` / `config_eth.json` / `config_doge.json` / `config_ada.json` (`risk_pct`; now
+   2.5 / 1.25 / 0.625 / 0.625, shorts x0.5). Lower them for your first weeks if you like.
+6. **Check:** `cd cryptobot && python check_setup.py` (places no orders). Every line must be OK (WARN = read it):
+   key works, withdrawals OFF, futures ON, One-way, balance, clock, and each coin's long/short size above
+   Binance's minimum at your risk.
+7. **Try it without risk:**
+   - `python run_all.py --dry-run`: real prices, no orders; at every 4-hour close each coin prints its decision.
+   - Optional, recommended: Binance futures **testnet / demo** keys in `.env`, then `python check_setup.py --testnet`
+     and `python run_all.py --testnet` for a few days. The testnet address is set to `https://demo-fapi.binance.com`;
+     if your demo uses another address, add `"base_url": "..."` to the four configs.
+8. **Go live:** `python run_all.py` (Windows: double-click `start-bots.bat`). On a Linux VPS make it start on boot:
+   copy `tbo.service` to `/etc/systemd/system/`, adjust user/paths, `sudo systemctl enable --now tbo`, watch with
+   `journalctl -u tbo -f`.
+9. **Day to day:** logs in `cryptobot/logs/<COIN>.log` (+ Telegram). The first log line of each coin shows
+   `TBO v2.3`, its risk and settings. Orders appear on Binance as conditional (algo) orders named `tbo_...`.
+   - Pause new entries (open trades still managed): create an empty file `cryptobot/PAUSE`; delete it to resume.
+   - Stop everything: Ctrl+C / close the window / `sudo systemctl stop tbo`. Stop-losses stay on Binance.
+   - Change risk: edit the config, then restart.
+   - Restarts are safe: positions are read from Binance, missing stop-losses are re-placed, a missed 4-hour close
+     is handled when the bot is back.
+10. **Rules for yourself:** judge it after months, not days (about 19 trades a month, most small losses or
+    breakeven; ~2 big winners a month pay for it). If the account is down more than 50% from its peak, stop and
+    review: that is beyond the backtest's usual range.
+
+**v2.3 changes (before real money):** price checked before every stop order (enters / exits at market if price is
+already past the level, instead of relying on error codes); position re-read after cancelling the old entry order
+(no double entry if it filled in the same second); a stop-loss that triggered but left the position open is
+re-placed after 60 s; tick rounding without floating-point noise; hourly clock re-sync; calm start-up retries;
+PAUSE file; Telegram alerts; `run_all.py`, `check_setup.py`. Bot vs backtest on a simulated exchange with tick-exact
+prices, H1 2024: BTC 29/29, ETH 24/24, DOGE 35/35, ADA 38/38 entries on the same minute and price.
+**Not yet run against the real Binance API** (blocked from the research machine): steps 6-7 are the first real test.
+
+## Running it (older notes)
 
 1. Python 3.10+, `pip install -r cryptobot/requirements.txt`.
 2. Binance: Futures account in **One-way** position mode. Create an API key with **Enable Futures** only (no
