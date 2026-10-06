@@ -13,7 +13,7 @@ def _simulate(t, o, h, l, c,
               kind2, direction2, price2, sl_d2, tp_d2, expiry2,
               allow_entry, allow_fill, force_exit, exit_long, exit_short,
               day_id, max_trades_day, max_bars, spread_arr, limit_pad_arr, group_size, miss_if_crossed, be_R=0.0, be_off=0.0,
-              trail_k=0.0, trail_start=0.0):
+              trail_k=0.0, trail_start=0.0, early_bars=0, early_R=0.0, ext_bars=0, ext_R=0.0):
     n = len(t)
     nslot = kind2.shape[1]
     cap = int((kind2 != 0).sum()) + 1
@@ -27,6 +27,7 @@ def _simulate(t, o, h, l, c,
     k = 0
 
     pos = 0
+    best_fav = 0.0
     entry_i = -1
     entry_price = 0.0
     sl = 0.0
@@ -58,8 +59,12 @@ def _simulate(t, o, h, l, c,
                 why = R_FORCED
             elif (pos == 1 and exit_long[j]) or (pos == -1 and exit_short[j]):
                 why = R_SIGNAL
+            elif early_bars > 0 and j - entry_i == early_bars and best_fav < early_R * dist:
+                why = R_TIME                               # 'dead trade': never reached early_R by early_bars
             elif max_bars > 0 and j - entry_i >= max_bars:
-                why = R_TIME
+                cur = (o[j] - entry_price) if pos == 1 else (entry_price - ask_o)
+                if not (ext_bars > max_bars and j - entry_i < ext_bars and cur >= ext_R * dist):
+                    why = R_TIME                           # extension: winners above ext_R held up to ext_bars
             if why != 0:
                 e_idx[k] = entry_i; x_idx[k] = j; dirs[k] = pos
                 e_px[k] = entry_price; x_px[k] = o[j] if pos == 1 else ask_o
@@ -86,6 +91,7 @@ def _simulate(t, o, h, l, c,
                 sl = entry_price - pos * dist
                 tp = entry_price + pos * tp_d2[j, q] if tp_d2[j, q] > 0 else (np.inf if pos == 1 else -np.inf)
                 entry_i = j
+                best_fav = 0.0
                 trades_today += 1
                 opened_at_open = True
                 for r in range(nslot):
@@ -129,6 +135,7 @@ def _simulate(t, o, h, l, c,
             sl = fill - pos * dist
             tp = fill + pos * p_tp[q] if p_tp[q] > 0 else (np.inf if pos == 1 else -np.inf)
             entry_i = j; trades_today += 1
+            best_fav = 0.0
             filled_here = True
             if group_size <= 0:
                 for r in range(nslot):
@@ -148,6 +155,10 @@ def _simulate(t, o, h, l, c,
         # ── 4. manage an open position through this bar ──
         if filled_here:
             continue
+        if pos == 1 and h[j] - entry_price > best_fav:
+            best_fav = h[j] - entry_price
+        elif pos == -1 and entry_price - (l[j] + spread) > best_fav:
+            best_fav = entry_price - (l[j] + spread)
         if pos == 1:
             px = 0.0; why = 0
             if o[j] <= sl and not opened_at_open:

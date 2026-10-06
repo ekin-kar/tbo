@@ -42,7 +42,9 @@ def _ema_daily_side(m1, d, ema_n, at_idx):
 
 def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0, atr_n=14, sides="both",
                      trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
-                     vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0):
+                     vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0,
+                     early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
+                     er_n=0, er_min=0.0, co_m1=None, entry_mask=None):
     """Stop orders at the n-bar high/low of tf candles, renewed each candle; SL k*ATR(tf); exit TP / time.
     trail_m > 0: also exit at a candle close below max(high of the last trail_m candles) - trail_atr * ATR
     (mirror for shorts). rand_seed: benchmark - same exits, but market entries at random candles with the
@@ -76,6 +78,26 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
             ok &= ext <= max_ext
         tside = np.where(tside == 0, 2, tside)         # 2 = blocked (neither >=0 for shorts nor <=0 for longs)
         tside = np.where(tside == 2, np.nan, tside)
+    if er_n > 0:                                       # daily Kaufman efficiency ratio (trend cleanliness)
+        d_ = resample(m1, 1440)
+        cc = d_["c"]
+        er = np.full(len(cc), np.nan)
+        num = np.abs(cc[er_n:] - cc[:-er_n])
+        den = np.convolve(np.abs(np.diff(cc)), np.ones(er_n), "valid")
+        er[er_n:] = num / np.maximum(den, 1e-12)
+        kd = np.clip(np.searchsorted(d_["act"], act, side="right") - 1, 0, None)
+        ok &= er[kd] >= er_min
+    if co_m1 is not None:                              # the other coin's trend (side + slope) must agree
+        dc = resample(co_m1, 1440)
+        ec = I.ema(dc["c"], ema_n)
+        sc = np.where(dc["c"] > ec, 1, -1)
+        if slope_d > 0:
+            slc = np.sign(ec - np.r_[np.full(slope_d, np.nan), ec[:-slope_d]])
+            sc = np.where(slc == sc, sc, 0)
+        when = m1["t"][np.clip(act, 0, len(m1["t"]) - 1)]
+        kc = np.searchsorted(dc["t"] + 1440, when, side="right") - 1    # last co-coin daily candle closed by then
+        co_side = np.where(kc >= ema_n, sc[np.clip(kc, 0, None)], 0)
+        tside = np.where(co_side == tside, tside, np.nan)
     if vr_max < 99:                                    # 7-day vs 90-day daily-return volatility (study: wild = worse)
         import pandas as pd
         d_ = resample(m1, 1440)
@@ -91,6 +113,8 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         wd = ((c["t"] + tf) // 1440 + 3) % 7           # weekday of the moment the order is placed
         ok &= wd < 5
     o = E.Orders(m1)
+    if entry_mask is not None:                         # entries / fills only where the mask is True
+        o.allow_entry[:] = entry_mask; o.allow_fill[:] = entry_mask
     sl = sl_atr * a
     tp = tp_R * sl if tp_R > 0 else np.zeros(len(a))
     if trail_m > 0:
@@ -112,14 +136,31 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         tr = run(m1, o, max_bars=int(hold_h * 60))
         return tr.sample(n=min(len(tr), len(real)), random_state=rand_seed).sort_values("entry_time")
     buf = buffer_atr * a
-    if sides in ("both", "long"):
-        m = ok & (tside >= 0)
-        o.place(act[m], STP, 1, sl[m], tp[m], price=(hi + buf)[m], expiry_min=tf, slot=0)
-    if sides in ("both", "short"):
-        m = ok & (tside <= 0)
-        o.place(act[m], STP, -1, sl[m], tp[m], price=(lo - buf)[m], expiry_min=tf, slot=1)
+    sl_l = sl_s = sl
+    if sl_mode == "swing":                             # stop beyond the recent swing, 0.5-2.5 ATR from the level
+        sw_lo = I.rolling_min(c["l"], swing_k); sw_hi = I.rolling_max(c["h"], swing_k)
+        sl_l = np.clip(hi + buf - sw_lo + 0.1 * a, 0.5 * a, 2.5 * a)
+        sl_s = np.clip(sw_hi - (lo - buf) + 0.1 * a, 0.5 * a, 2.5 * a)
+    tp_l = tp_R * sl_l if tp_R > 0 else np.zeros(len(a)); tp_s = tp_R * sl_s if tp_R > 0 else np.zeros(len(a))
+    if confirm_tf > 0:                                 # enter at market after a confirm_tf candle CLOSES beyond the level
+        cf = resample(m1, confirm_tf)
+        k4 = np.searchsorted(act, cf["act"], side="right") - 1       # governing 4h decision for each small candle
+        valid = (k4 >= 0) & (cf["act"] < len(m1["t"]))
+        k4c = np.clip(k4, 0, None)
+        gl = ok[k4c] & valid & (tside[k4c] >= 0) & (cf["c"] > (hi + buf)[k4c]) if sides in ("both", "long") else np.zeros(len(k4), bool)
+        gs = ok[k4c] & valid & (tside[k4c] <= 0) & (cf["c"] < (lo - buf)[k4c]) if sides in ("both", "short") else np.zeros(len(k4), bool)
+        o.place(cf["act"][gl], MKT, 1, sl_l[k4c][gl], tp_l[k4c][gl], slot=0)
+        o.place(cf["act"][gs], MKT, -1, sl_s[k4c][gs], tp_s[k4c][gs], slot=1)
+    else:
+        if sides in ("both", "long"):
+            m = ok & (tside >= 0)
+            o.place(act[m], STP, 1, sl_l[m], tp_l[m], price=(hi + buf)[m], expiry_min=tf, slot=0)
+        if sides in ("both", "short"):
+            m = ok & (tside <= 0)
+            o.place(act[m], STP, -1, sl_s[m], tp_s[m], price=(lo - buf)[m], expiry_min=tf, slot=1)
     return run(m1, o, max_bars=int(hold_h * 60), be_R=be_R, be_off=be_off, tp="maker",
-               trail_k=trail_k, trail_start=trail_start)
+               trail_k=trail_k, trail_start=trail_start, early_bars=int(early_h * 60), early_R=early_R,
+               ext_bars=int(ext_h * 60), ext_R=ext_R)
 
 
 def vol_breakout(m1, k=0.5, sl_k=0.5, tp_R=0.0, hold_h=24, ema_n=0, start_min=0, sides="both"):
