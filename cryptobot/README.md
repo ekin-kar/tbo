@@ -53,6 +53,34 @@ $1,000 compounded over the 6.6 years: 2% risk -> 5.2%/month average, max DD 24%;
 **These are in-sample (settings picked on this data): plan on the walk-forward figure, about 3-4% a month
 at 2% risk, with drawdowns up to 25-30%, and losing months (about 4 in 10).**
 
+## ETHUSDT (Oct 2026): same settings as BTC, `config_eth.json`
+
+Tuned with the same anchored walk-forward (`research/crypto/wf2.py eth|ethf ETHUSDT`, `eth_narrow.py`):
+5,184 core settings, a narrow channel/stop search and 256 filter settings. **None beat the BTC v2.1
+settings out of sample** (2022-26 at 2% risk: BTC settings 3.2%/month DD 28%; ETH-tuned 2.7%, narrow
+3.2% but DD 37%, filters 2.6%), so ETH runs the BTC settings unchanged - never fitted to ETH data.
+
+| ETHUSDT 2020-03..2026-09 (`eth_report.py`) | |
+|---|---|
+| Trades | 364 (4.6/month), PF 1.87, +191R, max DD 15.7R, worst losing run 17 |
+| Longs / shorts | +116R / +75R |
+| By year (R) | 2020 +43, 2021 +25, 2022 +24, 2023 +14, 2024 +20, 2025 +14, 2026 (to Sep) +50 |
+| Months positive | 43% (best +32R, worst -7R) |
+| $1,000 at 1% / 1.5% / 2% risk | 2.1% / 3.0% / 3.7% per month, max DD 15% / 22% / 28% |
+
+BTC for comparison: 1% / 1.5% / 2% -> 3.1% / 4.4% / 5.6% per month, DD 12% / 17% / 22% (in-sample for BTC).
+Stop: median 1.8% of ETH's price -> 2% risk is 1.1x leverage (max 4.4x).
+
+**Both bots on one account:** monthly results correlate 0.52 and 65% of BTC trades overlap an ETH trade in
+the same direction, so losses often come together. Closed-trade simulation: 1% risk each -> 5.3%/month,
+DD 24%; 1.5% each -> 7.5%/month, DD 34% (open-trade drawdowns are deeper than these closed-trade figures).
+Use about 1% each when running both.
+
+Parity on ETH: `replay.py ETHUSDT` 337 / 337 trades; `test_bot_sim.py ETHUSDT` 316 of 320 on the same minute,
+gross R 181.7 (bot) vs 178.8 (backtest): the differences are fills whose stop the backtest hits inside the
+fill minute (pessimistic), while the bot's stop goes on a few seconds later.
+Run: `python cryptobot/bot.py cryptobot/config_eth.json` (a second process next to the BTC one).
+
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d

@@ -37,6 +37,8 @@ class FakeFutures:
         return int(self.m["t"][self.j]) * 60_000 + 3000
 
     def exchange_info(self, sym):
+        if sym == "ETHUSDT":                                  # Binance USD-M ETHUSDT filters
+            return dict(tick=0.01, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=2000, min_notional=20, status="TRADING")
         return dict(tick=0.1, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=120, min_notional=100, status="TRADING")
 
     def klines(self, sym, interval, limit, start_ms=None):

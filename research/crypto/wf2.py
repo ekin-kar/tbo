@@ -1,7 +1,7 @@
 """
 Walk-forward tuning round 2 around TBO v2 (BTC only).
-    python wf2.py run  <grid>     # compute all configs over the full history (causal), cache trades
-    python wf2.py eval <grid>     # anchored walk-forward 2022..2026 vs v2 fixed, + parameter marginals
+    python wf2.py run  <grid> [SYMBOL]   # compute all configs over the full history (causal), cache trades
+    python wf2.py eval <grid> [SYMBOL]   # anchored walk-forward 2022..2026 vs the fixed base, + parameter marginals
 Grids: core (stage A), filt (stage B: filters on top of the core winner(s)).
 """
 import itertools, pickle, sys
@@ -10,10 +10,17 @@ import numpy as np, pandas as pd
 import common as C, families as F
 
 V2 = dict(tf=240, n=20, sl_atr=1.0, hold_h=120, ema_n=50, sides="both", slope_d=5, no_weekend=True,
-          be_R=1.5, be_off=0.0, tp_R=0.0, vol_lo=0.0, vol_hi=1.0, max_ext=99.0, buffer_atr=0.0, ema2_n=0)
+          be_R=1.5, be_off=0.0, tp_R=0.0, vol_lo=0.0, vol_hi=1.0, max_ext=99.0, buffer_atr=0.0, ema2_n=0,
+          trail_m=0, trail_atr=0.0)
+V21 = dict(V2, max_ext=4.0)                  # BTC live settings (TBO v2.1)
+SYM = sys.argv[3] if len(sys.argv) > 3 else "BTCUSDT"
 GRIDS = {
     "core": dict(n=[15, 20, 25, 30], sl_atr=[0.75, 1.0, 1.25], be_R=[1.0, 1.5, 2.0, 3.0], be_off=[0.0, 0.2],
                  hold_h=[72, 120, 168], ema_n=[30, 50, 75], slope_d=[3, 5, 10]),
+    "eth": dict(tf=[240, 120], n=[15, 20, 30, 40], sl_atr=[0.75, 1.0, 1.5], be_R=[0.0, 1.5, 2.5],
+                hold_h=[72, 120, 168], ema_n=[30, 50, 100], slope_d=[0, 5], sides=["long", "both"], max_ext=[99.0, 4.0]),
+    "ethf": dict(no_weekend=[True, False], tp_R=[0.0, 5.0], trail=[(0, 0.0), (12, 2.0)], vol_lo=[0.0, 0.2],
+                 vol_hi=[1.0, 0.8], buffer_atr=[0.0, 0.1], ema2_n=[0, 200], be_off=[0.0, 0.2]),
     "filt": dict(tp_R=[0.0, 5.0, 8.0], vol_lo=[0.0, 0.2], vol_hi=[1.0, 0.8], max_ext=[99.0, 4.0, 2.5],
                  buffer_atr=[0.0, 0.1], ema2_n=[0, 200], no_weekend=[True, False]),
 }
@@ -22,19 +29,30 @@ M = None
 
 
 def configs(grid):
-    base = dict(V2)
+    base = dict(V21 if grid.startswith("eth") else V2)
+    if grid == "ethf":
+        try:
+            base.update(pickle.load(open(C.D.CACHE / "wf2_eth_choice.pkl", "rb")))
+        except FileNotFoundError:
+            pass
     if grid == "filt":                       # stage B starts from the stage-A choice if it exists
         try:
             base.update(pickle.load(open(C.D.CACHE / "wf2_core_choice.pkl", "rb")))
         except FileNotFoundError:
             pass
     g = GRIDS[grid]
-    return [dict(base, **dict(zip(g, v))) for v in itertools.product(*g.values())]
+    out = []
+    for v in itertools.product(*g.values()):
+        c = dict(base, **dict(zip(g, v)))
+        if "trail" in c:
+            c["trail_m"], c["trail_atr"] = c.pop("trail")
+        out.append(c)
+    return out
 
 
 def init():
     global M
-    M = C.load("BTCUSDT")
+    M = C.load(SYM)
 
 
 def one(args):
@@ -69,10 +87,12 @@ def summary(x, label, yrs=4.75):
 if __name__ == "__main__":
     mode, grid = sys.argv[1], sys.argv[2]
     cfgs = configs(grid)
-    path = C.D.CACHE / f"wf2_{grid}.pkl"
+    path = C.D.CACHE / f"wf2_{grid}_{SYM}.pkl"
     if mode == "run":
         if V2 not in cfgs and grid == "core":
             cfgs.append(dict(V2))
+        if grid == "eth" and V21 not in cfgs:
+            cfgs.append(dict(V21))
         out = {}
         with Pool(4, initializer=init) as p:
             for i, tr in p.imap_unordered(one, list(enumerate(cfgs)), chunksize=8):
@@ -89,15 +109,17 @@ if __name__ == "__main__":
                 sc_cache[(i, y)] = mar(stream(T[i], "2020-03-01", f"{y}-01-01"), yrs)
             return sc_cache[(i, y)]
 
-        base_i = next((i for i, c in enumerate(cfgs) if c == V2), None)
+        ref = V21 if grid.startswith("eth") else V2
+        base_i = next((i for i, c in enumerate(cfgs) if c == ref), None)
         if base_i is not None:
-            summary(pd.concat([stream(T[base_i], f"{y}-01-01", f"{y+1}-01-01") for y in TESTS]), "v2 fixed (2022-26)")
+            summary(pd.concat([stream(T[base_i], f"{y}-01-01", f"{y+1}-01-01") for y in TESTS]),
+                    ("BTC v2.1 settings" if grid.startswith("eth") else "v2") + " fixed (2022-26)")
         picks = []
         for y in TESTS:
             sc = np.array([score(i, y) for i in range(len(cfgs))])
             picks.append(int(np.argmax(sc)))
         summary(pd.concat([stream(T[i], f"{y}-01-01", f"{y+1}-01-01") for y, i in zip(TESTS, picks)]), "walk-forward pick (out of sample)")
-        keys = list(GRIDS[grid])
+        keys = [k if k != "trail" else "trail_m" for k in GRIDS[grid]]
         for y, i in zip(TESTS, picks):
             print("  ", y, {k: cfgs[i][k] for k in keys})
         # marginals on all data: median MAR per value (plateau view)

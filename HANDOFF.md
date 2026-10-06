@@ -11,7 +11,8 @@ vs 2.0% for v1.0; ETH (untouched) +178R vs +88R. User wants ~8-9%/month: told it
 for TBO). Tested and rejected on BTC dev: hourly VOLC (-140R), RSI(2) dip-buying (-123R, costs), hourly
 seasonality (edges < costs). Williams volatility breakout: long-only works mildly, weaker than TBO.
 Round 2 (user wanted daily, two-sided trades): session breakouts, 1h breakouts, mean reversion, pullbacks,
-always-in momentum all fail after fees on BTC (`families2.py`, `holdout2.py`). Next: ETH bot (v2 rules +178R on ETH).
+always-in momentum all fail after fees on BTC (`families2.py`, `holdout2.py`). ETH (Oct 2026): ETH-specific tuning lost to the BTC v2.1 settings out of sample -> ETH runs BTC settings
+(`config_eth.json`): +191R 2020-26, DD 15.7R, 3.7%/month at 2% (DD 28%). Both bots: ~1% risk each.
 
 ---
 
