@@ -39,7 +39,7 @@ def simulate(T, risk=0.004, cap=0.03, dir_cap=99, start=A, end=B, eq0=1000.0, sh
         be_t = max(r.be_time, r.entry_time + eps); ex_t = max(r.exit_time, r.entry_time + 2 * eps)
         ev += [(r.entry_time, 1, i), (be_t, 0, i), (ex_t, 2, i)]
     ev.sort(key=lambda z: (z[0], -z[1]))          # other trades' exits / BE before entries at the same timestamp
-    eq = eq0; open_ = {}; taken = []; curve = []
+    eq = eq0; open_ = {}; taken = []; curve = []; pnl = {}; risk_amt = {}
     for t, kind, i in ev:
         if kind == 1:
             if i in open_:
@@ -53,13 +53,16 @@ def simulate(T, risk=0.004, cap=0.03, dir_cap=99, start=A, end=B, eq0=1000.0, sh
         elif kind == 0 and i in open_:
             open_[i]["be"] = True
         elif kind == 2 and i in open_:
-            eq += open_.pop(i)["amt"] * tr.R[i]
+            v = open_.pop(i); pnl[i] = v["amt"] * tr.R[i]; risk_amt[i] = v["amt"]
+            eq += pnl[i]
         worst = eq - sum(v["amt"] for v in open_.values() if not v["be"])
         curve.append((t, eq, worst, len(open_)))
     assert not open_ or max(tr.exit_time[i] for i in open_) >= ev[-1][0] - pd.Timedelta(seconds=1), "stuck trade"
     cv = pd.DataFrame(curve, columns=["t", "equity", "worst", "n_open"]).set_index("t")
     assert cv.n_open.max() <= tr.sym.nunique(), "more open trades than coins"
-    return cv, tr.loc[taken]
+    out = tr.loc[taken].copy()
+    out["pnl"] = [pnl.get(i, np.nan) for i in taken]; out["risk_usd"] = [risk_amt.get(i, np.nan) for i in taken]
+    return cv, out
 
 
 def report(cv, taken, label, months):
