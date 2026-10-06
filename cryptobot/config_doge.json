@@ -1,8 +1,8 @@
 {
-  "risk_pct": 0.625,
+  "risk_pct": 1.875,
   "short_risk_mult": 0.5,
-  "max_leverage": 5,
-  "exchange_leverage": 10,
+  "max_leverage": 12,
+  "exchange_leverage": 25,
   "poll_s": 5,
   "strategy": {
     "symbol": "DOGEUSDT",
