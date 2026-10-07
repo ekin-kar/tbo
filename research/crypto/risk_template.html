@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TBO Risk Comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#ffffff;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;
+--btc:#eb6834;--eth:#2a78d6;--bnb:#eda100;--sol:#8b5cf6;--ada:#1baf7a;--comb:#18212b;--neg:#b3432f;--pos:#1d6b5b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--btc:#d95926;--eth:#3987e5;--bnb:#c98500;--sol:#a78bfa;--ada:#199e70;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--btc:#d95926;--eth:#3987e5;--bnb:#c98500;--sol:#a78bfa;--ada:#199e70;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 22px;max-width:78ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:20px;margin:40px 0 4px;font-weight:600}h3{font-size:16px;margin:0 0 6px}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:80ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--eth);outline-offset:2px}
+.coinbtn{display:inline-flex;align-items:center;gap:7px}.coinbtn i{width:10px;height:10px;border-radius:3px;display:inline-block}
+label.risk{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.risk input{font:inherit;width:84px;padding:7px 9px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 16px 10px;position:relative}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 6px}.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:18px;height:3px;border-radius:2px;display:inline-block}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.chart-cap{font-size:13px;color:var(--muted);margin:6px 2px 4px}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
+tr.yr td{font-weight:600;background:var(--soft)}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.big div{background:var(--surface);padding:12px 14px}.big b{display:block;font-size:22px;font-weight:600}.big span{font-size:13px;color:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}
+.tip .r{display:flex;justify-content:space-between;gap:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.spec{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:8px 0 0;font-size:14px}dt{color:var(--muted)}dd{margin:0}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.notes li{margin-bottom:6px}
+details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
+
+.seg button.now::after{content:" (now)";color:inherit;opacity:.7}
+tr.sel td{background:var(--soft);font-weight:600}
+.warn{border-left:3px solid var(--neg);padding:8px 12px;background:var(--surface);border-radius:6px;font-size:14px;color:var(--muted);max-width:90ch}
+</style></head><body><div class="wrap">
+<h1>Risk comparison: $250 for 2 years</h1>
+<p class="lede">What the bot (<b>TBO v2.4</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter, shorts at half size) could do with <b>$250 over 24 months</b> at different risk levels. Each level was run on the <b>same</b> <span id="nj"></span> simulated 2-year market paths, built from random 4-week blocks of the bot's real trades, so the levels are compared fairly. Fees, slippage and funding included.</p>
+<div class="controls">
+ <div><div class="ctl-title">Risk per trade (BTC / ETH / each alt)</div><div class="seg" id="risk"></div></div>
+</div>
+<div class="controls">
+ <div><div class="ctl-title">Add money every month</div><div class="seg" id="dep"></div></div>
+ <div><div class="ctl-title">Trades taken from</div><div class="seg" id="src"></div></div>
+</div>
+<div class="big" id="tiles"></div>
+<div class="panel">
+ <div class="legend"><span><i style="background:var(--comb);height:3px"></i>Median path</span><span><i style="background:var(--comb);opacity:.28;height:10px"></i>Middle 50%</span><span><i style="background:var(--comb);opacity:.12;height:10px"></i>Middle 80%</span><span><i style="border-top:1.5px dashed var(--pos);height:0"></i>$10k / $20k</span><span><i style="border-top:1.5px dashed var(--muted);height:0"></i>Money put in</span></div>
+ <svg id="fan" height="360" role="img" aria-label="Range of balances"></svg>
+ <div class="chart-cap" id="fancap"></div>
+</div>
+<h2>Chance of having reached each level by month</h2>
+<p class="hint">Share of paths whose balance touched the level at least once by that month (it may have fallen back later).</p>
+<div class="panel"><div class="legend" id="rleg"></div><svg id="reach" height="260" role="img" aria-label="Chance of reaching balance levels"></svg></div>
+<h2>Example paths</h2>
+<p class="hint">12 single 2-year paths at this risk. Green ended above the money put in, red below. This is what it feels like: long flat or falling stretches, then sudden jumps.</p>
+<div class="panel"><svg id="ex" height="340" role="img" aria-label="Example paths"></svg></div>
+<h2>All risk levels side by side</h2>
+<p class="hint" id="thint"></p>
+<div class="scroll panel"><table id="tbl"></table></div>
+<p class="warn" id="warn"></p>
+<h2>How to read this</h2>
+<ul class="notes">
+<li>Each path glues together random 4-week blocks of the bot's real backtest trades (all 5 coins together, as the bot trades them). The same paths are used for every risk level and deposit, so differences come from the settings, not from luck.</li>
+<li>"Risk" is the share of the balance lost if a trade's stop is hit: BTC / ETH / each of BNB, SOL, ADA. 1× is the bot's current config. Higher risk also needs a higher position-size cap (<code>max_leverage</code>) so tight-stop trades are not cut: about 8× at 1×, 12× at 1.5×, 16× at 2×.</li>
+<li>"Worst drop" counts open trades as if they hit their stop (worst case), from the highest balance reached so far.</li>
+<li>This is a backtest of past markets, with the open-interest filter and BNB/SOL chosen partly after seeing 2022-26. Real results are usually worse than a backtest: read the chances as optimistic. A market unlike 2022-26 can do worse than every path here.</li>
+<li>Below about $100 some alt trades become smaller than Binance's minimum order and are skipped, so very small balances recover more slowly than shown.</li>
+</ul>
+</div>
+<script>
+const D=/*DATA*/null;
+let S={m:D.mults.indexOf(1.5)>=0?D.mults.indexOf(1.0):0,d:0,s:'2022'};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const money=v=>'$'+Math.round(v).toLocaleString('en-US');
+const pc=v=>Math.round(v)+'%';
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function seg(id,items,cur,fn,cls){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}" class="${cls?cls(i):''}">${t}</button>`).join('');
+ e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
+const R=D.risks,K=Object.keys(R);
+const rlab=m=>`${+(R.BTC*m).toFixed(2)}% / ${+(R.ETH*m).toFixed(2)}% / ${+(R[K[2]]*m).toFixed(2)}%`;
+function axes(sv,H,lo,hi,lg){const W=sv.clientWidth,L=64,Rm=24,T=10,B=26;sv.innerHTML='';sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const x=m=>L+m/D.months*(W-L-Rm),y=v=>T+(1-((lg?Math.log10(Math.max(v,1e-9)):v)-lo)/(hi-lo))*(H-T-B);
+ for(let m=0;m<=D.months;m+=3){el('line',{x1:x(m),x2:x(m),y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:x(m),y:H-7,'text-anchor':'middle'},sv).textContent=m?`month ${m}`:'start';}
+ return {W,L,Rm,T,B,x,y};}
+function logGrid(sv,A,mn,mx){for(let e=0;e<=7;e++)for(const k of[1,2,5]){const v=k*10**e;if(v>=mn&&v<=mx){el('line',{x1:A.L,x2:A.W-A.Rm,y1:A.y(v),y2:A.y(v),stroke:css('--rule')},sv);el('text',{x:A.L-8,y:A.y(v)+4,'text-anchor':'end'},sv).textContent=money(v);}}}
+function hline(sv,A,v,col){el('line',{x1:A.L,x2:A.W-A.Rm,y1:A.y(v),y2:A.y(v),stroke:col,'stroke-dasharray':'5 4','stroke-width':1.5},sv);}
+function invested(m){return D.start+D.deps[S.d]*Math.min(m,D.months-1);}
+function draw(){
+ seg('risk',D.mults.map(rlab),i=>i===S.m,i=>S.m=i,i=>D.mults[i]===1?'now':'');
+ seg('dep',D.deps.map(d=>d?`+$${d} / month`:'Nothing'),i=>i===S.d,i=>S.d=i);
+ seg('src',Object.values(D.srcs),i=>Object.keys(D.srcs)[i]===S.s,i=>S.s=Object.keys(D.srcs)[i]);
+ const mult=D.mults[S.m],dep=D.deps[S.d],r=D.res[S.s][`${mult}_${dep}`],inv=r.invested;
+ document.getElementById('nj').textContent=D.n.toLocaleString('en-US');
+ document.getElementById('tiles').innerHTML=[
+  [money(r.median),`typical result after 2 years (median) · money put in ${money(inv)}`],
+  [`${money(r.p10)} – ${money(r.p90)}`,`bad luck (1 in 10 ends lower) – good luck (1 in 10 ends higher)`],
+  [pc(r.p10k),`chance to end with $10k or more · $20k+: ${pc(r.p20k)}`],
+  [pc(r.p_up),`chance to end above the money put in`],
+  ['−'+pc(r.dd_med),`typical worst drop from a peak · 1 in 10 paths worse than −${pc(r.dd_p90)}`],
+  [pc(r.ever_lt100),`chance the balance falls below $100 at some point · ends there: ${pc(r.end_lt100)}`]]
+  .map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+ // fan
+ const P=r.pct,mn=Math.max(20,Math.min(...P['10'])*0.8),mx=Math.max(25000,...P['90'])*1.2,sv=document.getElementById('fan'),A=axes(sv,360,Math.log10(mn),Math.log10(mx),true);
+ logGrid(sv,A,mn,mx);
+ const band=(a,b,op)=>{let p='';a.forEach((v,m)=>p+=(m?'L':'M')+A.x(m).toFixed(1)+','+A.y(v).toFixed(1));for(let m=b.length-1;m>=0;m--)p+='L'+A.x(m).toFixed(1)+','+A.y(b[m]).toFixed(1);el('path',{d:p+'Z',fill:css('--comb'),'fill-opacity':op},sv);};
+ band(P['10'],P['90'],0.10);band(P['25'],P['75'],0.22);
+ hline(sv,A,10000,css('--pos'));hline(sv,A,20000,css('--pos'));
+ let ip='';for(let m=0;m<=D.months;m++)ip+=(m?'L':'M')+A.x(m).toFixed(1)+','+A.y(invested(m)).toFixed(1);el('path',{d:ip,fill:'none',stroke:css('--muted'),'stroke-dasharray':'5 4','stroke-width':1.5},sv);
+ let mp='';P['50'].forEach((v,m)=>mp+=(m?'L':'M')+A.x(m).toFixed(1)+','+A.y(v).toFixed(1));el('path',{d:mp,fill:'none',stroke:css('--comb'),'stroke-width':2.5},sv);
+ document.getElementById('fancap').textContent=`Month-end balance, log scale. Risk ${rlab(mult)}${dep?`, adding $${dep} every month`:''}; ${D.srcs[S.s].toLowerCase()}.`;
+ // reach
+ const cols=['--muted','--eth','--pos','--btc'],rv=document.getElementById('reach'),B=axes(rv,260,0,100,false);
+ for(let v=0;v<=100;v+=25){el('line',{x1:B.L,x2:B.W-B.Rm,y1:B.y(v),y2:B.y(v),stroke:css('--rule')},rv);el('text',{x:B.L-8,y:B.y(v)+4,'text-anchor':'end'},rv).textContent=v+'%';}
+ document.getElementById('rleg').innerHTML=D.levels.map((L,i)=>`<span><i style="background:var(${cols[i]})"></i>${money(L)}</span>`).join('');
+ D.levels.forEach((L,i)=>{const arr=r.reach[L];let p='';arr.forEach((v,m)=>p+=(m?'L':'M')+B.x(m).toFixed(1)+','+B.y(v).toFixed(1));el('path',{d:p,fill:'none',stroke:css(cols[i]),'stroke-width':2},rv);
+  el('text',{x:B.W-B.Rm-4,y:B.y(arr[arr.length-1])-5,'text-anchor':'end',style:`fill:var(${cols[i]});font-weight:600`},rv).textContent=Math.round(arr[arr.length-1])+'%';});
+ // examples
+ const ex=r.ex,ev=ex.flat(),emn=Math.max(10,Math.min(...ev)*0.8),emx=Math.max(...ev)*1.2,xv=document.getElementById('ex'),Cx=axes(xv,340,Math.log10(emn),Math.log10(emx),true);
+ logGrid(xv,Cx,emn,emx);
+ let ip2='';for(let m=0;m<=D.months;m++)ip2+=(m?'L':'M')+Cx.x(m).toFixed(1)+','+Cx.y(invested(m)).toFixed(1);el('path',{d:ip2,fill:'none',stroke:css('--muted'),'stroke-dasharray':'5 4','stroke-width':1.5},xv);
+ ex.forEach(path=>{const c=css(path[path.length-1]>=invested(D.months)?'--pos':'--neg');let p='';path.forEach((v,m)=>p+=(m?'L':'M')+Cx.x(m).toFixed(1)+','+Cx.y(v).toFixed(1));
+  el('path',{d:p,fill:'none',stroke:c,'stroke-width':1.6,'stroke-opacity':0.85},xv);el('circle',{cx:Cx.x(D.months),cy:Cx.y(path[path.length-1]),r:3.5,fill:c},xv);});
+ // table
+ document.getElementById('thint').textContent=`Same ${D.n.toLocaleString('en-US')} market paths for every row${dep?`, adding $${dep} every month (${money(inv)} put in)`:''}; ${D.srcs[S.s].toLowerCase()}. Click a row to show it above.`;
+ const cap=m=>Math.round(8*m);
+ document.getElementById('tbl').innerHTML='<thead><tr><th>Risk (BTC / ETH / each alt)</th><th>Typical result</th><th>Bad luck (1 in 10)</th><th>Good luck (1 in 10)</th><th>End ≥ $10k</th><th>End ≥ $20k</th><th>End above money in</th><th>Falls below $100 at some point</th><th>Typical worst drop</th><th>1 in 10 worst drop</th><th>Size cap needed</th></tr></thead><tbody>'+
+  D.mults.map((m,i)=>{const q=D.res[S.s][`${m}_${dep}`];return `<tr class="${i===S.m?'sel':''}" data-i="${i}" style="cursor:pointer"><td>${rlab(m)}${m===1?' (now)':''}</td><td>${money(q.median)}</td><td>${money(q.p10)}</td><td>${money(q.p90)}</td><td>${pc(q.p10k)}</td><td>${pc(q.p20k)}</td><td>${pc(q.p_up)}</td><td>${pc(q.ever_lt100)}</td><td>−${pc(q.dd_med)}</td><td>−${pc(q.dd_p90)}</td><td>${cap(m)}×</td></tr>`;}).join('')+'</tbody>';
+ document.querySelectorAll('#tbl tbody tr').forEach(tr=>tr.onclick=()=>{S.m=+tr.dataset.i;draw();});
+ const hi=D.res[S.s][`${D.mults[D.mults.length-1]}_${dep}`],mid=D.res[S.s][`1.5_${dep}`];
+ document.getElementById('warn').innerHTML=`<b>Reading the table:</b> beyond about 1.5× the chance of $10k barely rises (${pc(mid.p10k)} → ${pc(hi.p10k)} at 2×) while the typical worst drop goes from −${pc(mid.dd_med)} to −${pc(hi.dd_med)} and bad-luck results shrink. The biggest danger at any level is stopping the bot during a drop: every path that reached $10k went through drops like these.`;}
+draw();addEventListener('resize',()=>draw());matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>draw());
+</script></body></html>
