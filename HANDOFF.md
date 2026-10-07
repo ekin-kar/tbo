@@ -69,6 +69,12 @@ Funding carry: ~0.4%/month 2024-26 on capital, 1-3%/yr in 2025-26 -> not worth i
 OI-falling exit during a trade (x0.06-1.06, worse or flat), bigger size when OI rises (0 of 18 settings >10% better in
 both periods), spot-led vs futures-led (0 of 36; luck 1.3%), futures premium (0 of 24), top traders vs crowd (0 of 36),
 any of them as size x1.5 (0 of 78). Nothing adopted; v2.4 stays.
+Fakeout detection on v2.4 (Oct 2026, `ideas_v5.py`, 1m taker volume via `fetch_taker_1m.py` into cache/, not in git):
+RSI/MACD divergence vs the level candle (0 of 24 filters), other coins not joining (0 of 23; "one other coin near its
+break" x1.40 / x1.09 but not monotonic: 0/1/2/3 coins = +0.48/+0.07/+0.28/-0.64R 2020-23), rejected pokes / grinding
+under the level (0 of 14), early exits on absorption (0 of 42), trigger-minute trade spike / OI drop after the fill
+(0 of 12), gap / spike through the level (0 of 18): none beats base and random exits in both periods. Early exits lose
+because most breakouts that stall in the first hour still end as winners. Order book: no history; untestable.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
