@@ -1,4 +1,5 @@
-"""Downloads the extra Binance data for ideas 6, 7 and 10 (needs internet access to Binance; standard library + requests).
+"""Downloads the extra Binance data for ideas 6, 7 and 10 from Binance's public archive data.binance.vision
+(standard library + requests).
 Run from the repo root:   python research/crypto/fetch_binance_extra.py
 Writes data/extra/ (gzipped CSV, about 15 MB in total), then:   git add data/extra && git commit -m "extra data" && git push
   - {SYM}_funding.csv.gz   every funding payment since the coin listed (time, rate)          -> ideas 6 and 10
@@ -14,6 +15,7 @@ import requests
 COINS = ["BTCUSDT", "ETHUSDT", "DOGEUSDT", "ADAUSDT"]
 FAPI = "https://fapi.binance.com"
 ARCH = "https://data.binance.vision/data/futures/um/daily/metrics"
+MONTHLY = "https://data.binance.vision/data/futures/um/monthly"
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, "data", "extra")
 START = int(datetime(2020, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
@@ -42,20 +44,34 @@ def write(path, header, rows):
     os.replace(tmp, path)
 
 
+def months():
+    d = date(2020, 1, 1); out = []
+    while d < date.today().replace(day=1):
+        out.append(d.strftime("%Y-%m")); d = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return out
+
+
+def monthly_rows(kind, sym, sub=""):
+    """All rows of Binance's monthly archive files (data.binance.vision), header lines dropped."""
+    def one(mo):
+        name = f"{sym}-{sub + '-' if sub else ''}{mo}.zip" if kind == "klines" else f"{sym}-fundingRate-{mo}.zip"
+        url = f"{MONTHLY}/{kind}/{sym}/{sub + '/' if sub else ''}{name}"
+        r = get(url)
+        if r is None:
+            return []
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        rows = list(csv.reader(io.StringIO(z.read(z.namelist()[0]).decode())))
+        return [x for x in rows if x and x[0][:1].isdigit()]
+    with ThreadPoolExecutor(8) as ex:
+        return [r for part in ex.map(one, months()) for r in part]
+
+
 def funding(sym):
     path = os.path.join(OUT, f"{sym}_funding.csv.gz")
     if os.path.exists(path):
         return
-    rows, t = [], START
-    while True:
-        d = get(f"{FAPI}/fapi/v1/fundingRate", dict(symbol=sym, startTime=t, limit=1000)).json()
-        if not d:
-            break
-        rows += [(x["fundingTime"], x["fundingRate"]) for x in d]
-        t = d[-1]["fundingTime"] + 1
-        if len(d) < 1000:
-            break
-    write(path, ["time_ms", "rate"], rows)
+    rows = [(r[0], r[-1]) for r in monthly_rows("fundingRate", sym)]      # calc_time, ..., last_funding_rate
+    write(path, ["time_ms", "rate"], sorted(rows, key=lambda x: int(x[0])))
     print(f"{sym}: {len(rows)} funding payments")
 
 
@@ -63,16 +79,9 @@ def klines(sym):
     path = os.path.join(OUT, f"{sym}_4h.csv.gz")
     if os.path.exists(path):
         return
-    rows, t = [], START
-    while True:
-        d = get(f"{FAPI}/fapi/v1/klines", dict(symbol=sym, interval="4h", startTime=t, limit=1500)).json()
-        if not d:
-            break
-        rows += [(k[0], k[1], k[2], k[3], k[4], k[5], k[7], k[8], k[9], k[10]) for k in d]
-        t = d[-1][0] + 1
-        if len(d) < 1500:
-            break
-    write(path, ["open_ms", "o", "h", "l", "c", "volume", "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"], rows)
+    rows = [(k[0], k[1], k[2], k[3], k[4], k[5], k[7], k[8], k[9], k[10]) for k in monthly_rows("klines", sym, "4h")]
+    write(path, ["open_ms", "o", "h", "l", "c", "volume", "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"],
+          sorted(rows, key=lambda x: int(x[0])))
     print(f"{sym}: {len(rows)} 4h candles")
 
 
