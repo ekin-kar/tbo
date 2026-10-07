@@ -85,6 +85,10 @@ All 12 coins on v2.4 at 1% risk each from $200 (Oct 2026, `all12.py`, OI metrics
 DOT -0.19, LTC -0.69 (2020-23: BTC 3.56, DOGE 2.98, ADA 2.11, SOL 1.84, ETH 1.82, BNB 1.29 ...). Adding BNB at 1.25% raises
 money and drawdown in proportion (return/drop 0.358 -> 0.361, 0.312 -> 0.314) = like more risk, not a better edge;
 +BNB+SOL better 2020-23, worse 2024-26. Kept BTC/ETH/DOGE/ADA.
+Hedge idea (Oct 2026, `hedge_test.py`): half-size opposite trade opened with every entry (or after -0.5/-0.8R), kept after
+a stop-out until its TP (1-3R; stop at its entry), closed when the main trade is +0.5..1.5R: all 20 variants worse than
+no hedge (net/drop 2020-23 10.5-20.0 vs 21.5; 2024-26 5.0-13.5 vs 13.6), profit -5..-30%, drops not smaller. Not adopted
+(and it would need Binance hedge mode).
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
