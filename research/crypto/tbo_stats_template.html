@@ -47,7 +47,7 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.n
 details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
 </style></head><body><div class="wrap">
 <h1>TBO crypto bot statistics</h1>
-<p class="lede">Every trade of <b>TBO v2.2</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, DOGE and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: risk % of the balance at entry, shorts at the short-size factor. Pick coins, period, risk and starting balance; everything recalculates.</p>
+<p class="lede">Every trade of <b>TBO v2.4</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, DOGE and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: risk % of the balance at entry, shorts at the short-size factor. Pick coins, period, risk and starting balance; everything recalculates.</p>
 <div class="controls">
  <div><div class="ctl-title">Coins</div><div class="seg" id="coins"></div></div>
  <div><div class="ctl-title">Period</div><div class="seg" id="periods"></div></div>
@@ -113,6 +113,7 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 <li>R figures (win rate, profit factor, net R, drawdown in R) are pure trade statistics: they do not depend on risk, coin weights or the short-size factor. The combined R columns add all selected coins' trades at 1R each.</li>
 <li>Dollar and percent figures run one account through time: each trade's size is its coin's risk % of the balance at entry (× the short-size factor for shorts); a trade's result is size × R at its exit. The worst-case drawdown counts every open trade not yet at breakeven as lost at its stop. No cap on total open risk (the bot has none; when all four are open at once, the account risks the sum of the four coins' risks).</li>
 <li>A win is a trade closed above +0.2R, a loss below −0.2R, the rest are breakeven exits (the stop was moved to the entry at +1.5R).</li>
+<li>The open-interest filter (v2.4) only acts from 2022 (Binance's open-interest history starts in Dec 2021) and was chosen after seeing 2022–26: 24 of 32 nearby settings also beat the bot without it in both 2022–23 and 2024–26, and random skipping of the same number of orders never matched it, but expect live gains to be smaller.</li>
 <li>Honest caveats: the rules were tuned on BTC 2020–26, DOGE and ADA were picked after seeing 2020–23, and the coin weights and short size were chosen after seeing all years, so the full-history figures are optimistic. The 2024–26 period is the best guide; expect live results somewhat below it. In a test with 200 random-entry versions of the same rules, the real entries beat all 200 in both 2020–23 and 2024–26.</li>
 </ul>
 </div>
@@ -324,6 +325,7 @@ document.getElementById('specs').innerHTML=`
 <div class="spec"><h3>The trading rules (same for all four coins)</h3><p class="hint" style="margin:0">Trend breakout on 4-hour candles: wait for price to break out of its last ~3 days' range in the direction of the daily trend, then let the winners run for up to 5 days.</p><dl>
 <dt>Trend filter</dt><dd>Longs only while the last daily close is above the daily EMA${st.ema_n} <b>and</b> the EMA is higher than ${st.slope_d} days ago; shorts only when below and falling. Otherwise no orders.</dd>
 <dt>Don't chase</dt><dd>No new order while the daily close is more than ${st.max_ext} daily ATRs away from the EMA${st.ema_n}.</dd>
+<dt>Open interest</dt><dd>No new order while Binance open interest (USD) is down ${Math.abs(st.oi_min_chg*100)}% or more versus ${st.oi_lookback_h} hours earlier: traders are closing positions rather than opening new ones, and breakouts then follow through less. (Data from Dec 2021, so 2020–21 trades are unfiltered.)</dd>
 <dt>Entry</dt><dd>At every 4-hour close (00, 04, 08, 12, 16, 20 UTC) while flat: a stop order at the highest high (long) or lowest low (short) of the last ${st.n} closed 4-hour candles. Valid until the next 4-hour close, then moved to the new level.</dd>
 <dt>Weekends</dt><dd>No new orders on Saturday or Sunday (UTC).</dd>
 <dt>Stop-loss</dt><dd>${st.sl_atr} × ATR${st.atr_n} of the 4-hour candles from the fill price, placed on Binance right after the fill.</dd>
@@ -347,7 +349,7 @@ document.getElementById('settings').innerHTML='<thead><tr><th>Setting</th><th>Va
  ['risk_pct',COINS.map((c,i)=>`${c} ${D.risk[i]}`).join(' · '),'% of the balance lost if the stop is hit'],['short_risk_mult',D.smult,'shorts trade at this fraction of the risk'],
  ['max_leverage',D.maxlev,'per-position size cap: notional at most this many times the balance'],['exchange_leverage',D.exlev,'leverage set on Binance (only sets the margin each position locks)'],['tf_min',st.tf_min,'candle size in minutes (4 hours)'],
  ['n',st.n,'breakout channel: last n closed 4-hour candles'],['atr_n',st.atr_n,'ATR length for the stop'],['sl_atr',st.sl_atr,'stop distance in ATRs'],
- ['ema_n',st.ema_n,'daily trend EMA'],['slope_d',st.slope_d,'EMA must rise / fall over this many days'],['max_ext',st.max_ext,'skip when more than this many daily ATRs from the EMA'],
+ ['ema_n',st.ema_n,'daily trend EMA'],['slope_d',st.slope_d,'EMA must rise / fall over this many days'],['max_ext',st.max_ext,'skip when more than this many daily ATRs from the EMA'],['oi_lookback_h',st.oi_lookback_h,'open-interest filter: compare with this many hours ago (0 = off)'],['oi_min_chg',st.oi_min_chg,'no new order when open interest changed by this much or less'],
  ['no_weekend',st.no_weekend,'no new orders Sat / Sun'],['be_R',st.be_R,'move the stop to entry at this profit (in R)'],['be_off',st.be_off,'where the breakeven stop goes (0 = exactly the entry)'],
  ['max_hold_h',st.max_hold_h,'close after this many hours'],['trail_m / trail_atr',`${st.trail_m} / ${st.trail_atr}`,'trailing exit: off'],['sides',st.sides,'long and short']]
  .map(r=>`<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td style="text-align:left">${r[2]}</td></tr>`).join('')+'</tbody>';

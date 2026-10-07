@@ -28,7 +28,7 @@ import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.3"
+VERSION = "2.4"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -178,6 +178,19 @@ class Bot:
         for o in self.my_algo_orders():                 # stray entry orders (e.g. after a crash)
             if "_in_" in o["clientAlgoId"]:
                 self.cancel(o["algoId"])
+        # open-interest filter (no new order while open interest is falling)
+        blocked = False
+        if self.p.oi_lookback_h > 0:
+            try:
+                hist = self.x.open_interest_hist(self.sym, limit=self.p.oi_lookback_h + 12)
+                chg = S.oi_change(hist, open_ms + self.p.tf_min * 60_000, self.p.oi_lookback_h)
+            except Exception as e:                     # never let missing data stop the bot: no filter then
+                chg = None
+                log.warning(f"open interest unavailable ({e}): filter not applied this candle")
+            blocked = S.oi_blocks(self.p, chg)
+            if chg is not None:
+                log.info(f"open interest {chg * 100:+.1f}% over {self.p.oi_lookback_h} h"
+                         + (f" (<= {self.p.oi_min_chg * 100:.0f}%: no new entry order)" if blocked else ""))
         # 3. new entry order while flat (re-read: the old entry order may have filled in the meantime)
         if amt == 0 and not self.dry:
             amt, _ = self.x.position(self.sym)
@@ -188,7 +201,7 @@ class Bot:
         if amt == 0 and not self.paused():
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
-                if trig is None:
+                if trig is None or blocked:
                     continue
                 trig = ceil_step(trig, self.f["tick"]) if side == 1 else floor_step(trig, self.f["tick"])
                 if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
@@ -272,8 +285,9 @@ class Bot:
                 self.save()
             if not self.sl_alive():
                 self.place_sl(amt, entry_px)
-            self.check_breakeven(amt, entry_px)
-            if now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
+            if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
+                self.check_breakeven(amt, entry_px)
+            if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
                 self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)")
         elif self.st.get("entry_ms"):
             log.info("position closed (stop loss hit or closed by hand)")

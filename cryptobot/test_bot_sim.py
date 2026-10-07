@@ -5,6 +5,8 @@ with replay.py (the backtest of the same logic).
 
     python cryptobot/test_bot_sim.py [BTCUSDT] [2024-01-01] [2024-07-01]
 """
+import json
+import os
 import logging
 import sys
 from pathlib import Path
@@ -64,6 +66,13 @@ class FakeFutures:
         rows = [(int(c["t"][i]) * 60_000, c["o"][i], c["h"][i], c["l"][i], c["c"][i], (int(c["t"][i]) + tf) * 60_000 - 1)
                 for i in range(max(0, k - limit), k)]
         return rows
+
+    def open_interest_hist(self, sym, period="1h", limit=100):
+        if not hasattr(self, "oi"):
+            self.oi = RP.load_oi(sym)
+        now = self.now_ms()
+        i = int(np.searchsorted(self.oi[0], now, side="right"))
+        return [(int(t), float(v)) for t, v in zip(self.oi[0][max(0, i - limit):i], self.oi[1][max(0, i - limit):i])]
 
     def last_price(self, sym):
         return float(self.m["o"][self.j])
@@ -138,14 +147,19 @@ class FakeFutures:
                 self._fill(od["side"], od["qty"], px, "entry")
 
 
+def params(sym):
+    """The coin's live strategy settings (config_xxx.json)."""
+    return S.Params(**json.load(open(HERE / f"config_{sym[:-4].lower()}.json"))["strategy"])
+
+
 def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     m = C.load(sym)
     fx = FakeFutures(m, tick=FakeFutures.exchange_info(None, sym)["tick"])
-    cfg = dict(risk_pct=2.0, max_leverage=5, strategy=S.Params(symbol=sym).to_dict())
+    cfg = dict(risk_pct=2.0, max_leverage=5, strategy=params(sym).to_dict())
     bot = B.Bot.__new__(B.Bot)
     bot.cfg, bot.dry = cfg, False
     bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.02; bot.max_lev = 5; bot.poll = 0
-    bot.state_path = Path("/tmp/claude_tbo_sim_state.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
+    bot.state_path = Path(f"/tmp/claude_tbo_sim_state_{sym}_{os.getpid()}.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
     bot.short_mult = 1.0; bot.cfg = cfg; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))
     tf_ms = 240 * 60_000
@@ -173,7 +187,7 @@ if __name__ == "__main__":
     start = sys.argv[2] if len(sys.argv) > 2 else "2024-01-01"
     end = sys.argv[3] if len(sys.argv) > 3 else "2024-07-01"
     bt = run(sym, start, end)
-    ref = RP.replay(C.load(sym), S.Params(symbol=sym), start, end)
+    ref = RP.replay(C.load(sym), params(sym), start, end)
     ref = ref[ref.exit_time < end]
     bt_entries = {C.D.to_datetime([b["entry_time"]])[0]: b for b in bt}
     same = sum(1 for t in ref.entry_time if t in bt_entries)

@@ -19,10 +19,24 @@ import common as C, families as F         # noqa: E402
 
 LIVE_4H_CANDLES = 1000
 LIVE_1D_CANDLES = 500
+EXTRA = HERE.parent / "data" / "extra"
 
 
-def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE):
+def load_oi(sym):
+    """Hourly open interest (USD) from Binance's archive (data/extra, fetch_binance_extra.py): (times ms, values);
+    the archive has a few zero rows, which carry the previous value."""
+    g = pd.read_csv(EXTRA / f"{sym}_metrics_1h.csv.gz", usecols=["create_time", "sum_open_interest_value"])
+    t = pd.to_datetime(g.create_time).values.astype("datetime64[ms]").astype(np.int64)
+    o = np.argsort(t)
+    v = g.sum_open_interest_value.to_numpy(float)[o]
+    v = pd.Series(np.where(v > 0, v, np.nan)).ffill().to_numpy()
+    return t[o], v
+
+
+def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
     c4 = F.resample(m, p.tf_min)
+    if p.oi_lookback_h > 0 and oi is None:
+        oi = load_oi(p.symbol)
     d1 = F.resample(m, 1440)
     t0, t1 = C.D.minutes(start), C.D.minutes(end)
     n1 = len(m["t"])
@@ -52,7 +66,14 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE):
         elif pos == -1 and dec.exit_short:
             close(j0, m["o"][j0], "SIGNAL")
         order = None
-        if pos == 0:
+        blocked = False
+        if p.oi_lookback_h > 0:
+            order_ms = (int(c4["t"][k]) + p.tf_min) * 60_000
+            i = int(np.searchsorted(oi[0], order_ms))
+            lo_i = max(0, i - p.oi_lookback_h - 12)
+            chg = S.oi_change(list(zip(oi[0][lo_i:i], oi[1][lo_i:i])), order_ms, p.oi_lookback_h)
+            blocked = S.oi_blocks(p, chg)
+        if pos == 0 and not blocked:
             if dec.long_trigger is not None:
                 order = (1, dec.long_trigger)
             elif dec.short_trigger is not None:

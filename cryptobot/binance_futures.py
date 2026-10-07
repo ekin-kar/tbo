@@ -96,6 +96,11 @@ class Futures:
     def last_price(self, symbol):
         return float(self._req("GET", "/fapi/v1/ticker/price", dict(symbol=symbol))["price"])
 
+    def open_interest_hist(self, symbol, period="1h", limit=100):
+        """[(timestamp_ms, open interest USD value), ...] oldest first (public endpoint, last 30 days)."""
+        raw = self._req("GET", "/futures/data/openInterestHist", dict(symbol=symbol, period=period, limit=min(int(limit), 500)))
+        return sorted((int(r["timestamp"]), float(r["sumOpenInterestValue"])) for r in raw)
+
     # ── account ──
     def account(self):
         return self._req("GET", "/fapi/v3/account", signed=True)

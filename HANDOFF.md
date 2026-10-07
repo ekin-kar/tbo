@@ -1,6 +1,6 @@
 # Crypto (Binance futures) - Oct 2026
 
-**Live setup (v2.3):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
+**Live setup (v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), configs BTC 5% / ETH 2.5% / DOGE 1.25% / ADA 1.25% risk (user chose 2x for a $200 account; size cap 8x, leverage 20x), shorts x0.5; step-by-step
 guide in `cryptobot/README.md` ("GO LIVE"). Pages: `stats/tbo_crypto_statistics.html`, `cryptobot/robustness.html`,
 `cryptobot/monthly_report.html`.

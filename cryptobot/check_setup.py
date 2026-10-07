@@ -83,6 +83,16 @@ for c in cfgs:
         except Exception:
             pass
         x.open_algo_orders(sym); res(True, f"algo-order endpoint reachable for {sym}")
+        if p.oi_lookback_h > 0:
+            try:
+                hist = x.open_interest_hist(sym, limit=p.oi_lookback_h + 12)
+                chg = S.oi_change(hist, x.now_ms(), p.oi_lookback_h)
+                res(chg is not None, f"open interest data: {len(hist)} hourly rows" + (
+                    f", {chg * 100:+.1f}% over {p.oi_lookback_h} h -> " + ("new entries PAUSED by the filter right now" if S.oi_blocks(p, chg)
+                                                                          else "entries allowed") if chg is not None else
+                    " but not enough recent rows (the filter is skipped until there are)"), warn=chg is None)
+            except Exception as e:
+                res(False, f"open interest data unavailable ({e}): the bot then trades without the filter", warn=True)
     except BinanceError as e:
         res(False, f"{sym}: {e}")
 print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${bal * total_risk:.2f})")

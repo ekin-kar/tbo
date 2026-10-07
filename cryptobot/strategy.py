@@ -7,6 +7,9 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
                falling (shorts) versus slope_d days earlier, otherwise no order.
   Weekend    : no_weekend -> no new orders placed on Saturday / Sunday (UTC).
   Stretch    : no new order while the daily close is more than max_ext x daily ATR14 away from the daily EMA.
+  Open int.  : oi_lookback_h > 0 -> no new order while Binance open interest (USD value, hourly) is down by
+               oi_min_chg or more versus oi_lookback_h hours earlier (positions are being closed, not opened:
+               breakouts then follow through less). Missing / stale data -> no filter.
   Entry      : at each 4h candle close, while flat: a stop order at the highest high of the last `n`
                closed 4h candles (long) / lowest low (short). The order lives until the next 4h close,
                where it is cancelled and re-placed at the new level.
@@ -41,6 +44,8 @@ class Params:
     be_R: float = 1.5
     be_off: float = 0.0
     max_ext: float = 4.0         # in daily ATR14 from the daily EMA; 99 = off
+    oi_lookback_h: int = 0       # open-interest filter: hours back (hourly rows); 0 = off
+    oi_min_chg: float = -0.03    # skip new orders when OI changed by this much or less over the lookback
 
     def to_dict(self):
         return asdict(self)
@@ -79,6 +84,23 @@ def trend_side(daily_close, ema_n, slope_d=0):
     if slope_d > 0 and np.sign(e[-1] - e[-1 - slope_d]) != side:
         return 0
     return side
+
+
+def oi_change(hist, order_ms, lookback_h):
+    """hist: [(timestamp_ms, open interest USD value), ...] hourly, oldest first. Change from lookback_h rows
+    before the last row strictly before order_ms to that row; None when the data is missing or stale (>= 3 h old)."""
+    ts = [t for t, _ in hist]
+    i = int(np.searchsorted(ts, order_ms, side="left")) - 1
+    if i < lookback_h or order_ms - ts[i] >= 3 * 3600_000:
+        return None
+    v0, v1 = hist[i - lookback_h][1], hist[i][1]
+    if not (v0 > 0 and v1 > 0):
+        return None
+    return v1 / v0 - 1
+
+
+def oi_blocks(p: "Params", chg):
+    return p.oi_lookback_h > 0 and chg is not None and chg <= p.oi_min_chg
 
 
 @dataclass

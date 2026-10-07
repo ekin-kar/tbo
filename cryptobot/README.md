@@ -8,6 +8,7 @@
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
 | Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
+| Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |

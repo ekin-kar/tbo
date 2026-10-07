@@ -1,11 +1,11 @@
-"""Builds cryptobot/tbo_statistics.html (TBO v2.2, BTC/ETH/DOGE/ADA) and a Python reference for checking the page's math.
-Trades: TBO v2.2 rules (= v2.1 entries/exits; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
+"""Builds cryptobot/tbo_statistics.html (TBO v2.4, BTC/ETH/DOGE/ADA) and a Python reference for checking the page's math.
+Trades: TBO v2.4 rules (v2.2 + open-interest filter from 2022, filter_test3.py 'USD 3d <= -3%'; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import json, pickle
 import numpy as np, pandas as pd
 import common as C
 
 ROOT = C.ROOT
-ALL = pickle.load(open(C.D.CACHE / "portfolio_trades.pkl", "rb"))
+ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
 COINS = ["BTCUSDT", "ETHUSDT", "DOGEUSDT", "ADAUSDT"]
 cfg = {c: json.load(open(ROOT / "cryptobot" / f"config_{c[:-4].lower()}.json")) for c in COINS}
 ms = lambda s: (s.values.astype("datetime64[ms]").astype(np.int64))
