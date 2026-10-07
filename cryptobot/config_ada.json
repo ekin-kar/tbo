@@ -1,5 +1,5 @@
 {
-  "risk_pct": 1.25,
+  "risk_pct": 0.83,
   "short_risk_mult": 0.5,
   "max_leverage": 8,
   "exchange_leverage": 20,

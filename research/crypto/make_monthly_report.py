@@ -1,4 +1,4 @@
-"""cryptobot/monthly_report.html: TBO, BTC+ETH+DOGE+ADA at the bot's config risks (read from the configs), shorts at
+"""cryptobot/monthly_report.html: TBO, BTC+ETH+BNB+SOL+ADA at the bot's config risks (read from the configs), shorts at
 short_risk_mult, no open-risk cap (like the bot), starting balance START.
 Two runs: from Mar 2020 and a fresh start in Jan 2024 (the period no choice was based on)."""
 import json, pickle
@@ -7,7 +7,7 @@ import common as C
 from portfolio import simulate
 
 ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
-COINS = ["BTCUSDT", "ETHUSDT", "DOGEUSDT", "ADAUSDT"]
+COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 T4 = pd.concat([ALL[(s, 0.0003)] for s in COINS])
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}
 BASE = CFG["BTCUSDT"]["risk_pct"] / 100

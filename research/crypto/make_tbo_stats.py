@@ -1,4 +1,4 @@
-"""Builds cryptobot/tbo_statistics.html (TBO v2.4, BTC/ETH/DOGE/ADA) and a Python reference for checking the page's math.
+"""Builds cryptobot/tbo_statistics.html (TBO v2.4, BTC/ETH/BNB/SOL/ADA) and a Python reference for checking the page's math.
 Trades: TBO v2.4 rules (v2.2 + open-interest filter from 2022, filter_test3.py 'USD 3d <= -3%'; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import json, pickle
 import numpy as np, pandas as pd
@@ -6,7 +6,7 @@ import common as C
 
 ROOT = C.ROOT
 ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
-COINS = ["BTCUSDT", "ETHUSDT", "DOGEUSDT", "ADAUSDT"]
+COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 cfg = {c: json.load(open(ROOT / "cryptobot" / f"config_{c[:-4].lower()}.json")) for c in COINS}
 ms = lambda s: (s.values.astype("datetime64[ms]").astype(np.int64))
 rows = []
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     (ROOT / "stats" / "tbo_crypto_statistics.html").write_text(html)
     T0, T1 = int(pd.Timestamp("2020-03-01").value // 10**6), int(pd.Timestamp("2026-10-01").value // 10**6)
     T24 = int(pd.Timestamp("2024-01-01").value // 10**6)
-    cases = {"all4": ([1, 1, 1, 1], T0), "btc": ([1, 0, 0, 0], T0), "btc_eth": ([1, 1, 0, 0], T0), "doge_ada_2024": ([0, 0, 1, 1], T24),
-             "all4_2024": ([1, 1, 1, 1], T24)}
+    cases = {"all5": ([1, 1, 1, 1, 1], T0), "btc": ([1, 0, 0, 0, 0], T0), "btc_eth": ([1, 1, 0, 0, 0], T0), "alts_2024": ([0, 0, 1, 1, 1], T24),
+             "all5_2024": ([1, 1, 1, 1, 1], T24)}
     ref = {k: ref_sim(on, data["risk"], data["smult"], 500.0, t0, T1) for k, (on, t0) in cases.items()}
     json.dump(dict(cases={k: dict(on=v[0], t0=v[1], t1=T1) for k, v in cases.items()}, ref=ref), open(C.D.CACHE / "tbo_stats_ref.json", "w"))
     print(len(rows), "trades;", ref)

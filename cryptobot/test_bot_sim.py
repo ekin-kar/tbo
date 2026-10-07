@@ -45,6 +45,10 @@ class FakeFutures:
             return dict(tick=0.00001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=30_000_000, min_notional=5, status="TRADING")
         if sym == "ADAUSDT":
             return dict(tick=0.0001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=3_000_000, min_notional=5, status="TRADING")
+        if sym == "BNBUSDT":
+            return dict(tick=0.01, step=0.01, min_qty=0.01, mkt_step=0.01, mkt_max=2000, min_notional=5, status="TRADING")
+        if sym == "SOLUSDT":
+            return dict(tick=0.01, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=5000, min_notional=5, status="TRADING")
         if sym == "ETHUSDT":                                  # Binance USD-M ETHUSDT filters
             return dict(tick=0.01, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=2000, min_notional=20, status="TRADING")
         return dict(tick=0.1, step=0.001, min_qty=0.001, mkt_step=0.001, mkt_max=120, min_notional=100, status="TRADING")
