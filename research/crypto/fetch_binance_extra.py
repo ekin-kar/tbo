@@ -54,7 +54,7 @@ def months():
 def monthly_rows(kind, sym, sub=""):
     """All rows of Binance's monthly archive files (data.binance.vision), header lines dropped."""
     def one(mo):
-        name = f"{sym}-{sub + '-' if sub else ''}{mo}.zip" if kind == "klines" else f"{sym}-fundingRate-{mo}.zip"
+        name = f"{sym}-{sub + '-' if sub else ''}{mo}.zip" if kind.endswith(("klines", "Klines")) else f"{sym}-fundingRate-{mo}.zip"
         url = f"{MONTHLY}/{kind}/{sym}/{sub + '/' if sub else ''}{name}"
         r = get(url)
         if r is None:
@@ -114,10 +114,39 @@ def metrics(sym):
     print(f"{sym}: {len(rows)} hourly metrics rows ({sum(1 for p in parts if p)} of {len(days)} days)")
 
 
+def spot_klines(sym):
+    """Spot 4h candles (idea: spot-led vs futures-led breakouts). Spot archive times are in microseconds from 2025."""
+    path = os.path.join(OUT, f"{sym}_spot_4h.csv.gz")
+    if os.path.exists(path):
+        return
+    def one(mo):
+        r = get(f"https://data.binance.vision/data/spot/monthly/klines/{sym}/4h/{sym}-4h-{mo}.zip")
+        if r is None:
+            return []
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        rows = [x for x in csv.reader(io.StringIO(z.read(z.namelist()[0]).decode())) if x and x[0][:1].isdigit()]
+        return [(int(x[0]) // 1000 if int(x[0]) > 10**14 else int(x[0]),) + tuple(x[1:6]) + (x[7], x[8], x[9], x[10]) for x in rows]
+    with ThreadPoolExecutor(8) as ex:
+        rows = [r for part in ex.map(one, months()) for r in part]
+    write(path, ["open_ms", "o", "h", "l", "c", "volume", "quote_volume", "trades", "taker_buy_base", "taker_buy_quote"],
+          sorted(rows, key=lambda x: x[0]))
+    print(f"{sym}: {len(rows)} spot 4h candles")
+
+
+def premium(sym):
+    """Futures premium index, 1h candles (perpetual price vs the spot index, as used for funding)."""
+    path = os.path.join(OUT, f"{sym}_premium_1h.csv.gz")
+    if os.path.exists(path):
+        return
+    rows = [(k[0], k[1], k[2], k[3], k[4]) for k in monthly_rows("premiumIndexKlines", sym, "1h")]
+    write(path, ["open_ms", "o", "h", "l", "c"], sorted(rows, key=lambda x: int(x[0])))
+    print(f"{sym}: {len(rows)} premium index 1h candles")
+
+
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     for sym in COINS:
-        funding(sym); klines(sym)
+        funding(sym); klines(sym); spot_klines(sym); premium(sym)
     for sym in COINS:
         print(f"{sym}: downloading ~{(date.today() - date(2021, 12, 1)).days} daily metrics files ...", flush=True)
         metrics(sym)
