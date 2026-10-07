@@ -75,6 +75,11 @@ break" x1.40 / x1.09 but not monotonic: 0/1/2/3 coins = +0.48/+0.07/+0.28/-0.64R
 under the level (0 of 14), early exits on absorption (0 of 42), trigger-minute trade spike / OI drop after the fill
 (0 of 12), gap / spike through the level (0 of 18): none beats base and random exits in both periods. Early exits lose
 because most breakouts that stall in the first hour still end as winners. Order book: no history; untestable.
+Coins together (Oct 2026, `ideas_v6.py`): per-coin win rate BTC 20.4% (avg +0.92R), ADA 18.3%, ETH 16.7%, DOGE 13.3%.
+BTC confirming alt trades (BTC in a trade / entered within 24-48 h / near its own level / 4h trend; skip or size x1.5),
+BTC dominance proxy (BTC vs 11-alt index, 7d/30d) and USDT dominance proxy (12-coin market trend): none beats random skips in
+both periods. Alt trades with BTC already in the same direction average +0.38R vs +0.20R without, but skipping the others
+loses in 2024-26 (x0.87). External dominance data (CoinGecko) is blocked from the cloud.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
