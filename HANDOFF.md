@@ -80,6 +80,11 @@ BTC confirming alt trades (BTC in a trade / entered within 24-48 h / near its ow
 BTC dominance proxy (BTC vs 11-alt index, 7d/30d) and USDT dominance proxy (12-coin market trend): none beats random skips in
 both periods. Alt trades with BTC already in the same direction average +0.38R vs +0.20R without, but skipping the others
 loses in 2024-26 (x0.87). External dominance data (CoinGecko) is blocked from the cloud.
+All 12 coins on v2.4 at 1% risk each from $200 (Oct 2026, `all12.py`, OI metrics downloaded for all 12):
+2024-26 %/month BTC 2.47, ETH 1.97, BNB 1.72, TRX 1.39, DOGE 1.08, AVAX 0.94, SOL 0.93, ADA 0.86, XRP 0.69, LINK 0.11,
+DOT -0.19, LTC -0.69 (2020-23: BTC 3.56, DOGE 2.98, ADA 2.11, SOL 1.84, ETH 1.82, BNB 1.29 ...). Adding BNB at 1.25% raises
+money and drawdown in proportion (return/drop 0.358 -> 0.361, 0.312 -> 0.314) = like more risk, not a better edge;
++BNB+SOL better 2020-23, worse 2024-26. Kept BTC/ETH/DOGE/ADA.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
