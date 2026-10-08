@@ -31,7 +31,7 @@ def at(series, t):
     return series.iloc[i] if i >= 0 else np.nan
 
 
-def sim(rule, start, end, eq0=200.0):
+def sim(rule, start, end, eq0=200.0, curve=False):
     tr = T[(T.entry_time >= start) & (T.entry_time < end)].reset_index(drop=True)
     eps = pd.Timedelta(microseconds=1); ev = []
     for i, r in tr.iterrows():
@@ -88,7 +88,14 @@ def sim(rule, start, end, eq0=200.0):
     pm = ((cv.bal.iloc[-1] / eq0) ** (1 / mo) - 1) * 100
     hw = cv.bal.cummax(); nh = cv.index[cv.bal >= hw]; flat = np.diff(nh.values).astype("timedelta64[D]").astype(int).max()
     mm = cv.bal.resample("ME").last().ffill().pct_change().dropna()
-    return dict(final=cv.bal.iloc[-1], pm=pm, dd=dd, ratio=pm / dd, flat=int(flat), pos=(mm > 0).mean() * 100, worst_m=mm.min() * 100, skipped=skipped)
+    st = dict(final=cv.bal.iloc[-1], pm=pm, dd=dd, ratio=pm / dd, flat=int(flat), pos=(mm > 0).mean() * 100, worst_m=mm.min() * 100, skipped=skipped)
+    if curve:
+        idx = pd.date_range(pd.Timestamp(start), pd.Timestamp(end) - pd.Timedelta(days=1), freq="D")
+        bal = cv.bal.resample("D").last().reindex(idx).ffill().fillna(eq0)
+        wst = cv.worst.resample("D").min().reindex(idx).ffill().fillna(eq0)
+        ddd = (wst / np.maximum.accumulate(np.maximum(wst.values, 1e-9)) - 1) * 100
+        return st, bal, ddd
+    return st
 
 
 RULES = {"now (no portfolio rule)": {}}
