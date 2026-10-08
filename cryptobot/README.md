@@ -181,7 +181,35 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   2024-01..2026-09: 594 entries, all 130 BTC full size, 41 shrunk, 4 cut or closed right after a same-minute fill,
   0 off the rule.
 
-## GO LIVE: step by step (v2.3)
+## 3-month trial from $200 (v2.5, Oct 2026)
+
+Settings: BTC 5%, ETH 2.5%, BNB / SOL / ADA 0.83% (shorts half), open-risk cap 5.5% with BTC exempt. Leave them
+alone for the 3 months (changing settings mid-way makes the result impossible to judge).
+
+- **Start:** steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades are mostly
+  too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
+- **Every month-end:** `python report.py --days 31` -> `reports/report_<date>.md` + two CSV files (Binance keeps
+  only a few months of history, so keep each month's files).
+- **Every fill** is logged with the level aimed for and the slippage (`FILLED ... level ..., slippage ...%`).
+- **After 3 months:** send the `reports/` and `logs/` folders. They are compared with the backtest of the same
+  days (same trades? same fills? fees and slippage as assumed?).
+- **What 3 months looked like in the past** (`research/crypto/three_months.py`; every real 3-month window of 2022-26
+  from $200, and 5,000 reshuffled ones; real results will be somewhat worse):
+
+| After 3 months | real windows | reshuffled |
+|---|---|---|
+| 1 in 10 bad | $170 | $149 |
+| 1 in 4 bad | $203 | $189 |
+| typical | $257 | $262 |
+| 1 in 4 good | $380 | $393 |
+| 1 in 10 good | $620 | $634 |
+| below $200 / doubled | 24% / 21% | 29% / 24% |
+| worst drop inside the 3 months (typical / 1 in 10) | 26% / 38% | 26% / 40% |
+
+  About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
+  time in 4 and says little; a drop beyond 50% would be outside the backtest's range: stop and review then.
+
+## GO LIVE: step by step (v2.5)
 
 **Where to run it.** Recommended: a small Linux VPS (~$5/month, e.g. Hetzner in Germany/Finland), **not in the USA**
 (Binance.com blocks US IPs). It runs 24/7 without sleep, updates or power cuts. Your Windows PC also works if it

@@ -5,3 +5,4 @@ cryptobot/logs/
 *.tmp
 cryptobot/.env
 cryptobot/PAUSE
+cryptobot/reports/

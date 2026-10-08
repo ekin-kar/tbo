@@ -146,8 +146,13 @@ class Futures:
     def set_leverage(self, symbol, leverage):
         return self._req("POST", "/fapi/v1/leverage", dict(symbol=symbol, leverage=int(leverage)), signed=True)
 
-    def user_trades(self, symbol, limit=50):
-        return self._req("GET", "/fapi/v1/userTrades", dict(symbol=symbol, limit=limit), signed=True)
+    def user_trades(self, symbol, limit=50, start_ms=None, end_ms=None):
+        """Own fills (at most 7 days between start and end)."""
+        return self._req("GET", "/fapi/v1/userTrades", dict(symbol=symbol, limit=limit, startTime=start_ms, endTime=end_ms), signed=True)
+
+    def income(self, start_ms, end_ms, limit=1000):
+        """Realized PnL, commission, funding, transfers ... between start and end (oldest first)."""
+        return self._req("GET", "/fapi/v1/income", dict(startTime=start_ms, endTime=end_ms, limit=limit), signed=True)
 
     # ── orders ──
     def market(self, symbol, side, qty, reduce_only=False, client_id=None):

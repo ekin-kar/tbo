@@ -141,3 +141,11 @@ leave-one-coin-out better 3 of 4 (not BTC); 20+40 half each 2.98 in 2024-26. Not
 Round 2 (user wanted daily, two-sided trades): session breakouts, 1h breakouts, mean reversion, pullbacks,
 always-in momentum all fail after fees on BTC (`families2.py`, `holdout2.py`). ETH (Oct 2026): ETH-specific tuning lost to the BTC v2.1 settings out of sample -> ETH runs BTC settings
 (`config_eth.json`): +191R 2020-26, DD 15.7R, 3.7%/month at 2% (DD 28%). Both bots: ~1% risk each.
+
+## Live trial (from Oct 2026)
+User runs v2.5 for 3 months from $200 (BTC 5 / ETH 2.5 / alts 0.83, cap 5.5% BTC exempt), then sends
+cryptobot/reports/ (report.py, run monthly: summary + trades/income CSV from Binance) and cryptobot/logs/ (FILLED lines
+carry level + slippage). To do then: backtest the same days (replay / sizing_v4 with the live equity), match trades,
+compare fills, fees, funding, slippage. Expectation (research/crypto/three_months.py): typical $257, 1-in-10 bad
+$150-170, below $200 in ~1 of 4 windows, worst drop inside 3 months typical 26% / 1-in-10 ~40%, ~58 trades.
+

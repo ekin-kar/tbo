@@ -377,9 +377,12 @@ class Bot:
                         pass
                 self.st["entry_ms"] = fill_ms
                 self.st["be_from"] = fill_ms - fill_ms % 60_000 + 60_000   # first full 1m candle after the fill
+                lvl, side = self.st.get("entry_trig") or 0.0, (1 if amt > 0 else -1)
+                slip = f", level {lvl:g}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""
+                risk = abs(amt) * (self.st.get("sl_dist") or 0)
                 self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
                 self.st["cap_check"] = self.cap_frac() > 0
-                log.info(f"FILLED {amt} @ {entry_px:.2f}")
+                log.info(f"FILLED {amt} @ {entry_px:.2f}{slip}, risk {risk:.2f} USDT")
                 self.save()
             if not self.sl_alive():
                 self.place_sl(amt, entry_px)
