@@ -166,7 +166,7 @@ class Bot:
     def open_risk(self, filled_before=None):
         """USDT lost if every OTHER open position not yet at breakeven hit its stop now (every symbol on the account).
         filled_before (ms): count only positions that filled before it (the first to fill keeps its size); an exempt
-        coin (BTC) always counts, also when it filled moments later (BTC goes first, as in the research simulation)."""
+        coin (BTC) also counts when it filled in the same minute (BTC goes first, as in the research simulation)."""
         pos = self.x.positions()
         exempt = set(self.portfolio().get("cap_exempt", []))
         pos.pop(self.sym, None)
@@ -184,11 +184,15 @@ class Bot:
         for sym, (amt, entry) in sorted(pos.items()):
             side = 1 if amt > 0 else -1
             st = self.coin_state(sym)
-            later = filled_before and sym not in exempt and st is not None
-            if later and (st.get("entry_ms") or 0) == 0 and st.get("entry_side"):
-                continue                                # its bot has not even seen the fill yet: it filled after ours
-            if later and (st.get("entry_ms") or 0) > filled_before:
-                continue
+            if filled_before and st is not None:
+                e_ms = st.get("entry_ms") or 0
+                if e_ms == 0 and st.get("entry_side"):
+                    continue                            # its bot has not seen the fill yet (seconds ago): checked again next poll
+                if sym in exempt:                       # BTC: counts if it filled in the same minute as ours or before
+                    if e_ms // 60_000 > filled_before // 60_000:
+                        continue
+                elif e_ms > filled_before:              # others: only if they filled before ours
+                    continue
             trig = [t for sd, t in stops.get(sym, []) if sd == ("SELL" if side == 1 else "BUY") and t > 0]
             if trig:                                    # the stop that would close it first
                 stop = max(trig) if side == 1 else min(trig)
@@ -458,8 +462,8 @@ class Bot:
         self.save()
 
     def trim_to_cap(self, amt):
-        """For 2 minutes after a fill: if coins that filled earlier (or BTC, at any moment of those 2 minutes) left less
-        room than this order was sized for, cut the position to fit, or close it if less than cap_min_fraction would remain."""
+        """For 2 minutes after a fill: if coins that filled earlier (or BTC in the same minute) left less room than this
+        order was sized for, cut the position to fit, or close it if less than cap_min_fraction would remain."""
         try:
             eq = self.equity()
             want = abs(amt) * self.st["sl_dist"]

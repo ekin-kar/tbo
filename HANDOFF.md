@@ -157,8 +157,8 @@ $5k+ peak 7%. 10% start: more ruin (5% end < $200). test_cap_sim CAPSIM_PORTFOLI
 ## v2.5 live settings (Oct 2026): risk ladder
 portfolio.json: ladder rows (from $0: BTC 7.5 / ETH 2.5 / alts 0.83, cap 8.25; $1k: 5 / 2.5 / 0.83, cap 5.5; $10k: 2.5 /
 1.25 / 0.42, cap 2.75), cap_exempt BTC. config_btc max_leverage 12, exchange_leverage 25 (8x would cut 19% of BTC trades
-at 7.5%). bot.py: risk_now / ladder_row / cap_frac(eq); BTC always counts in the post-fill trim, re-checked for 2 min
-after a fill (same-minute races: BTC first; that order is +10% vs BTC-last in 2024-26, drop 42 vs 46% in 2020-23).
+at 7.5%). bot.py: risk_now / ladder_row / cap_frac(eq); BTC counts in the post-fill trim if it filled in the same minute or
+before, re-checked for 2 min after a fill (same-minute races: BTC first; that order is +10% vs BTC-last in 2024-26, drop 42 vs 46% in 2020-23).
 `research/crypto/botsim.py` = the bot's sizing (ladder, cap at fill, BTC exempt, same-minute entries BTC, ETH, BNB, SOL,
 ADA); every page generator uses it (make_monthly_report, make_risk_html -> risk_comparison + plan_ladder_plus50,
 make_cap_html, make_tbo_stats; the statistics page JS matches botsim to the cent, check in make_tbo_stats ref).
