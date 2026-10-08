@@ -178,6 +178,8 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 - `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
+  2024-01..2026-09: 594 entries, all 130 BTC full size, 41 shrunk, 4 cut or closed right after a same-minute fill,
+  0 off the rule.
 
 ## GO LIVE: step by step (v2.3)
 
