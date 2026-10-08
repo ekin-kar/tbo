@@ -111,7 +111,15 @@ both periods; 5.5% (= 1.1 x BTC risk): 2020-23 x1.03, 2024-26 x1.17 (worst drop 
 2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). **Better: BTC exempt** (BTC trades never shrunk or
 skipped, but their open risk still counts against the cap for ETH/alts): 1.1x -> 2020-23 x1.03, 2024-26 x1.23 ($18.0k,
 drop 38.0%), 2022-26 x1.08; plateau 0.9-1.1x (x1.22-1.23), fades at 1.3x (x1.07) / 1.5x (x0.99). A cap among ETH+alts
-only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: cryptobot/cap_comparison.html. Not yet in the bot.
+only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: cryptobot/cap_comparison.html. **In the bot as v2.5** (`portfolio.json`
+open_risk_cap_pct 5.5, cap_exempt BTCUSDT; bot.py size/capped/open_risk/resize_entry/trim_to_cap). Timing
+(`sizing_v4.py`): sizing only at the 4h close loses part of it (2024-26 $17.0k, drop 41%); the bot therefore re-sizes
+a waiting entry order every minute and trims at the fill -> equals the fill-time rule ($18.2k, 38%).
+`cryptobot/test_cap_sim.py`: the five bots on one simulated account, each entry checked against the rule.
+BTC 7.5% (Oct 2026, fill-time cap 1.1x BTC, $200): 7.5/2.5/0.83 -> 2020-23 22.5%/mo drop 61%, 2024-26 $31.8k drop
+48%; 2-yr bootstrap from $250 (2022-26 blocks): drop median 64% / 1-in-10 80%, P(>=$10k) 45%, P(>=$20k) 33%
+(5% + cap: 51% / 68%, 35%, 22%). Lowering ETH/alts with BTC 7.5 (1.5/0.5) cuts profit a lot ($20.5k) for little
+drop (58% / 46%, MC 61%): BTC drives the drops. 6/2.5/0.83: $24.3k, 54% / 42%, MC 56%.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;

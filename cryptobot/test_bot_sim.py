@@ -25,7 +25,7 @@ from binance_futures import BinanceError             # noqa: E402
 class FakeFutures:
     base, key = "sim", "x"
 
-    def __init__(self, m, tick=None):
+    def __init__(self, m, tick=None, sym=None):
         if tick:                                    # serve tick-exact prices like Binance (the history is float32)
             m = dict(m, **{k: np.round(np.round(m[k] / tick) * tick, 10) for k in ("o", "h", "l", "c")})
         self.m = m
@@ -35,6 +35,9 @@ class FakeFutures:
         self.orders = {}                 # algoId -> dict
         self.next_id = 1
         self.fills = []                  # (time, side, qty, price, kind)
+        self.sym = sym
+        self.group = [self]              # every coin's simulated exchange on the same account (open-risk cap)
+        self.sl_log = []                 # (time, trigger) of every stop loss placed
 
     # clock: 3 s after the open of 1m bar j
     def now_ms(self):
@@ -90,6 +93,9 @@ class FakeFutures:
     def position(self, sym):
         return self.pos, self.entry
 
+    def positions(self):
+        return {f.sym: (f.pos, f.entry) for f in self.group if f.pos != 0}
+
     def hedge_mode(self):
         return False
 
@@ -117,11 +123,15 @@ class FakeFutures:
         if (side == "BUY" and o >= trig) or (side == "SELL" and o <= trig):
             raise BinanceError(400, -2021, "Order would immediately trigger.")
         aid = self.next_id; self.next_id += 1
-        self.orders[aid] = dict(algoId=aid, clientAlgoId=client_id, side=side, trig=trig,
-                                qty=None if qty is None else float(qty), close=close_position, algoStatus="NEW")
+        self.orders[aid] = dict(algoId=aid, clientAlgoId=client_id, side=side, trig=trig, symbol=self.sym, triggerPrice=str(trig),
+                                closePosition=close_position, qty=None if qty is None else float(qty), close=close_position, algoStatus="NEW")
+        if close_position:
+            self.sl_log.append((int(self.m["t"][self.j]), trig))
         return {"algoId": aid}
 
-    def open_algo_orders(self, sym):
+    def open_algo_orders(self, sym=None):
+        if sym is None:
+            return [o for f in self.group for o in f.orders.values() if o["algoStatus"] == "NEW"]
         return [o for o in self.orders.values() if o["algoStatus"] == "NEW"]
 
     def algo_order(self, algo_id=None, client_id=None):
@@ -158,12 +168,14 @@ def params(sym):
 
 def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     m = C.load(sym)
-    fx = FakeFutures(m, tick=FakeFutures.exchange_info(None, sym)["tick"])
+    fx = FakeFutures(m, tick=FakeFutures.exchange_info(None, sym)["tick"], sym=sym)
     cfg = dict(risk_pct=2.0, max_leverage=5, strategy=params(sym).to_dict())
     bot = B.Bot.__new__(B.Bot)
     bot.cfg, bot.dry = cfg, False
     bot.p = S.Params(**cfg["strategy"]); bot.sym = sym; bot.risk = 0.02; bot.max_lev = 5; bot.poll = 0
-    bot.state_path = Path(f"/tmp/claude_tbo_sim_state_{sym}_{os.getpid()}.json"); bot.x = fx; bot.f = fx.exchange_info(sym)
+    bot.dir, bot.suffix = Path(f"/tmp/claude_tbo_sim_{os.getpid()}"), ""            # no portfolio.json there: cap off
+    bot.dir.mkdir(exist_ok=True)
+    bot.state_path = bot.dir / f"state_{sym}.json"; bot.x = fx; bot.f = fx.exchange_info(sym)
     bot.short_mult = 1.0; bot.cfg = cfg; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))
     tf_ms = 240 * 60_000

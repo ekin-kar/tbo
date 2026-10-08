@@ -9,6 +9,8 @@ Loop (every `poll_s` seconds):
   * at each 4h close (+ a few seconds): trail exit -> cancel the old entry order -> if flat, new stop order
   * after an entry fills: place the server-side stop loss at once (closePosition STOP_MARKET)
   * time exit after max_hold_h; if a position has no stop loss (e.g. after a restart) one is placed
+  * open-risk cap (v2.5, portfolio.json): a coin's new trade is shrunk (or skipped) so that the risk of all open
+    positions not yet at breakeven stays <= the cap; BTC is exempt (never shrunk) but its risk counts for the others
 State (entry time, stop distance, order ids) is kept in state_<SYMBOL>.json next to the config, so a
 restart picks up where it left off; the exchange is always the source of truth for the position.
 """
@@ -28,7 +30,7 @@ import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.4"
+VERSION = "2.5"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -61,7 +63,8 @@ class Bot:
         self.short_mult = float(cfg.get("short_risk_mult", 1.0))   # shorts earn less: trade them smaller
         self.max_lev = float(cfg.get("max_leverage", 3))
         self.poll = float(cfg.get("poll_s", 5))
-        self.state_path = path.parent / f"state_{self.sym}{'_testnet' if testnet else ''}.json"
+        self.dir, self.suffix = path.parent, ("_testnet" if testnet else "")
+        self.state_path = self.dir / f"state_{self.sym}{self.suffix}.json"
         key = os.environ.get("BINANCE_API_KEY", cfg.get("api_key", ""))
         sec = os.environ.get("BINANCE_API_SECRET", cfg.get("api_secret", ""))
         self.x = Futures(key, sec, testnet=testnet, base_url=cfg.get("base_url"))
@@ -103,15 +106,94 @@ class Bot:
         except BinanceError as e:
             log.info(f"cancel {algo_id}: {e.msg} (already gone)")
 
-    def size(self, sl_dist, price, side=1):
+    def size(self, sl_dist, price, side=1, quiet=False):
+        """(quantity, cap note, no_room). Raises if the cap applies and the account cannot be read."""
         eq = self.equity()
-        qty = eq * self.risk * (self.short_mult if side < 0 else 1.0) / sl_dist
+        want = eq * self.risk * (self.short_mult if side < 0 else 1.0)
+        risk, note = self.capped(eq, want)
+        if risk <= 0:
+            return 0.0, note, True
+        qty = risk / sl_dist
         qty = min(qty, eq * self.max_lev / price, self.f["mkt_max"])
         qty = floor_step(qty, max(self.f["step"], self.f["mkt_step"]))
         if qty < self.f["min_qty"] or qty * price < self.f["min_notional"]:
-            log.warning(f"size {qty} below the exchange minimum (equity {eq:.2f}): no order")
+            if not quiet:
+                log.warning(f"size {qty} below the exchange minimum (equity {eq:.2f}): no order")
+            return 0.0, note, False
+        return qty, note, False
+
+    # ── open-risk cap (whole account) ──
+    def portfolio(self):
+        """portfolio.json next to the configs; re-read every time, so an edit applies without a restart."""
+        p = self.dir / "portfolio.json"
+        try:
+            return json.loads(p.read_text()) if p.exists() else {}
+        except ValueError as e:
+            log.warning(f"portfolio.json unreadable ({e}): no open-risk cap")
+            return {}
+
+    def cap_frac(self):
+        """The cap as a fraction of equity, 0 when it does not apply to this coin (off, or exempt like BTC)."""
+        pf = self.portfolio()
+        if self.sym in pf.get("cap_exempt", []):
             return 0.0
-        return qty
+        return max(0.0, float(pf.get("open_risk_cap_pct", 0) or 0)) / 100
+
+    def coin_state(self, sym):
+        try:
+            return json.loads((self.dir / f"state_{sym}{self.suffix}.json").read_text())
+        except (OSError, ValueError):
+            return None
+
+    def open_risk(self, filled_before=None):
+        """USDT lost if every OTHER open position not yet at breakeven hit its stop now (every symbol on the account).
+        filled_before (ms): count only positions that filled before it (the first to fill keeps its size)."""
+        pos = self.x.positions()
+        pos.pop(self.sym, None)
+        if not pos:
+            return 0.0, ""
+        stops = {}
+        try:
+            orders = self.x.open_algo_orders()
+        except BinanceError:                            # all-symbol query refused: ask per symbol
+            orders = [o for sym in pos for o in self.x.open_algo_orders(sym)]
+        for o in orders:
+            if str(o.get("closePosition")).lower() == "true" or str(o.get("reduceOnly")).lower() == "true":
+                stops.setdefault(o["symbol"], []).append((o.get("side"), float(o.get("triggerPrice") or 0)))
+        total, parts = 0.0, []
+        for sym, (amt, entry) in sorted(pos.items()):
+            side = 1 if amt > 0 else -1
+            st = self.coin_state(sym)
+            if filled_before and st is not None and (st.get("entry_ms") or 0) == 0 and st.get("entry_side"):
+                continue                                # its bot has not even seen the fill yet: it filled after ours
+            if filled_before and st is not None and (st.get("entry_ms") or 0) > filled_before:
+                continue
+            trig = [t for sd, t in stops.get(sym, []) if sd == ("SELL" if side == 1 else "BUY") and t > 0]
+            if trig:                                    # the stop that would close it first
+                stop = max(trig) if side == 1 else min(trig)
+                r = max(0.0, side * (entry - stop)) * abs(amt)
+            elif st is not None and st.get("sl_dist"):  # stop not placed yet (filled seconds ago): its bot's distance
+                r = 0.0 if st.get("be_done") else float(st["sl_dist"]) * abs(amt)
+            else:
+                log.warning(f"{sym} position {amt} has no stop loss and no bot state: not counted in the open risk")
+                r = 0.0
+            total += r
+            parts.append(f"{sym[:-4]} {r:.2f}" if r > 0 else f"{sym[:-4]} at breakeven")
+        return total, ", ".join(parts)
+
+    def capped(self, eq, want, filled_before=None):
+        """Risk (USDT) this coin may take now under the cap (0 = no room) and a note for the log."""
+        cap = self.cap_frac()
+        if cap <= 0:
+            return want, ""
+        used, parts = self.open_risk(filled_before)
+        room = cap * eq - used
+        note = f"open risk of the other coins {used:.2f} ({parts or 'none open'}), cap {cap * 100:.2f}% = {cap * eq:.2f}"
+        if want <= room:
+            return want, note
+        if room > float(self.portfolio().get("cap_min_fraction", 0.25)) * want:
+            return room, note + f": trade shrunk to {room / want * 100:.0f}% of its normal size"
+        return 0.0, note + ": no room"
 
     # ── actions ──
     def close_position(self, amt, why):
@@ -155,6 +237,24 @@ class Bot:
             raise
         self.save()
 
+    def place_entry(self, side, trig, qty):
+        """Stop-market entry at trig; at market if the price is already beyond it (the backtest fills at the open)."""
+        q, bs = fmt(qty, self.f["step"]), ("BUY" if side == 1 else "SELL")
+        self.st.update(entry_trig=trig, entry_qty=qty)
+        last = self.x.last_price(self.sym)
+        if (side == 1 and last >= trig) or (side == -1 and last <= trig):
+            log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
+            self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
+            return
+        try:
+            r = self.x.stop_market(self.sym, bs, fmt(trig, self.f["tick"]), qty=q, client_id=f"{PREFIX}_in_{int(time.time())}")
+            self.st["entry_id"] = r["algoId"]
+        except BinanceError as e:
+            if e.code != -2021:
+                raise
+            log.info("price already beyond the level: market entry (as the backtest fills at the open)")
+            self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
+
     def on_candle_close(self, open_ms):
         k4, k1 = self.candles()
         if not k4 or k4[-1][0] != open_ms:
@@ -175,6 +275,7 @@ class Bot:
         if self.st.get("entry_id"):
             self.cancel(self.st["entry_id"])
             self.st["entry_id"] = None
+        self.st.update(entry_trig=0.0, entry_qty=0.0)    # (also ends an entry waiting for room under the cap)
         for o in self.my_algo_orders():                 # stray entry orders (e.g. after a crash)
             if "_in_" in o["clientAlgoId"]:
                 self.cancel(o["algoId"])
@@ -207,32 +308,28 @@ class Bot:
                 if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
                     log.warning(f"invalid level {trig} / stop distance {dec.sl_dist}: no order")
                     continue
-                qty = self.size(dec.sl_dist, trig, side)
+                try:
+                    qty, note, no_room = self.size(dec.sl_dist, trig, side)
+                except Exception as e:                  # cap on but the account cannot be read: add no risk blind
+                    log.warning(f"open risk unavailable ({e}): no new entry order this candle")
+                    break
+                if note:
+                    log.info(note)
+                if no_room:                             # the cap is full: wait, re-checked every minute until the next close
+                    log.info(f"no entry order for now ({'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])}): "
+                             f"placed if room opens before the price gets there, until the next 4h close")
+                    self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_trig=trig, entry_qty=0.0,
+                                   entry_from=open_ms + self.p.tf_min * 60_000)
+                    break
                 if qty <= 0:
                     continue
                 log.info(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
                          f"{fmt(trig, self.f['tick'])}  (SL dist {dec.sl_dist:.2f} = {dec.sl_dist / trig * 100:.2f}%, "
                          f"valid until the next 4h close)")
-                self.st.update(sl_dist=dec.sl_dist, entry_side=side)
+                self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_from=open_ms + self.p.tf_min * 60_000)
                 if self.dry:
                     break
-                last = self.x.last_price(self.sym)
-                if (side == 1 and last >= trig) or (side == -1 and last <= trig):
-                    log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
-                    self.x.market(self.sym, "BUY" if side == 1 else "SELL", fmt(qty, self.f["step"]),
-                                  client_id=f"{PREFIX}_mk_{int(time.time())}")
-                    break
-                try:
-                    r = self.x.stop_market(self.sym, "BUY" if side == 1 else "SELL", fmt(trig, self.f["tick"]),
-                                           qty=fmt(qty, self.f["step"]),
-                                           client_id=f"{PREFIX}_in_{int(time.time())}")
-                    self.st["entry_id"] = r["algoId"]
-                except BinanceError as e:
-                    if e.code != -2021:
-                        raise
-                    log.info("price already beyond the level: market entry (as the backtest fills at the open)")
-                    self.x.market(self.sym, "BUY" if side == 1 else "SELL", fmt(qty, self.f["step"]),
-                                  client_id=f"{PREFIX}_mk_{int(time.time())}")
+                self.place_entry(side, trig, qty)
                 break                                   # one entry order at a time (sides="both": trend picks one)
         self.st["last_candle"] = open_ms
         self.save()
@@ -280,11 +377,15 @@ class Bot:
                         pass
                 self.st["entry_ms"] = fill_ms
                 self.st["be_from"] = fill_ms - fill_ms % 60_000 + 60_000   # first full 1m candle after the fill
-                self.st["entry_id"] = None              # the entry order has triggered
+                self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
+                self.st["cap_check"] = self.cap_frac() > 0
                 log.info(f"FILLED {amt} @ {entry_px:.2f}")
                 self.save()
             if not self.sl_alive():
                 self.place_sl(amt, entry_px)
+            if self.st.get("cap_check") and self.st.get("entry_ms"):
+                self.trim_to_cap(amt)
+                amt, entry_px = self.x.position(self.sym)
             if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
                 self.check_breakeven(amt, entry_px)
             if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
@@ -294,6 +395,71 @@ class Bot:
             self.cancel(self.st.get("sl_id"))
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
             self.save()
+        elif self.st.get("entry_trig") and now - self.st.get("cap_seen_ms", 0) >= 60_000:
+            self.st["cap_seen_ms"] = now
+            self.resize_entry()
+
+    def resize_entry(self):
+        """Once a minute while an entry order waits: keep it inside the open-risk cap as the other coins fill, reach
+        breakeven or close (as if the cap were checked at the fill), and place a held-back order once room opens."""
+        if self.cap_frac() <= 0 or not self.st.get("sl_dist") or self.paused():
+            return
+        side, trig, old = self.st["entry_side"], self.st["entry_trig"], self.st.get("entry_qty") or 0.0
+        if not old:                                     # held back: give up if the breakout happened meanwhile
+            bars = self.x.klines(self.sym, "1m", 1000, start_ms=self.st.get("entry_from"))
+            if bars and ((side == 1 and max(k[2] for k in bars) >= trig) or (side == -1 and min(k[3] for k in bars) <= trig)):
+                log.info("the breakout happened while the cap was full: no trade this candle")
+                self.st.update(entry_trig=0.0); self.save()
+                return
+        try:
+            qty, note, _ = self.size(self.st["sl_dist"], trig, side, quiet=True)
+        except Exception as e:
+            log.warning(f"open risk unavailable ({e}): entry order left as it is")
+            return
+        step = max(self.f["step"], self.f["mkt_step"])
+        if abs(qty - old) < max(step, 0.05 * old) - 1e-12:
+            return
+        log.info(f"CAP: entry order {fmt(old, self.f['step'])} -> {fmt(qty, self.f['step'])} ({note})")
+        if self.st.get("entry_id"):
+            self.cancel(self.st["entry_id"])
+            amt, _ = self.x.position(self.sym)
+            if amt != 0:                                # it filled just before the cancel: the fill check takes over
+                log.info("the entry order filled before the change")
+                return
+            self.st["entry_id"] = None
+        if qty > 0:
+            self.place_entry(side, trig, qty)
+        else:
+            self.st["entry_qty"] = 0.0
+        self.save()
+
+    def trim_to_cap(self, amt):
+        """Right after a fill: if coins that filled earlier left less room than this order was sized for (fills in the
+        same minute), cut the position to fit, or close it if less than cap_min_fraction would remain."""
+        try:
+            eq = self.equity()
+            want = abs(amt) * self.st["sl_dist"]
+            allowed, note = self.capped(eq, want, filled_before=self.st["entry_ms"])
+        except Exception as e:
+            log.warning(f"open risk unavailable ({e}): cap check after the fill retried next poll")
+            return
+        self.st["cap_check"] = False
+        self.save()
+        if allowed >= want * 0.95:                      # (5% slack: equity moves a little between order and fill)
+            return
+        step = max(self.f["step"], self.f["mkt_step"])
+        keep = floor_step(allowed / self.st["sl_dist"], step)
+        px = self.x.last_price(self.sym)
+        if allowed <= 0 or keep < self.f["min_qty"] or keep * px < self.f["min_notional"]:
+            log.info(f"CAP after the fill: {note}")
+            self.close_position(amt, "open-risk cap (other coins filled first)")
+            return
+        cut = floor_step(abs(amt) - keep, step)
+        if cut <= 0:
+            return
+        log.info(f"CAP after the fill: {note}: position cut by {fmt(cut, self.f['step'])} to {fmt(keep, self.f['step'])}")
+        self.x.market(self.sym, "SELL" if amt > 0 else "BUY", fmt(cut, self.f["step"]), reduce_only=True,
+                      client_id=f"{PREFIX}_cap_{int(time.time())}")
 
     def check_breakeven(self, amt, entry_px):
         """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour."""

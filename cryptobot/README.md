@@ -1,4 +1,4 @@
-# TBO v2.2: trend-breakout bot (BTC, ETH, DOGE, ADA) (Binance USD-M futures)
+# TBO v2.5: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -15,6 +15,7 @@
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
 | Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
+| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **5.5% of equity** (1.1 x the BTC risk). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
@@ -138,6 +139,34 @@ Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 sta
 equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
 The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
 
+## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `cap_comparison.html`
+
+Why: the deepest drops come when several coins break out together and all their stops get hit. Capping the risk
+that is open at once (only trades not yet at breakeven count: a breakeven stop loses nothing) trims exactly
+those moments. BTC is the best coin, so it is never trimmed; its risk still counts, so while BTC is in a fresh
+trade the other coins get less room. $200, compounding, worst drop counting open risk as lost:
+
+| BTC 5% / ETH 2.5% / alts 0.83% | 2020-23 %/month, worst drop | 2024-26 $200 -> | worst drop |
+|---|---|---|---|
+| no cap | 19.1%, 50% | $15.3k | 45% |
+| cap 5.5%, all coins | 18.5%, 47% | $14.6k | 38% |
+| **cap 5.5%, BTC exempt (v2.5)** | 18.9%, 49% | **$18.2k** | **38%** |
+
+Smooth from 0.9x to 1.1x the BTC risk (1.3x: less gain; 1.5x: no effect). A cap among ETH + alts only (ignoring
+BTC's risk) does nothing. If you change the BTC risk, set `open_risk_cap_pct` to about 1.1x it (BTC 7.5% -> 8.25).
+
+How the bot applies it (the order is sized at the 4h close, before it fills, so it keeps checking):
+- At the 4h close: room = cap x equity - risk of the other open positions not at breakeven (read from Binance:
+  every position and its stop loss; a position whose stop is not placed yet uses its bot's state file).
+- Every minute while the entry order waits: re-sized if the room changed by 5% or more (other coins filled,
+  reached breakeven or closed); an order held back for lack of room is placed once room opens, unless the price
+  already went through the level.
+- Right after a fill: if coins that filled earlier (same minute) left less room, the position is cut to fit.
+- Sizing only at the close would keep less of the gain (2024-26 $17.0k, drop 41%); with the re-checks it is
+  the same as checking at the fill ($18.2k, 38%).
+- Cap set but the account cannot be read: no new ETH / alt order that candle (no risk added blind).
+- `portfolio.json` is read every time: an edit applies without a restart. Delete it (or set 0) to turn the cap off.
+
 ## Parity tests
 
 - `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
@@ -146,6 +175,9 @@ The simulation reshuffles months independently and uses closed trades: real draw
   exchange on 1m history (v2.1): 327 vs 328 trades, 326 on the same minute, entry price within 1 tick, gross R
   234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
+- `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
+  with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
+  always full size; the others shrunk to the room left by the coins that filled before them).
 
 ## GO LIVE: step by step (v2.3)
 
@@ -163,8 +195,9 @@ entries, breakeven moves and the 5-day exit until it is back.
    `pip install -r cryptobot/requirements.txt`.
 4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
    token + chat id for phone alerts (fills, stops, breakeven, exits, warnings).
-5. **Risk:** set in `config_btc.json` / `config_eth.json` / `config_doge.json` / `config_ada.json` (`risk_pct`; now
-   2.5 / 1.25 / 0.625 / 0.625, shorts x0.5). Lower them for your first weeks if you like.
+5. **Risk:** set in `config_btc.json` / `config_eth.json` / `config_bnb.json` / `config_sol.json` / `config_ada.json`
+   (`risk_pct`; now 5 / 2.5 / 0.83 / 0.83 / 0.83, shorts x0.5) and the open-risk cap in `portfolio.json`
+   (`open_risk_cap_pct` 5.5 = 1.1 x the BTC risk; change it with the BTC risk).
 6. **Check:** `cd cryptobot && python check_setup.py` (places no orders). Every line must be OK (WARN = read it):
    key works, withdrawals OFF, futures ON, One-way, balance, clock, and each coin's long/short size above
    Binance's minimum at your risk.
@@ -177,7 +210,7 @@ entries, breakeven moves and the 5-day exit until it is back.
    copy `tbo.service` to `/etc/systemd/system/`, adjust user/paths, `sudo systemctl enable --now tbo`, watch with
    `journalctl -u tbo -f`.
 9. **Day to day:** logs in `cryptobot/logs/<COIN>.log` (+ Telegram). The first log line of each coin shows
-   `TBO v2.3`, its risk and settings. Orders appear on Binance as conditional (algo) orders named `tbo_...`.
+   `TBO v2.5`, its risk and settings. Orders appear on Binance as conditional (algo) orders named `tbo_...`.
    - Pause new entries (open trades still managed): create an empty file `cryptobot/PAUSE`; delete it to resume.
    - Stop everything: Ctrl+C / close the window / `sudo systemctl stop tbo`. Stop-losses stay on Binance.
    - Change risk: edit the config, then restart.

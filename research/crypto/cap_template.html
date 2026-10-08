@@ -49,7 +49,7 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 tr.rec td{font-weight:600}
 </style></head><body><div class="wrap">
 <h1>With and without the open-risk cap</h1>
-<p class="lede">The bot (<b>TBO v2.4</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter) on one $200 account, compounding. <b>The cap:</b> before a new trade, the bot adds up what it would lose if every trade not yet at breakeven hit its stop. If the new trade would push that above the cap, the new trade is made smaller to fit (skipped if less than a quarter fits). The cap is set relative to the BTC risk: 1.1× means 5.5% of the account at BTC 5%. <b>BTC never shrunk</b> (recommended): BTC trades always open at full size, but their risk still counts, so when BTC is in a fresh trade the other coins get less room. <b>Lower risk instead</b> shows the simple alternative: everything at 0.8× risk.</p>
+<p class="lede">The bot (<b>TBO v2.5</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter) on one $200 account, compounding. <b>The cap:</b> before a new trade, the bot adds up what it would lose if every trade not yet at breakeven hit its stop. If the new trade would push that above the cap, the new trade is made smaller to fit (skipped if less than a quarter fits). The cap is set relative to the BTC risk: 1.1× means 5.5% of the account at BTC 5%, 8.25% at BTC 7.5%. <b>BTC never shrunk</b> (recommended): BTC trades always open at full size, but their risk still counts, so when BTC is in a fresh trade the other coins get less room. <b>Lower risk instead</b> shows the simple alternative: everything at 0.8× risk.</p>
 <div class="controls">
  <div><div class="ctl-title">Start</div><div class="seg" id="start"></div></div>
  <div><div class="ctl-title">Risk level (BTC / ETH / each alt)</div><div class="seg" id="risk"></div></div>
@@ -77,26 +77,26 @@ tr.rec td{font-weight:600}
 <script>
 const D=/*DATA*/null;
 const CV=['--s1','--s6','--s2','--s3','--s4','--s5'];
-let S={s:'2024',m:1,on:{now:1,capbtc:1,cap11:1,low:1,cap10:0,cap13:0},scale:'log'};
+let S={s:'2024',m:'now',on:{now:1,capbtc:1,cap11:1,low:1,cap10:0,cap13:0},scale:'log'};
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const money=v=>'$'+Math.round(v).toLocaleString('en-US');
 const pc=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
 function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}">${t}</button>`).join('');e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
-const R=D.risks,rl=m=>`${+(R.BTCUSDT*m).toFixed(2)}% / ${+(R.ETHUSDT*m).toFixed(2)}% / ${+(R.BNBUSDT*m).toFixed(2)}%`;
+const rl=m=>D.sets.find(x=>x[0]===m)[1].replace(' (now)','');
 function draw(){
  const SK=Object.keys(D.starts);
  seg('start',SK.map(k=>D.starts[k]),i=>SK[i]===S.s,i=>S.s=SK[i]);
- seg('risk',D.mults.map(m=>rl(m)+(m===1?' (now)':'')),i=>D.mults[i]===S.m,i=>S.m=D.mults[i]);
+ seg('risk',D.sets.map(x=>x[1]),i=>D.sets[i][0]===S.m,i=>S.m=D.sets[i][0]);
  seg('lines',D.variants.map(([k,l],i)=>`<span class="lbtn"><i style="background:var(${CV[i]})"></i>${l}</span>`),i=>!!S.on[D.variants[i][0]],i=>{const k=D.variants[i][0];S.on[k]=S.on[k]?0:1;if(!Object.values(S.on).some(Boolean))S.on[k]=1;});
  seg('scale',['Log scale','Linear'],i=>(i===0)===(S.scale==='log'),i=>S.scale=i?'lin':'log');
  const ser=D.variants.map(([k,l],i)=>({k,l,col:css(CV[i]),d:D.series[`${S.s}_${S.m}_${k}`]})).filter(x=>S.on[x.k]);
  const now=D.series[`${S.s}_${S.m}_now`].stats,cp=D.series[`${S.s}_${S.m}_capbtc`].stats,lo=D.series[`${S.s}_${S.m}_low`].stats;
  document.getElementById('tiles').innerHTML=[
-  [`${money(now.final)} → ${money(cp.final)}`,`final balance: now → with the cap (${pc((cp.final/now.final-1)*100,0)})`],
-  [`−${now.dd.toFixed(0)}% → −${cp.dd.toFixed(0)}%`,`worst drop: now → with the cap`],
+  [`${money(now.final)} → ${money(cp.final)}`,`final balance: no cap → with the cap (${pc((cp.final/now.final-1)*100,0)})`],
+  [`−${now.dd.toFixed(0)}% → −${cp.dd.toFixed(0)}%`,`worst drop: no cap → with the cap`],
   [`${money(lo.final)} / −${lo.dd.toFixed(0)}%`,`lower risk instead (0.8×): final / worst drop`],
-  [`${now.pm.toFixed(1)}% → ${cp.pm.toFixed(1)}%`,`average per month: now → with the cap`]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+  [`${now.pm.toFixed(1)}% → ${cp.pm.toFixed(1)}%`,`average per month: no cap → with the cap`]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
  // equity
  const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=380,L=64,Rm=150,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
  const t0=new Date(ser[0].d.t0+'T00:00:00Z').getTime(),n=ser[0].d.bal.length,DAY=864e5,t1=t0+(n-1)*DAY,lg=S.scale==='log';
@@ -108,7 +108,7 @@ function draw(){
  const y0=new Date(t0).getUTCFullYear();for(let yy=y0+1;Date.UTC(yy,0,1)<t1;yy++){const tx=x(Date.UTC(yy,0,1));el('line',{x1:tx,x2:tx,y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:tx,y:H-6,'text-anchor':'middle'},sv).textContent=yy;}
  for(const s of ser.slice().reverse()){let p='';s.d.bal.forEach((v,i)=>p+=(i?'L':'M')+x(t0+i*DAY).toFixed(1)+','+y(v).toFixed(1));el('path',{d:p,fill:'none',stroke:s.col,'stroke-width':s.k==='cap11'?2.5:2,'stroke-linejoin':'round'},sv);}
  const ends=ser.map(s=>({s,yv:y(s.d.bal[n-1])})).sort((a,b)=>a.yv-b.yv);let last=-99;
- for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:W-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='capbtc'?700:500}`},sv).textContent=`${e.s.k==='now'?'Now':e.s.k==='low'?'0.8× risk':e.s.k==='capbtc'?'Cap, BTC free':e.s.k==='cap11'?'Cap 1.1× all':e.s.k==='cap10'?'Cap 1.0×':'Cap 1.3×'} ${money(e.s.d.bal[n-1])}`;}
+ for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:W-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='capbtc'?700:500}`},sv).textContent=`${e.s.k==='now'?'No cap':e.s.k==='low'?'0.8× risk':e.s.k==='capbtc'?'Cap, BTC free':e.s.k==='cap11'?'Cap 1.1× all':e.s.k==='cap10'?'Cap 1.0×':'Cap 1.3×'} ${money(e.s.d.bal[n-1])}`;}
  document.getElementById('legend').innerHTML=ser.map(s=>`<span><i style="background:${s.col}"></i>${s.l}</span>`).join('');
  document.getElementById('cap').textContent=`From $200, ${D.starts[S.s].toLowerCase()} to Sep 2026; risk ${rl(S.m)} (shorts at half). Daily closed balance; hover for values.`;
  // drawdown

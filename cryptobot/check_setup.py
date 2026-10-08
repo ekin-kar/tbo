@@ -96,6 +96,23 @@ for c in cfgs:
     except BinanceError as e:
         res(False, f"{sym}: {e}")
 print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${bal * total_risk:.2f})")
+pf_path = Path(__file__).resolve().parent / "portfolio.json"
+pf = json.loads(pf_path.read_text()) if pf_path.exists() else {}
+cap = float(pf.get("open_risk_cap_pct", 0) or 0)
+if cap > 0:
+    ex = [c["strategy"]["symbol"] for c in cfgs if c["strategy"]["symbol"] in pf.get("cap_exempt", [])]
+    capped = [c["risk_pct"] for c in cfgs if c["strategy"]["symbol"] not in ex] or [0]
+    btc = next((c["risk_pct"] for c in cfgs if c["strategy"]["symbol"] == "BTCUSDT"), None)
+    print(f" open-risk cap (portfolio.json): {cap:g}% of the balance (${bal * cap / 100:.2f})"
+          + (f" = {cap / btc:.2f} x the BTC risk (tested best: about 1.1x)" if btc else "") + f"; never shrunk: {', '.join(ex) or 'none'}")
+    res(cap >= max(capped), f"cap {cap:g}% vs the biggest capped coin risk {max(capped):g}%" + ("" if cap >= max(capped) else
+        " -> that coin could never trade full size: raise the cap (about 1.1 x the BTC risk)"), warn=cap < max(capped))
+    try:
+        x.positions(); x.open_algo_orders(); res(True, "all-symbol position / order endpoints reachable (needed by the cap)")
+    except BinanceError as e:
+        res(False, f"all-symbol position / order endpoints: {e} (the cap then blocks new alt / ETH orders)")
+else:
+    print(" open-risk cap: off (no portfolio.json or open_risk_cap_pct 0)")
 if bal > 0:
     res(total_notional < 0.8 * bal, f"margin locked if all four are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
         + ("" if total_notional < 0.8 * bal else " (raise exchange_leverage in the configs)"), warn=True)

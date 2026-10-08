@@ -1,0 +1,5 @@
+{
+  "open_risk_cap_pct": 5.5,
+  "cap_exempt": ["BTCUSDT"],
+  "cap_min_fraction": 0.25
+}

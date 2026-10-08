@@ -112,6 +112,16 @@ class Futures:
         entry = next((float(r["entryPrice"]) for r in rows if float(r["positionAmt"]) != 0), 0.0)
         return amt, entry
 
+    def positions(self):
+        """All open positions on the account: {symbol: (signed amount, entry price)} (one-way mode)."""
+        out = {}
+        for r in self._req("GET", "/fapi/v3/positionRisk", signed=True):
+            amt = float(r["positionAmt"])
+            if amt != 0:
+                a0, e0 = out.get(r["symbol"], (0.0, 0.0))
+                out[r["symbol"]] = (a0 + amt, e0 or float(r["entryPrice"]))
+        return out
+
     def api_restrictions(self):
         """Spot API (api.binance.com): enableWithdrawals, enableFutures, ipRestrict ... (live keys only)."""
         if self.base != LIVE:
@@ -153,7 +163,8 @@ class Futures:
             quantity=None if close_position else qty, closePosition="true" if close_position else None,
             workingType="CONTRACT_PRICE", clientAlgoId=client_id), signed=True)
 
-    def open_algo_orders(self, symbol):
+    def open_algo_orders(self, symbol=None):
+        """Open conditional orders of one symbol, or of every symbol when symbol is None."""
         r = self._req("GET", "/fapi/v1/openAlgoOrders", dict(symbol=symbol), signed=True)
         return r if isinstance(r, list) else r.get("orders", [])
 

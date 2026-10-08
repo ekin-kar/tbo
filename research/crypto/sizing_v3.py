@@ -41,7 +41,7 @@ def sim(rule, start, end, eq0=200.0, want_curve=False):
     for t, kind, i in ev:
         if kind == 1:
             sym, dr = tr.sym[i], tr.dir[i]
-            amt = RISK[sym] * eq * rule.get("mult", 1.0)
+            amt = rule.get("risk", RISK)[sym] * eq * rule.get("mult", 1.0)
             if dr < 0:
                 sm = rule.get("short", 0.5)
                 if rule.get("bear_shorts") is not None:
