@@ -1,5 +1,10 @@
 {
   "open_risk_cap_pct": 5.5,
   "cap_exempt": ["BTCUSDT"],
-  "cap_min_fraction": 0.25
+  "cap_min_fraction": 0.25,
+  "risk_ladder": [
+    {"from_usdt": 0,     "BTCUSDT": 7.5, "ETHUSDT": 2.5,  "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "cap_pct": 8.25},
+    {"from_usdt": 1000,  "BTCUSDT": 5,   "ETHUSDT": 2.5,  "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "cap_pct": 5.5},
+    {"from_usdt": 10000, "BTCUSDT": 2.5, "ETHUSDT": 1.25, "BNBUSDT": 0.42, "SOLUSDT": 0.42, "ADAUSDT": 0.42, "cap_pct": 2.75}
+  ]
 }

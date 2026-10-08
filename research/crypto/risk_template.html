@@ -50,10 +50,10 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 tr.sel td{background:var(--soft);font-weight:600}
 .warn{border-left:3px solid var(--neg);padding:8px 12px;background:var(--surface);border-radius:6px;font-size:14px;color:var(--muted);max-width:90ch}
 </style></head><body><div class="wrap">
-<h1>Risk comparison: $250 for 2 years</h1>
-<p class="lede">What the bot (<b>TBO v2.4</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter, shorts at half size) could do with <b>$250 over 24 months</b> at different risk levels. Each level was run on the <b>same</b> <span id="nj"></span> simulated 2-year market paths, built from random 4-week blocks of the bot's real trades, so the levels are compared fairly. Fees, slippage and funding included.</p>
+<h1>Risk comparison: $200 for 2 years</h1>
+<p class="lede">What the bot (<b>TBO v2.5</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter, shorts at half size, open-risk cap with BTC exempt) could do with <b>$200 over 24 months</b> with its <b>risk ladder</b> (7.5% BTC risk under $1,000, 5% up to $10,000, 2.5% above) and with flat risk levels. Each level was run on the <b>same</b> <span id="nj"></span> simulated 2-year market paths, built from random 4-week blocks of the bot's real trades, so the levels are compared fairly. Fees, slippage and funding included.</p>
 <div class="controls">
- <div><div class="ctl-title">Risk per trade (BTC / ETH / each alt)</div><div class="seg" id="risk"></div></div>
+ <div><div class="ctl-title">Risk per trade (BTC / ETH / each alt; the ladder changes with the balance)</div><div class="seg" id="risk"></div></div>
 </div>
 <div class="controls">
  <div><div class="ctl-title">Add money every month</div><div class="seg" id="dep"></div></div>
@@ -78,7 +78,7 @@ tr.sel td{background:var(--soft);font-weight:600}
 <h2>How to read this</h2>
 <ul class="notes">
 <li>Each path glues together random 4-week blocks of the bot's real backtest trades (all 5 coins together, as the bot trades them). The same paths are used for every risk level and deposit, so differences come from the settings, not from luck.</li>
-<li>"Risk" is the share of the balance lost if a trade's stop is hit: BTC / ETH / each of BNB, SOL, ADA. 1× is the bot's current config. Higher risk also needs a higher position-size cap (<code>max_leverage</code>) so tight-stop trades are not cut: about 8× at 1×, 12× at 1.5×, 16× at 2×.</li>
+<li>"Risk" is the share of the balance lost if a trade's stop is hit: BTC / ETH / each of BNB, SOL, ADA. The ladder (the bot's <code>portfolio.json</code>) picks the row for the current balance at every trade, and goes back up if the balance falls below a step. Every profile uses the open-risk cap (1.1× the BTC risk; BTC never shrunk but counted). Higher BTC risk needs a higher position-size cap (<code>max_leverage</code>) so tight-stop trades are not cut: the bot has 12× for BTC.</li>
 <li>"Worst drop" counts open trades as if they hit their stop (worst case), from the highest balance reached so far.</li>
 <li>This is a backtest of past markets, with the open-interest filter and BNB/SOL chosen partly after seeing 2022-26. Real results are usually worse than a backtest: read the chances as optimistic. A market unlike 2022-26 can do worse than every path here.</li>
 <li>Below about $100 some alt trades become smaller than Binance's minimum order and are skipped, so very small balances recover more slowly than shown.</li>
@@ -86,15 +86,14 @@ tr.sel td{background:var(--soft);font-weight:600}
 </div>
 <script>
 const D=/*DATA*/null;
-let S=Object.assign({m:D.mults.indexOf(1.0),d:0,s:'2022'},D.preset||{});
+let S=Object.assign({m:0,d:0,s:'2022'},D.preset||{});
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const money=v=>'$'+Math.round(v).toLocaleString('en-US');
 const pc=v=>Math.round(v)+'%';
 function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function seg(id,items,cur,fn,cls){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}" class="${cls?cls(i):''}">${t}</button>`).join('');
  e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
-const R=D.risks,K=Object.keys(R);
-const rlab=m=>`${+(R.BTC*m).toFixed(2)}% / ${+(R.ETH*m).toFixed(2)}% / ${+(R[K[2]]*m).toFixed(2)}%`;
+const P_=D.profiles,rlab=i=>(i===0?'Ladder: ':'Flat ')+P_[i][1];
 function axes(sv,H,lo,hi,lg){const W=sv.clientWidth,L=64,Rm=24,T=10,B=26;sv.innerHTML='';sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
  const x=m=>L+m/D.months*(W-L-Rm),y=v=>T+(1-((lg?Math.log10(Math.max(v,1e-9)):v)-lo)/(hi-lo))*(H-T-B);
  for(let m=0;m<=D.months;m+=3){el('line',{x1:x(m),x2:x(m),y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:x(m),y:H-7,'text-anchor':'middle'},sv).textContent=m?`month ${m}`:'start';}
@@ -103,10 +102,10 @@ function logGrid(sv,A,mn,mx){for(let e=0;e<=7;e++)for(const k of[1,2,5]){const v
 function hline(sv,A,v,col){el('line',{x1:A.L,x2:A.W-A.Rm,y1:A.y(v),y2:A.y(v),stroke:col,'stroke-dasharray':'5 4','stroke-width':1.5},sv);}
 function invested(m){return D.start+D.deps[S.d]*Math.min(m,D.months-1);}
 function draw(){
- seg('risk',D.mults.map(rlab),i=>i===S.m,i=>S.m=i,i=>D.mults[i]===1?'now':'');
+ seg('risk',P_.map((p,i)=>rlab(i)),i=>i===S.m,i=>S.m=i,i=>i===0?'now':'');
  seg('dep',D.deps.map(d=>d?`+$${d} / month`:'Nothing'),i=>i===S.d,i=>S.d=i);
  seg('src',Object.values(D.srcs),i=>Object.keys(D.srcs)[i]===S.s,i=>S.s=Object.keys(D.srcs)[i]);
- const mult=D.mults[S.m],dep=D.deps[S.d],r=D.res[S.s][`${mult}_${dep}`],inv=r.invested;
+ const pk_=P_[S.m][0],dep=D.deps[S.d],r=D.res[S.s][`${pk_}_${dep}`],inv=r.invested;
  document.getElementById('nj').textContent=D.n.toLocaleString('en-US');
  document.getElementById('tiles').innerHTML=[
   [money(r.median),`typical result after 2 years (median) · money put in ${money(inv)}`],
@@ -124,7 +123,7 @@ function draw(){
  hline(sv,A,10000,css('--pos'));hline(sv,A,20000,css('--pos'));
  let ip='';for(let m=0;m<=D.months;m++)ip+=(m?'L':'M')+A.x(m).toFixed(1)+','+A.y(invested(m)).toFixed(1);el('path',{d:ip,fill:'none',stroke:css('--muted'),'stroke-dasharray':'5 4','stroke-width':1.5},sv);
  let mp='';P['50'].forEach((v,m)=>mp+=(m?'L':'M')+A.x(m).toFixed(1)+','+A.y(v).toFixed(1));el('path',{d:mp,fill:'none',stroke:css('--comb'),'stroke-width':2.5},sv);
- document.getElementById('fancap').textContent=`Month-end balance, log scale. Risk ${rlab(mult)}${dep?`, adding $${dep} every month`:''}; ${D.srcs[S.s].toLowerCase()}.`;
+ document.getElementById('fancap').textContent=`Month-end balance, log scale. Risk ${rlab(S.m)}${dep?`, adding $${dep} every month`:''}; ${D.srcs[S.s].toLowerCase()}.`;
  // reach
  const cols=['--muted','--eth','--pos','--btc'],rv=document.getElementById('reach'),B=axes(rv,260,0,100,false);
  for(let v=0;v<=100;v+=25){el('line',{x1:B.L,x2:B.W-B.Rm,y1:B.y(v),y2:B.y(v),stroke:css('--rule')},rv);el('text',{x:B.L-8,y:B.y(v)+4,'text-anchor':'end'},rv).textContent=v+'%';}
@@ -139,11 +138,10 @@ function draw(){
   el('path',{d:p,fill:'none',stroke:c,'stroke-width':1.6,'stroke-opacity':0.85},xv);el('circle',{cx:Cx.x(D.months),cy:Cx.y(path[path.length-1]),r:3.5,fill:c},xv);});
  // table
  document.getElementById('thint').textContent=`Same ${D.n.toLocaleString('en-US')} market paths for every row${dep?`, adding $${dep} every month (${money(inv)} put in)`:''}; ${D.srcs[S.s].toLowerCase()}. Click a row to show it above.`;
- const cap=m=>Math.round(8*m);
- document.getElementById('tbl').innerHTML='<thead><tr><th>Risk (BTC / ETH / each alt)</th><th>Typical result</th><th>Bad luck (1 in 10)</th><th>Good luck (1 in 10)</th><th>End ≥ $10k</th><th>End ≥ $20k</th><th>End above money in</th><th>Falls below $100 at some point</th><th>Typical worst drop</th><th>1 in 10 worst drop</th><th>Size cap needed</th></tr></thead><tbody>'+
-  D.mults.map((m,i)=>{const q=D.res[S.s][`${m}_${dep}`];return `<tr class="${i===S.m?'sel':''}" data-i="${i}" style="cursor:pointer"><td>${rlab(m)}${m===1?' (now)':''}</td><td>${money(q.median)}</td><td>${money(q.p10)}</td><td>${money(q.p90)}</td><td>${pc(q.p10k)}</td><td>${pc(q.p20k)}</td><td>${pc(q.p_up)}</td><td>${pc(q.ever_lt100)}</td><td>−${pc(q.dd_med)}</td><td>−${pc(q.dd_p90)}</td><td>${cap(m)}×</td></tr>`;}).join('')+'</tbody>';
+ document.getElementById('tbl').innerHTML='<thead><tr><th>Risk per trade (BTC / ETH / each alt)</th><th>Typical result</th><th>Bad luck (1 in 10)</th><th>Good luck (1 in 10)</th><th>End ≥ $10k</th><th>End ≥ $20k</th><th>End above money in</th><th>Falls below $100 at some point</th><th>Typical worst drop</th><th>1 in 10 worst drop</th><th>BTC size cap needed</th></tr></thead><tbody>'+
+  P_.map((p,i)=>{const q=D.res[S.s][`${p[0]}_${dep}`];return `<tr class="${i===S.m?'sel':''}" data-i="${i}" style="cursor:pointer"><td>${rlab(i)}${i===0?' (the bot)':''}</td><td>${money(q.median)}</td><td>${money(q.p10)}</td><td>${money(q.p90)}</td><td>${pc(q.p10k)}</td><td>${pc(q.p20k)}</td><td>${pc(q.p_up)}</td><td>${pc(q.ever_lt100)}</td><td>−${pc(q.dd_med)}</td><td>−${pc(q.dd_p90)}</td><td>${p[2]}×</td></tr>`;}).join('')+'</tbody>';
  document.querySelectorAll('#tbl tbody tr').forEach(tr=>tr.onclick=()=>{S.m=+tr.dataset.i;draw();});
- const hi=D.res[S.s][`${D.mults[D.mults.length-1]}_${dep}`],mid=D.res[S.s][`1.5_${dep}`];
- document.getElementById('warn').innerHTML=`<b>Reading the table:</b> beyond about 1.5× the chance of $10k barely rises (${pc(mid.p10k)} → ${pc(hi.p10k)} at 2×) while the typical worst drop goes from −${pc(mid.dd_med)} to −${pc(hi.dd_med)} and bad-luck results shrink. The biggest danger at any level is stopping the bot during a drop: every path that reached $10k went through drops like these.`;}
+ const g=k=>D.res[S.s][`${k}_${dep}`],L_=g('lad'),F5=g('f5'),F75=g('f75');
+ document.getElementById('warn').innerHTML=`<b>Reading the table:</b> the ladder takes more risk only while the account is under $1,000 (money you accepted losing), then trades like flat 5% and steps down to 2.5% from $10,000 to protect what was won. Against flat 5% it raises the chance of $10k (${pc(F5.p10k)} → ${pc(L_.p10k)}) and the bad-luck result (${money(F5.p10)} → ${money(L_.p10)}); flat 7.5% gets a similar chance of $10k (${pc(F75.p10k)}) but keeps the large risk on a large account. The biggest danger at any level is stopping the bot during a drop: every path that reached $10k went through drops like these.`;}
 draw();addEventListener('resize',()=>draw());matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>draw());
 </script></body></html>

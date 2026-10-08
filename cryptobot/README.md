@@ -15,7 +15,8 @@
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
 | Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
-| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **5.5% of equity** (1.1 x the BTC risk). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
+| Risk ladder (v2.5) | `portfolio.json`: BTC 7.5% / ETH 2.5% / alts 0.83% under $1,000; 5% / 2.5% / 0.83% to $10,000; 2.5% / 1.25% / 0.42% above. See "Risk ladder" below |
+| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (5.5% of equity at BTC 5%). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
@@ -181,57 +182,65 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   2024-01..2026-09: 594 entries, all 130 BTC full size, 41 shrunk, 4 cut or closed right after a same-minute fill,
   0 off the rule.
 
-## 3-month trial from $200 (v2.5, Oct 2026)
+## Risk ladder (v2.5, live from Oct 2026): `portfolio.json`
 
-Settings: BTC 5%, ETH 2.5%, BNB / SOL / ADA 0.83% (shorts half), open-risk cap 5.5% with BTC exempt. Leave them
-alone for the 3 months (changing settings mid-way makes the result impossible to judge).
+The risk per trade is set by the balance: high while the account is small (money you accepted losing), lower as it
+grows (protects what was won). The bot reads `portfolio.json` at every order (an edit applies without a restart) and
+`check_setup.py` shows the step that applies now. If the balance falls back under a step, the risk goes back up.
 
-- **Start:** steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades are mostly
-  too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
-- **Every month-end:** `python report.py --days 31` -> `reports/report_<date>.md` + two CSV files (Binance keeps
-  only a few months of history, so keep each month's files).
-- **Every fill** is logged with the level aimed for and the slippage (`FILLED ... level ..., slippage ...%`).
-- **After 3 months:** send the `reports/` and `logs/` folders. They are compared with the backtest of the same
-  days (same trades? same fills? fees and slippage as assumed?).
-- **What 3 months looked like in the past** (`research/crypto/three_months.py`; every real 3-month window of 2022-26
-  from $200, and 5,000 reshuffled ones; real results will be somewhat worse):
-
-| After 3 months | real windows | reshuffled |
-|---|---|---|
-| 1 in 10 bad | $170 | $149 |
-| 1 in 4 bad | $203 | $189 |
-| typical | $257 | $262 |
-| 1 in 4 good | $380 | $393 |
-| 1 in 10 good | $620 | $634 |
-| below $200 / doubled | 24% / 21% | 29% / 24% |
-| worst drop inside the 3 months (typical / 1 in 10) | 26% / 38% | 26% / 40% |
-
-  About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
-  time in 4 and says little; a drop beyond 50% would be outside the backtest's range: stop and review then.
-
-### Optional: risk ladder (`research/crypto/ladder.py`)
-
-`portfolio_ladder.json` (not active): risk set by the balance, high while the account is small, lower as it grows.
-To use it, copy it over `portfolio.json` (read live; `check_setup.py` shows the row that applies).
-
-| Balance | BTC | ETH | BNB / SOL / ADA | cap |
+| Balance | BTC | ETH | BNB / SOL / ADA | open-risk cap (BTC exempt) |
 |---|---|---|---|---|
-| below $1,000 | 7.5% | 2.5% | 0.83% | 8.25% |
+| under $1,000 | 7.5% | 2.5% | 0.83% | 8.25% |
 | $1,000 - 10,000 | 5% | 2.5% | 0.83% | 5.5% |
 | from $10,000 | 2.5% | 1.25% | 0.42% | 2.75% |
 
-2 years from $200 (4,000 reshuffled runs of 2022-26 trades / every real 2-year window 2020-26):
+Shorts at half size. `risk_pct` in the configs is only used if `portfolio.json` has no ladder. BTC's size cap is
+12x the balance (`max_leverage`; at 7.5% risk 8x would cut 1 in 5 BTC trades, 12x about 3 in 100) and its Binance
+leverage 25x (only sets the margin a position locks; in cross margin it does not move the liquidation point).
 
-| | flat 5% | ladder | flat 7.5% |
+2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`); 3,000 reshuffled runs of
+2022-26 trades / every real 2-year window of 2022-26):
+
+| | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
 |---|---|---|---|
-| typical end | $4.1k / $5.6k | $5.5k / $7.4k | $6.0k / $8.3k |
-| 1 in 4 bad end | $1.5k / $3.1k | $1.9k / $4.6k | $1.7k / $4.4k |
-| reach $10k | 29% / 23% | 37% / 41% | 39% / 48% |
-| worst drop once above $1k (typical / 1 in 10) | 41% / 60% | 41% / 64% | 54% / 74% |
-| fell below half of a $5k+ peak | 2% | 1% | 7% |
+| typical end | $4.3k / $4.0k | **$5.8k / $5.6k** | $6.3k / $5.8k |
+| 1 in 4 bad end | $1.6k / $2.2k | **$2.1k / $2.7k** | $1.8k / $2.6k |
+| reach $10k | 30% / 8% | **39% / 29%** | 40% / 28% |
+| worst drop once above $1k (typical / 1 in 10) | 40% / 59% | **40% / 63%** | 53% / 74% |
+| gave back half of a $5k+ peak | 2% | **1%** | 7% |
 
-The extra drops of the ladder happen while the account is under $1,000; above it, it is the same as flat 5%.
-If the balance falls back under a step, the risk goes back up (that is what was tested).
+The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
+`tbo_statistics.html` (equity chart, every statistic, random journeys), `risk_comparison.html`, `plan_ladder_plus50.html`,
+`monthly_report.html`, `cap_comparison.html` all size trades like the bot.
+
+## 3-month trial from $200 (v2.5, Oct 2026)
+
+Settings: the risk ladder above (at $200: BTC 7.5%, ETH 2.5%, BNB / SOL / ADA 0.83%, cap 8.25%). Leave them alone
+for the 3 months (changing settings mid-way makes the result impossible to judge).
+
+- **Start:** `git pull`, then steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades
+  are mostly too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
+- **Every month-end:** `python report.py --days 31` -> `reports/report_<date>.md` + two CSV files (Binance keeps
+  only a few months of history, so keep each month's files).
+- **Every fill** is logged with the level aimed for, the slippage and the risk (`FILLED ... level ..., slippage ...%`).
+- **After 3 months:** send the `reports/` and `logs/` folders. They are compared with the backtest of the same
+  days (same trades? same fills? fees and slippage as assumed?).
+- **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $200; every real
+  3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
+
+| After 3 months | real windows | reshuffled |
+|---|---|---|
+| 1 in 10 bad | $155 | $131 |
+| 1 in 4 bad | $184 | $179 |
+| typical | $259 | $272 |
+| 1 in 4 good | $378 | $447 |
+| 1 in 10 good | $684 | $804 |
+| below $200 / doubled | 30% / 23% | 31% / 29% |
+| worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 33% / 42% / 51% | 33% / 42% / 51% |
+
+  About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
+  time in 3 and says little. A drop beyond 60% from the top would be outside the backtest's usual range: stop and
+  review then.
 
 ## GO LIVE: step by step (v2.5)
 
@@ -249,9 +258,8 @@ entries, breakeven moves and the 5-day exit until it is back.
    `pip install -r cryptobot/requirements.txt`.
 4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
    token + chat id for phone alerts (fills, stops, breakeven, exits, warnings).
-5. **Risk:** set in `config_btc.json` / `config_eth.json` / `config_bnb.json` / `config_sol.json` / `config_ada.json`
-   (`risk_pct`; now 5 / 2.5 / 0.83 / 0.83 / 0.83, shorts x0.5) and the open-risk cap in `portfolio.json`
-   (`open_risk_cap_pct` 5.5 = 1.1 x the BTC risk; change it with the BTC risk).
+5. **Risk:** the risk ladder and the open-risk cap in `portfolio.json` (see "Risk ladder"; shorts x0.5 in the
+   configs). `risk_pct` in the configs is only the fallback when `portfolio.json` has no ladder.
 6. **Check:** `cd cryptobot && python check_setup.py` (places no orders). Every line must be OK (WARN = read it):
    key works, withdrawals OFF, futures ON, One-way, balance, clock, and each coin's long/short size above
    Binance's minimum at your risk.

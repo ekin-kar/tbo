@@ -1,34 +1,39 @@
 """cryptobot/cap_comparison.html: equity and drawdown of the bot with and without the open-risk cap (and the
-'just lower the risk' alternative; recommended: BTC never shrunk, its risk still counts against the cap for the others), from $200, for three start dates and three risk levels. Uses sizing_v3.sim."""
+'just lower the risk' alternative), from $200, for three start dates and risk sets (the bot's ladder first). botsim.py."""
 import json
 from multiprocessing import Pool
 import numpy as np, pandas as pd
 import common as C
-import sizing_v3 as S
+import botsim as BS
 
 STARTS = {"2020": "2020-03-01", "2022": "2022-01-01", "2024": "2024-01-01"}
 END = "2026-10-01"
-SETS = [("now", "5% / 2.5% / 0.83% (now)", (5, 2.5, 0.83)), ("b6", "6% / 2.5% / 0.83%", (6, 2.5, 0.83)),
+LAD = [(r[0], r[1][0], r[1][1], r[1][2]) for r in BS.bot_policy()["rows"]]
+SETS = [("lad", "Ladder: 7.5% → 5% from $1k → 2.5% from $10k (the bot)", None), ("now", "5% / 2.5% / 0.83%", (5, 2.5, 0.83)),
         ("b75", "7.5% / 2.5% / 0.83%", (7.5, 2.5, 0.83)), ("b75lo", "7.5% / 1.5% / 0.5%", (7.5, 1.5, 0.5))]
+VARIANTS = [("now", "No cap", dict(cap_x=0)),
+            ("capbtc", "Cap 1.1× BTC risk, BTC never shrunk (the bot)", dict(cap_x=1.1)),
+            ("cap11", "Cap 1.1×, all coins", dict(cap_x=1.1, exempt_btc=False)),
+            ("low", "Lower risk instead (0.8×, no cap)", dict(cap_x=0, mult=0.8)),
+            ("cap10", "Cap 1.0×, all coins", dict(cap_x=1.0, exempt_btc=False)),
+            ("cap13", "Cap 1.3×, all coins", dict(cap_x=1.3, exempt_btc=False))]
 
 
-def risk(b, e, a):
-    return {"BTCUSDT": b / 100, "ETHUSDT": e / 100, "BNBUSDT": a / 100, "SOLUSDT": a / 100, "ADAUSDT": a / 100}
-
-
-VARIANTS = [("now", "No cap", lambda r, b: dict(risk=r)),
-            ("capbtc", "Cap 1.1× BTC risk, BTC never shrunk (recommended)", lambda r, b: dict(risk=r, cap=0.011 * b, cap_mode="shrink", exempt=("BTCUSDT",))),
-            ("cap11", "Cap 1.1×, all coins", lambda r, b: dict(risk=r, cap=0.011 * b, cap_mode="shrink")),
-            ("low", "Lower risk instead (0.8×)", lambda r, b: dict(risk=r, mult=0.8)),
-            ("cap10", "Cap 1.0×, all coins", lambda r, b: dict(risk=r, cap=0.010 * b, cap_mode="shrink")),
-            ("cap13", "Cap 1.3×, all coins", lambda r, b: dict(risk=r, cap=0.013 * b, cap_mode="shrink"))]
+def policy(m, kw):
+    v = dict((k, x) for k, _, x in SETS)[m]
+    return BS.ladder_policy(LAD, **kw) if v is None else BS.flat_policy(*v, **kw)
 
 
 def job(args):
     sk, m, vk = args
-    f = dict((k, fn) for k, _, fn in VARIANTS)[vk]
-    b, e, a = dict((k, v) for k, _, v in SETS)[m]
-    st, bal, dd = S.sim(f(risk(b, e, a), b), STARTS[sk], END, want_curve=True)
+    h = BS.history(policy(m, dict((k, kw) for k, _, kw in VARIANTS)[vk]), STARTS[sk], END, 200.0)
+    bal, dd, r = h["bal"], h["dd"], h["r"]
+    mo = (pd.Timestamp(END) - pd.Timestamp(STARTS[sk])).days / 30.44
+    pm = ((r["final"] / 200) ** (1 / mo) - 1) * 100
+    hw = bal.cummax(); nh = bal.index[bal >= hw]; flat = int(np.diff(nh.values).astype("timedelta64[D]").astype(int).max())
+    mm = bal.resample("ME").last().pct_change().dropna()
+    st = dict(final=r["final"], pm=pm, dd=r["dd"], ratio=pm / r["dd"], flat=flat, pos=float((mm > 0).mean() * 100),
+              worst_m=float(mm.min() * 100), skipped=r["skipped"])
     return sk, m, vk, st, bal, dd
 
 
@@ -45,6 +50,6 @@ if __name__ == "__main__":
     html = open(C.ROOT / "research" / "crypto" / "cap_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
     (C.ROOT / "cryptobot" / "cap_comparison.html").write_text(html)
     s = data["series"]
-    for k in ("2024_now_now", "2024_now_capbtc", "2024_b75_capbtc", "2020_b75_capbtc", "2024_b75lo_capbtc"):
+    for k in ("2024_lad_now", "2024_lad_capbtc", "2024_now_capbtc", "2022_lad_capbtc", "2020_lad_capbtc"):
         st = s[k]["stats"]; print(k, round(st["final"]), round(st["pm"], 2), round(st["dd"], 1))
     print("written", len(html) // 1024, "KB")

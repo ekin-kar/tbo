@@ -165,8 +165,10 @@ class Bot:
 
     def open_risk(self, filled_before=None):
         """USDT lost if every OTHER open position not yet at breakeven hit its stop now (every symbol on the account).
-        filled_before (ms): count only positions that filled before it (the first to fill keeps its size)."""
+        filled_before (ms): count only positions that filled before it (the first to fill keeps its size); an exempt
+        coin (BTC) always counts, also when it filled moments later (BTC goes first, as in the research simulation)."""
         pos = self.x.positions()
+        exempt = set(self.portfolio().get("cap_exempt", []))
         pos.pop(self.sym, None)
         if not pos:
             return 0.0, ""
@@ -182,9 +184,10 @@ class Bot:
         for sym, (amt, entry) in sorted(pos.items()):
             side = 1 if amt > 0 else -1
             st = self.coin_state(sym)
-            if filled_before and st is not None and (st.get("entry_ms") or 0) == 0 and st.get("entry_side"):
+            later = filled_before and sym not in exempt and st is not None
+            if later and (st.get("entry_ms") or 0) == 0 and st.get("entry_side"):
                 continue                                # its bot has not even seen the fill yet: it filled after ours
-            if filled_before and st is not None and (st.get("entry_ms") or 0) > filled_before:
+            if later and (st.get("entry_ms") or 0) > filled_before:
                 continue
             trig = [t for sd, t in stops.get(sym, []) if sd == ("SELL" if side == 1 else "BUY") and t > 0]
             if trig:                                    # the stop that would close it first
@@ -455,8 +458,8 @@ class Bot:
         self.save()
 
     def trim_to_cap(self, amt):
-        """Right after a fill: if coins that filled earlier left less room than this order was sized for (fills in the
-        same minute), cut the position to fit, or close it if less than cap_min_fraction would remain."""
+        """For 2 minutes after a fill: if coins that filled earlier (or BTC, at any moment of those 2 minutes) left less
+        room than this order was sized for, cut the position to fit, or close it if less than cap_min_fraction would remain."""
         try:
             eq = self.equity()
             want = abs(amt) * self.st["sl_dist"]
@@ -464,8 +467,9 @@ class Bot:
         except Exception as e:
             log.warning(f"open risk unavailable ({e}): cap check after the fill retried next poll")
             return
-        self.st["cap_check"] = False
-        self.save()
+        if self.x.now_ms() - self.st["entry_ms"] > 120_000:
+            self.st["cap_check"] = False
+            self.save()
         if allowed >= want * 0.95:                      # (5% slack: equity moves a little between order and fill)
             return
         step = max(self.f["step"], self.f["mkt_step"])

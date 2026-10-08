@@ -47,10 +47,11 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.n
 details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
 </style></head><body><div class="wrap">
 <h1>TBO crypto bot statistics</h1>
-<p class="lede">Every trade of <b>TBO v2.4</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: risk % of the balance at entry, shorts at the short-size factor. Pick coins, period, risk and starting balance; everything recalculates.</p>
+<p class="lede">Every trade of <b>TBO v2.5</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: the <b>risk ladder</b> (BTC 7.5% of the balance under $1,000, 5% up to $10,000, 2.5% above) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size. Pick coins, period and starting balance, or switch to fixed risks; everything recalculates.</p>
 <div class="controls">
  <div><div class="ctl-title">Coins</div><div class="seg" id="coins"></div></div>
  <div><div class="ctl-title">Period</div><div class="seg" id="periods"></div></div>
+ <div><div class="ctl-title">Position sizing</div><div class="seg" id="sizing"></div></div>
 </div>
 <div class="controls" id="risks"></div>
 <div class="big" id="headline"></div>
@@ -111,7 +112,7 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 <li>Trades come from a 1-minute backtest engine on Binance futures prices (last price, 1-minute candles). The bot's own code was run against a simulated exchange on the same history: on BTC 327 of 328 trades matched to the minute, on ETH 316 of 320 (the rest are minutes where the backtest assumes the stop is hit inside the fill minute, which is pessimistic).</li>
 <li>Costs: taker fee 0.05% per side, plus slippage 0.01% (BTC, ETH) or 0.03% (BNB, SOL, ADA) on every stop or market fill; funding 0.01% per 8 hours charged on every open position (long or short), which is pessimistic.</li>
 <li>R figures (win rate, profit factor, net R, drawdown in R) are pure trade statistics: they do not depend on risk, coin weights or the short-size factor. The combined R columns add all selected coins' trades at 1R each.</li>
-<li>Dollar and percent figures run one account through time: each trade's size is its coin's risk % of the balance at entry (× the short-size factor for shorts); a trade's result is size × R at its exit. The worst-case drawdown counts every open trade not yet at breakeven as lost at its stop. No cap on total open risk (the bot has none; when all coins are open at once, the account risks the sum of the coins' risks).</li>
+<li>Dollar and percent figures run one account through time, sized like the bot (v2.5): each trade risks its coin's % from the ladder row for the balance at entry (× the short-size factor for shorts); an ETH / BNB / SOL / ADA trade is shrunk so the risk of all open trades not yet at breakeven stays within the cap (1.1× that row's BTC risk), or skipped if less than a quarter fits; BTC is never shrunk but its risk counts. A trade's result is size × R at its exit. The worst-case drawdown counts every open trade not yet at breakeven as lost at its stop. The bot's five bots were run together on a simulated account and matched this rule on every trade.</li>
 <li>A win is a trade closed above +0.2R, a loss below −0.2R, the rest are breakeven exits (the stop was moved to the entry at +1.5R).</li>
 <li>The open-interest filter (v2.4) only acts from 2022 (Binance's open-interest history starts in Dec 2021) and was chosen after seeing 2022–26: 24 of 32 nearby settings also beat the bot without it in both 2022–23 and 2024–26, and random skipping of the same number of orders never matched it, but expect live gains to be smaller.</li>
 <li>Honest caveats: the rules were tuned on BTC 2020–26, ADA was picked after seeing 2020–23 and BNB + SOL replaced DOGE in Oct 2026 after seeing their stronger 2024–26 (recent strength helps only a little when choosing coins), and the coin weights and short size were chosen after seeing all years, so the full-history figures are optimistic. The 2024–26 period is the best guide; expect live results somewhat below it. In a test with 200 random-entry versions of the same rules, the real entries beat all 200 in both 2020–23 and 2024–26.</li>
@@ -122,7 +123,15 @@ const D=/*DATA*/null;
 const COINS=D.coins,CV=['--btc','--eth','--bnb','--sol','--ada'];
 const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
 const PERIODS=[['All (Mar 2020 – Sep 2026)',M(2020,2),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,2),Y(2024)]];
-let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:200,scale:'log',which:-1};
+let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:200,scale:'log',which:-1,mode:'bot',cap:1};
+const spec=()=>({mode:S.mode,risk:S.risk.slice(),smult:S.smult,cap:S.cap});
+// the bot's sizing (bot.py v2.5): ladder row for the balance -> each coin's risk % and the open-risk cap %; BTC exempt but counted
+function rowAt(sp,eq){if(sp.mode==='bot'){let r=D.ladder[0];for(const x of D.ladder)if(eq>=x[0])r=x;return r;}return [0,sp.risk,sp.cap?1.1*sp.risk[0]:0];}
+function sizeOf(sp,c,dir,eq,open){const r=rowAt(sp,eq);let a=r[1][c]/100*(dir<0?sp.smult:1)*eq;
+ if(r[2]>0&&!D.exempt.includes(c)){let u=0;for(const o of open.values())if(!o.be)u+=o.a;const room=r[2]/100*eq-u;if(a>room)a=room>D.minf*a?room:0;}return a;}
+const RK=[1,2,0];   // same minute: exits, breakevens, then entries (as botsim.py)
+const spLabel=sp=>sp.mode==='bot'?'risk ladder '+D.ladder.map((r,i)=>`${i?'from $'+r[0].toLocaleString('en-US')+': ':''}BTC ${r[1][0]}% / ETH ${r[1][1]}% / alts ${r[1][2]}%`).join(' → ')+', open-risk cap 1.1× BTC risk (BTC exempt)':
+ COINS.map((c,i)=>c+' '+sp.risk[i]+'%').join(', ')+(sp.cap?', open-risk cap '+(1.1*sp.risk[0]).toFixed(2)+'% (BTC exempt)':', no cap');
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const money=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:Math.abs(v)>=1000?0:2,minimumFractionDigits:Math.abs(v)>=1000?0:2});
 const pct=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
@@ -131,19 +140,19 @@ const cls=v=>v>0?'pos':v<0?'neg':'';
 function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 
 // ── one account trading the selected coins (same algorithm as the Python reference) ──
-function sim(on,risk,smult,start,t0,t1){
+function sim(on,sp,start,t0,t1){
  const tr=D.trades.filter(t=>on[t[0]]&&t[1]>=t0&&t[1]<t1);
  const ev=[];tr.forEach((t,i)=>{ev.push([t[1],1,i],[Math.max(t[3],t[1]+1),0,i],[Math.max(t[2],t[1]+2),2,i]);});
- ev.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+ ev.sort((a,b)=>a[0]-b[0]||RK[a[1]]-RK[b[1]]);
  let eq=start,open=new Map(),pkw=start,ddw=0,pkc=start,ddc=0;const curve=[[t0,start,start]],pnl=new Array(tr.length).fill(0);
  for(const [t,k,i] of ev){const x=tr[i];
-  if(k===1){open.set(i,{a:risk[x[0]]/100*(x[4]<0?smult:1)*eq,be:false});}
+  if(k===1){const a=sizeOf(sp,x[0],x[4],eq,open);if(a>0)open.set(i,{a,be:false});}
   else if(k===0){const o=open.get(i);if(o)o.be=true;}
   else{const o=open.get(i);if(o){pnl[i]=o.a*x[5];eq+=pnl[i];open.delete(i);}}
   let w=eq;for(const o of open.values())if(!o.be)w-=o.a;
   pkw=Math.max(pkw,w);ddw=Math.max(ddw,1-w/pkw);pkc=Math.max(pkc,eq);ddc=Math.max(ddc,1-eq/pkc);curve.push([t,eq,w]);}
  return {tr,pnl,curve,final:eq,ddw:ddw*100,ddc:ddc*100};}
-window.__sim=(on,risk,smult,start,t0,t1)=>{const r=sim(on,risk,smult,start,t0,t1);return {final:Math.round(r.final*100)/100,ddw:Math.round(r.ddw*100)/100,ddc:Math.round(r.ddc*100)/100,trades:r.tr.length};};
+window.__sim=(on,sp,start,t0,t1)=>{const r=sim(on,sp,start,t0,t1);return {final:Math.round(r.final*100)/100,ddw:Math.round(r.ddw*100)/100,ddc:Math.round(r.ddc*100)/100,trades:r.tr.length};};
 
 function rstats(tr){const R=tr.map(t=>t[5]),n=R.length;if(!n)return null;
  const w=R.filter(r=>r>0.2),l=R.filter(r=>r<-0.2),be=n-w.length-l.length,pos=R.filter(r=>r>0).reduce((a,b)=>a+b,0),neg=-R.filter(r=>r<0).reduce((a,b)=>a+b,0);
@@ -156,7 +165,7 @@ function monthly(res,t0,t1,start){const out=[];let d=new Date(t0),prev=start,k=0
   const trs=res.tr.map((t,i)=>[t,res.pnl[i]]).filter(([t])=>t[2]>=a&&t[2]<b);
   out.push({a,start:prev,end,pct:(end/prev-1)*100,n:trs.length,w:trs.filter(([t])=>t[5]>0.2).length,l:trs.filter(([t])=>t[5]<-0.2).length,dd:(end/pk-1)*100});prev=end;d=nd;}
  return out;}
-function acct(on,t0,t1){const res=sim(on,S.risk,S.smult,S.start,t0,t1),mo=monthly(res,t0,t1,S.start),months=mo.length,pos=mo.filter(m=>m.pct>0).length;
+function acct(on,t0,t1){const res=sim(on,spec(),S.start,t0,t1),mo=monthly(res,t0,t1,S.start),months=mo.length,pos=mo.filter(m=>m.pct>0).length;
  const days=[];let k=0,best=S.start,gap=0,last=t0;for(const [t,e] of res.curve){if(e>=best){gap=Math.max(gap,(t-last)/864e5);best=e;last=t;}}gap=Math.max(gap,(t1-last)/864e5);
  return {res,mo,months,pos,ret:(res.final/S.start-1)*100,mavg:(Math.pow(res.final/S.start,1/months)-1)*100,ann:(Math.pow(res.final/S.start,12/months)-1)*100,
   best:Math.max(...mo.map(m=>m.pct)),worst:Math.min(...mo.map(m=>m.pct)),flat:gap};}
@@ -167,13 +176,17 @@ function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=it
 function controls(){
  seg('coins',COINS.map((c,i)=>`<span class="coinbtn"><i style="background:var(${CV[i]})"></i>${c}</span>`),i=>!!S.on[i],i=>{S.on[i]=S.on[i]?0:1;if(!S.on.some(Boolean))S.on[i]=1;});
  seg('periods',PERIODS.map(p=>p[0]),i=>i===S.per,i=>S.per=i);
+ seg('sizing',['The bot: risk ladder + cap','Fixed risks'],i=>(i===0)===(S.mode==='bot'),i=>S.mode=i?'flat':'bot');
  seg('scale',['Balance, log scale','Balance, linear'],i=>(i===0)===(S.scale==='log'),i=>S.scale=i?'lin':'log');
  seg('which',['Combined'].concat(COINS),i=>i-1===S.which,i=>S.which=i-1);
  const r=document.getElementById('risks');
- r.innerHTML=COINS.map((c,i)=>`<label class="risk">${c} risk per trade (%)<input type="number" step="0.125" min="0.05" max="20" value="${S.risk[i]}" data-i="${i}"></label>`).join('')+
+ r.innerHTML=(S.mode==='bot'?`<div class="hint" style="max-width:60ch;margin:0">Risk per trade by balance (the bot's <code>portfolio.json</code>): ${D.ladder.map((x,i)=>`<b>${i?'from $'+x[0].toLocaleString('en-US'):'under $'+D.ladder[1][0].toLocaleString('en-US')}</b> BTC ${x[1][0]}% · ETH ${x[1][1]}% · BNB/SOL/ADA ${x[1][2]}% · cap ${x[2]}%`).join('<br>')}</div>`:
+  COINS.map((c,i)=>`<label class="risk">${c} risk per trade (%)<input type="number" step="0.125" min="0.05" max="20" value="${S.risk[i]}" data-i="${i}"></label>`).join('')+
+  `<label class="risk" title="Open-risk cap at 1.1× the BTC risk, BTC exempt">Open-risk cap<input type="checkbox" id="capbox" ${S.cap?'checked':''}></label>`)+
   `<label class="risk" title="Shorts are sized at this fraction of the coin's risk (bot: short_risk_mult)">Short size ×<input type="number" step="0.25" min="0" max="1" value="${S.smult}" id="sm"></label>`+
   `<label class="risk">Starting balance ($)<input type="number" step="100" min="100" value="${S.start}" id="sb"></label>`;
  r.querySelectorAll('input[data-i]').forEach(e=>e.onchange=()=>{const v=parseFloat(e.value);if(v>0){S.risk[+e.dataset.i]=v;draw();}});
+ const cb=document.getElementById('capbox');if(cb)cb.onchange=e=>{S.cap=e.target.checked?1:0;draw();};
  document.getElementById('sm').onchange=e=>{const v=parseFloat(e.target.value);if(v>=0&&v<=1){S.smult=v;draw();}};
  document.getElementById('sb').onchange=e=>{const v=parseFloat(e.target.value);if(v>0){S.start=v;draw();}};}
 
@@ -216,7 +229,7 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
  const cols=[{name:'Combined',a:C0,tr}].concat(single.map(s=>({name:COINS[s.i]+' alone',a:s.a,tr:s.a.res.tr,i:s.i})));
  const rr=cols.map(c=>rstats(c.tr));
  const row=(lab,f)=>`<tr><td>${lab}</td>${cols.map((c,j)=>`<td>${rr[j]?f(rr[j],c.a):'-'}</td>`).join('')}</tr>`;
- document.getElementById('periodnote').textContent=`${lab}: ${C0.months} months. Risk per trade: ${sel.map(i=>COINS[i]+' '+S.risk[i]+'%').join(', ')}; shorts × ${S.smult}; start ${money(S.start)}.`;
+ document.getElementById('periodnote').textContent=`${lab}: ${C0.months} months. Sizing: ${spLabel(spec())}; shorts × ${S.smult}; start ${money(S.start)}.`;
  document.getElementById('stats').innerHTML=`<thead><tr><th></th>${cols.map(c=>`<th>${c.i===undefined?c.name:`<span class="dot" style="background:var(${CV[c.i]})"></span>${c.name}`}</th>`).join('')}</tr></thead><tbody>`+
   row('Trades',r=>r.n)+row('Trades per month',(r,a)=>(r.n/a.months).toFixed(1))+row('Longs / shorts',r=>`${r.long} / ${r.short}`)+
   row('Win rate (closed above +0.2R)',r=>r.win.toFixed(1)+'%')+row('Breakeven exits',r=>r.be.toFixed(1)+'%')+row('Losses',r=>r.loss.toFixed(1)+'%')+
@@ -249,25 +262,28 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
 // ── simulated journeys (random 4-week blocks of the real trades) ──
 const J={src:0,hz:1,seed:7,cache:{}};
 const JSRC=[['2024 – Sep 2026 (unseen by the design)',Y(2024),M(2026,9)],['All years 2020 – 2026',M(2020,2),M(2026,9)]],JHZ=[6,12,24];
-const MO=30.44*864e5,BLK=28*864e5,NJ=800,RMULT=[0.5,1,1.5,2,3];
+const MO=30.44*864e5,BLK=28*864e5,NJ=800;
+const PROF=[['The bot: risk ladder + cap',{mode:'bot'}],['Fixed 2.5 / 1.25 / 0.42% + cap',{mode:'flat',risk:[2.5,1.25,0.42,0.42,0.42],cap:1}],
+ ['Fixed 5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[5,2.5,0.83,0.83,0.83],cap:1}],['Fixed 7.5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[7.5,2.5,0.83,0.83,0.83],cap:1}],
+ ['Fixed 10 / 2.5 / 0.83% + cap',{mode:'flat',risk:[10,2.5,0.83,0.83,0.83],cap:1}],['Fixed 5 / 2.5 / 0.83%, no cap',{mode:'flat',risk:[5,2.5,0.83,0.83,0.83],cap:0}]];
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function jlists(on,t0,t1,months,n,seed){const pool=D.trades.filter(t=>on[t[0]]&&t[1]>=t0&&t[1]<t1),r=rng(seed),nb=Math.ceil(months*MO/BLK),out=[];
  const lb=v=>{let a=0,b=pool.length;while(a<b){const m=(a+b)>>1;if(pool[m][1]<v)a=m+1;else b=m;}return a;};
  for(let j=0;j<n;j++){const tr=[];for(let b=0;b<nb;b++){const u=t0+r()*(t1-BLK-t0),sh=b*BLK-u;for(let k=lb(u);k<pool.length&&pool[k][1]<u+BLK;k++){const t=pool[k];tr.push([t[0],t[1]+sh,t[2]+sh,t[3]+sh,t[4],t[5]]);}}out.push(tr);}
  return out;}
-function jsim(tr,risk,smult,start,months,keep){
- const ev=[];tr.forEach((t,i)=>{ev.push([t[1],1,i],[Math.max(t[3],t[1]+1),0,i],[Math.max(t[2],t[1]+2),2,i]);});ev.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+function jsim(tr,sp,start,months,keep){
+ const ev=[];tr.forEach((t,i)=>{ev.push([t[1],1,i],[Math.max(t[3],t[1]+1),0,i],[Math.max(t[2],t[1]+2),2,i]);});ev.sort((a,b)=>a[0]-b[0]||RK[a[1]]-RK[b[1]]);
  const end=months*MO,nw=Math.round(months*30.44/7),WK=end/nw;let eq=start,open=new Map(),pkw=start,ddw=0;const wk=[start],hit={},path=keep?[[0,start]]:null;
  for(const [t,k,i] of ev){if(t>end)break;while(wk.length*WK<=t)wk.push(eq);const x=tr[i];
-  if(k===1)open.set(i,{a:risk[x[0]]/100*(x[4]<0?smult:1)*eq,be:false});
+  if(k===1){const a=sizeOf(sp,x[0],x[4],eq,open);if(a>0)open.set(i,{a,be:false});}
   else if(k===0){const o=open.get(i);if(o)o.be=true;}
   else{const o=open.get(i);if(o){eq+=o.a*x[5];open.delete(i);for(const m of[2,5,10])if(hit[m]===undefined&&eq>=m*start)hit[m]=t;if(hit.h===undefined&&eq<=start/2)hit.h=t;if(keep)path.push([t,eq]);}}
   let w=eq;for(const o of open.values())if(!o.be)w-=o.a;pkw=Math.max(pkw,w);ddw=Math.max(ddw,1-w/pkw);}
  while(wk.length<=nw)wk.push(eq);if(keep)path.push([end,eq]);return {final:eq,ddw:ddw*100,wk,hit,path};}
 const q=(a,p)=>{const s=a.slice().sort((x,y)=>x-y),i=(s.length-1)*p,lo=Math.floor(i);return s[lo]+(s[Math.min(lo+1,s.length-1)]-s[lo])*(i-lo);};
-function jdata(){const [,t0,t1]=JSRC[J.src],months=JHZ[J.hz],key=JSON.stringify([S.on,S.risk,S.smult,S.start,J.src,J.hz]);
+function jdata(){const [,t0,t1]=JSRC[J.src],months=JHZ[J.hz],key=JSON.stringify([S.on,spec(),S.start,J.src,J.hz]);
  if(J.cache.key===key)return J.cache;const lists=jlists(S.on,t0,t1,months,NJ,12345);
- const res=lists.map(tr=>jsim(tr,S.risk,S.smult,S.start,months,false));
+ const res=lists.map(tr=>jsim(tr,spec(),S.start,months,false));
  J.cache={key,months,lists,byR:null,res};return J.cache;}
 function jaxes(sv,H,months,lo,hi,lg,money_){const W=sv.clientWidth,L=64,R=24,T=10,B=26;sv.innerHTML='';sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
  const x=m=>L+m/months*(W-L-R),y=v=>T+(1-((lg?Math.log10(v):v)-lo)/(hi-lo))*(H-T-B);
@@ -305,7 +321,7 @@ function journeys(){const d=jdata(),months=d.months,res=d.res,st=S.start,n=res.l
   el('path',{d:p,fill:'none',stroke:css(c),'stroke-width':2,'stroke-dasharray':nm.startsWith('Fell')?'6 4':''},hv);
   const last=res.filter(r=>f(r)!==undefined).length/n*100;el('text',{x:B2.W-B2.R-4,y:B2.y(last)-5,'text-anchor':'end',style:`fill:var(${c});font-weight:600`},hv).textContent=Math.round(last)+'%';}
  // examples
- const [,t0,t1]=JSRC[J.src],ex=jlists(S.on,t0,t1,months,12,J.seed).map(tr=>jsim(tr,S.risk,S.smult,st,months,true));
+ const [,t0,t1]=JSRC[J.src],ex=jlists(S.on,t0,t1,months,12,J.seed).map(tr=>jsim(tr,spec(),st,months,true));
  const ev=ex.flatMap(e=>e.path.map(p=>p[1])),emn=Math.min(st,...ev)*0.85,emx=Math.max(st,...ev)*1.15,xv=document.getElementById('jex'),C2=jaxes(xv,340,months,Math.log10(emn),Math.log10(emx),true);
  for(const v of logTicks(emn,emx)){el('line',{x1:C2.L,x2:C2.W-C2.R,y1:C2.y(v),y2:C2.y(v),stroke:css('--rule')},xv);el('text',{x:C2.L-8,y:C2.y(v)+4,'text-anchor':'end'},xv).textContent=money(v).replace('.00','');}
  el('line',{x1:C2.L,x2:C2.W-C2.R,y1:C2.y(st),y2:C2.y(st),stroke:css('--muted'),'stroke-dasharray':'5 4','stroke-width':1.5},xv);
@@ -313,11 +329,11 @@ function journeys(){const d=jdata(),months=d.months,res=d.res,st=S.start,n=res.l
   el('path',{d:p,fill:'none',stroke:c,'stroke-width':1.6,'stroke-opacity':0.85},xv);el('circle',{cx:C2.x(months),cy:C2.y(e.final),r:3.5,fill:c},xv);}
  document.getElementById('reseed').onclick=()=>{J.seed=1+Math.floor(Math.random()*1e6);journeys();};
  // risk options
- document.getElementById('jriskhint').textContent=`The same ${n} journeys (${months} months, from ${money(st)}) at other risk levels: all coins' risks multiplied by the factor. More risk grows the good journeys faster but makes the drops deeper; past a point the losses outweigh it.`;
- const tbl=()=>{if(J.cache!==d)return;if(!d.byR)d.byR=RMULT.map(m=>m===1?d.res:d.lists.map(tr=>jsim(tr,S.risk.map(v=>v*m),S.smult,st,months,false)));
- document.getElementById('jrisk').innerHTML='<thead><tr><th>Risk</th><th>Per trade</th><th>Median balance</th><th>Middle half</th><th>Ends below start</th><th>Falls to half at some point</th><th>Median worst drop</th><th>1 in 10 worst drop</th></tr></thead><tbody>'+
-  RMULT.map((m,k)=>{const R=d.byR[k],f=R.map(r=>r.final),w=R.map(r=>r.ddw),sh=g=>Math.round(R.filter(g).length/R.length*100)+'%';
-   return `<tr${m===1?' class="yr"':''}><td>${m}×${m===1?' (your settings)':''}</td><td>${S.on.map((o,i)=>o?COINS[i]+' '+(+(S.risk[i]*m).toFixed(3))+'%':'').filter(Boolean).join(' · ')}</td><td>${money(q(f,0.5))}</td><td>${money(q(f,0.25))} – ${money(q(f,0.75))}</td><td>${sh(r=>r.final<st)}</td><td>${sh(r=>r.hit.h!==undefined)}</td><td>${pct(-q(w,0.5),0)}</td><td>${pct(-q(w,0.9),0)}</td></tr>`;}).join('')+'</tbody>';};
+ document.getElementById('jriskhint').textContent=`The same ${n} journeys (${months} months, from ${money(st)}) with the bot's ladder and with fixed risks (BTC / ETH / each alt). More risk grows the good journeys faster but makes the drops deeper; the ladder takes the extra risk only while the account is under $1,000.`;
+ const tbl=()=>{if(J.cache!==d)return;if(!d.byR)d.byR=PROF.map(([,p])=>d.lists.map(tr=>jsim(tr,Object.assign({smult:S.smult},p),st,months,false)));
+ document.getElementById('jrisk').innerHTML='<thead><tr><th>Sizing</th><th>Median balance</th><th>Middle half</th><th>Ends below start</th><th>Falls to half at some point</th><th>Median worst drop</th><th>1 in 10 worst drop</th></tr></thead><tbody>'+
+  PROF.map(([lab],k)=>{const R=d.byR[k],f=R.map(r=>r.final),w=R.map(r=>r.ddw),sh=g=>Math.round(R.filter(g).length/R.length*100)+'%';
+   return `<tr${k===0?' class="yr"':''}><td>${lab}</td><td>${money(q(f,0.5))}</td><td>${money(q(f,0.25))} – ${money(q(f,0.75))}</td><td>${sh(r=>r.final<st)}</td><td>${sh(r=>r.hit.h!==undefined)}</td><td>${pct(-q(w,0.5),0)}</td><td>${pct(-q(w,0.9),0)}</td></tr>`;}).join('')+'</tbody>';};
  if(d.byR)tbl();else{document.getElementById('jrisk').innerHTML='<tbody><tr><td>Calculating…</td></tr></tbody>';setTimeout(tbl,30);}}
 // ── static sections ──
 const st=D.strat;
@@ -333,10 +349,11 @@ document.getElementById('specs').innerHTML=`
 <dt>Exit</dt><dd>Stop, breakeven stop, or closed ${st.max_hold_h / 24} days (${st.max_hold_h} h) after the fill. No take-profit.</dd>
 <dt>Positions</dt><dd>One position per coin at a time; the coins trade independently.</dd></dl></div>
 <div class="spec"><h3>Position size</h3><p class="hint" style="margin:0">Each trade risks a fixed share of the account: if the stop is hit, you lose that share.</p><dl>
-<dt>Risk per trade</dt><dd>${COINS.map((c,i)=>`${c} ${D.risk[i]}%`).join(' · ')} of the balance (BTC weighted 2×, ETH 1×, BNB, SOL and ADA ⅓× each: BTC is the steadiest coin, the alts share the same total risk as ETH)</dd>
+<dt>Risk per trade</dt><dd>Risk ladder by balance: ${D.ladder.map((x,i)=>`${i?'from $'+x[0].toLocaleString('en-US'):'under $'+D.ladder[1][0].toLocaleString('en-US')}: BTC ${x[1][0]}%, ETH ${x[1][1]}%, BNB / SOL / ADA ${x[1][2]}% each`).join('; ')}. High while the account is small, lower as it grows (back up if it falls below a step).</dd>
+<dt>Open-risk cap</dt><dd>The risk of all open trades not yet at breakeven may not exceed 1.1× the BTC risk (${D.ladder.map(x=>x[2]+'%').join(' / ')} by step). A new ETH / BNB / SOL / ADA trade that would go over is made smaller, or skipped if less than a quarter fits; BTC is never shrunk but counts. In practice: while BTC is in a fresh trade, the others do not pile on.</dd>
 <dt>Shorts</dt><dd>× ${D.smult} of that (shorts earn about a quarter of what longs earn on every coin)</dd>
 <dt>Size formula</dt><dd>quantity = balance × risk % ÷ stop distance, rounded down to Binance's step size</dd>
-<dt>Leverage</dt><dd>Position size = risk % ÷ stop distance (BTC at ${D.risk[0]}% risk with a 2% stop = ${(D.risk[0]/2).toFixed(1)}× the balance), capped at ${D.maxlev}× per position; Binance leverage set to ${D.exlev}× so all coins fit in margin at once; all coins open at once risk about ${(D.risk.reduce((a,b)=>a+b,0)).toFixed(1)}% of the account</dd>
+<dt>Leverage</dt><dd>Position size = risk % ÷ stop distance (BTC at 7.5% risk with a 1.5% stop = 5× the balance), capped at ${D.maxlev}× per position for BTC (8× for the others); Binance leverage ${D.exlev}× for BTC so all coins fit in margin at once</dd>
 <dt>Expect</dt><dd>About 19 trades a month in total; ~1 in 6 is a winner, ~3 in 10 end at breakeven, the rest are small losses. About 2 big trades a month pay for everything.</dd></dl></div>
 <div class="spec"><h3>How the bot runs</h3><p class="hint" style="margin:0">One small Python process per coin (<code>cryptobot/bot.py config_xxx.json</code>), talking to Binance USD-M futures through its REST API.</p><dl>
 <dt>Every 5 s</dt><dd>Checks the position. A new fill gets its stop-loss at once; the breakeven move and the 5-day exit are checked from 1-minute candles.</dd>
@@ -346,8 +363,10 @@ document.getElementById('specs').innerHTML=`
 <dt>Checks</dt><dd>The bot's code was replayed on 6 years of history against a simulated exchange and matched the backtest trade for trade (within 1 minute).</dd>
 <dt>Account</dt><dd>One-way position mode, cross margin; API key with futures only (no withdrawals), IP-restricted. Do not trade these coins by hand on the same account.</dd></dl></div>`;
 document.getElementById('settings').innerHTML='<thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead><tbody>'+[
- ['risk_pct',COINS.map((c,i)=>`${c} ${D.risk[i]}`).join(' · '),'% of the balance lost if the stop is hit'],['short_risk_mult',D.smult,'shorts trade at this fraction of the risk'],
- ['max_leverage',D.maxlev,'per-position size cap: notional at most this many times the balance'],['exchange_leverage',D.exlev,'leverage set on Binance (only sets the margin each position locks)'],['tf_min',st.tf_min,'candle size in minutes (4 hours)'],
+ ['risk_ladder (portfolio.json)',D.ladder.map(x=>`from $${x[0].toLocaleString('en-US')}: ${COINS.map((c,i)=>c+' '+x[1][i]).join(' · ')} · cap ${x[2]}`).join('<br>'),'% of the balance lost if the stop is hit, by balance; cap = max % at risk in open trades not yet at breakeven'],
+ ['cap_exempt',D.exempt.map(i=>COINS[i]).join(', '),'never shrunk by the cap (its risk still counts for the others)'],
+ ['risk_pct (configs)',COINS.map((c,i)=>`${c} ${D.risk[i]}`).join(' · '),'only used if portfolio.json has no ladder'],['short_risk_mult',D.smult,'shorts trade at this fraction of the risk'],
+ ['max_leverage',D.maxlev+' (BTC) / 8','per-position size cap: notional at most this many times the balance'],['exchange_leverage',D.exlev,'leverage set on Binance (only sets the margin each position locks)'],['tf_min',st.tf_min,'candle size in minutes (4 hours)'],
  ['n',st.n,'breakout channel: last n closed 4-hour candles'],['atr_n',st.atr_n,'ATR length for the stop'],['sl_atr',st.sl_atr,'stop distance in ATRs'],
  ['ema_n',st.ema_n,'daily trend EMA'],['slope_d',st.slope_d,'EMA must rise / fall over this many days'],['max_ext',st.max_ext,'skip when more than this many daily ATRs from the EMA'],['oi_lookback_h',st.oi_lookback_h,'open-interest filter: compare with this many hours ago (0 = off)'],['oi_min_chg',st.oi_min_chg,'no new order when open interest changed by this much or less'],
  ['no_weekend',st.no_weekend,'no new orders Sat / Sun'],['be_R',st.be_R,'move the stop to entry at this profit (in R)'],['be_off',st.be_off,'where the breakeven stop goes (0 = exactly the entry)'],

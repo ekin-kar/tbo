@@ -1,8 +1,10 @@
-"""Builds cryptobot/tbo_statistics.html (TBO v2.4, BTC/ETH/BNB/SOL/ADA) and a Python reference for checking the page's math.
+"""Builds cryptobot/tbo_statistics.html (TBO v2.5, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
+botsim.py) and Python reference results (botsim) for checking the page's math (check_tbo_stats.py).
 Trades: TBO v2.4 rules (v2.2 + open-interest filter from 2022, filter_test3.py 'USD 3d <= -3%'; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import json, pickle
 import numpy as np, pandas as pd
 import common as C
+import botsim as BS
 
 ROOT = C.ROOT
 ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
@@ -14,7 +16,7 @@ for ci, s in enumerate(COINS):
     x = ALL[(s, 0.0003)]
     for e, xx, b, d, r, h in zip(ms(x.entry_time), ms(x.exit_time), ms(x.be_time), x.dir, x.R, x.hours):
         rows.append([ci, int(e), int(xx), int(b), int(d), round(float(r), 6), round(float(h), 2)])
-rows.sort(key=lambda r: r[1])
+rows.sort(key=lambda r: (r[1], r[0]))
 
 
 def ref_sim(on, risks, smult, start_bal, t0, t1):
@@ -39,7 +41,8 @@ def ref_sim(on, risks, smult, start_bal, t0, t1):
 
 
 if __name__ == "__main__":
-    data = dict(trades=rows, coins=[s[:-4] for s in COINS],
+    pol = BS.bot_policy()
+    data = dict(trades=rows, coins=[s[:-4] for s in COINS], ladder=[[f, r, c] for f, r, c in pol["rows"]], exempt=sorted(pol["exempt"]), minf=pol["minf"],
                 risk=[cfg[s]["risk_pct"] for s in COINS], smult=cfg["BTCUSDT"]["short_risk_mult"],
                 strat=cfg["BTCUSDT"]["strategy"], maxlev=cfg["BTCUSDT"]["max_leverage"], exlev=cfg["BTCUSDT"].get("exchange_leverage", cfg["BTCUSDT"]["max_leverage"]))
     html = open(ROOT / "research" / "crypto" / "tbo_stats_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
@@ -49,6 +52,10 @@ if __name__ == "__main__":
     T24 = int(pd.Timestamp("2024-01-01").value // 10**6)
     cases = {"all5": ([1, 1, 1, 1, 1], T0), "btc": ([1, 0, 0, 0, 0], T0), "btc_eth": ([1, 1, 0, 0, 0], T0), "alts_2024": ([0, 0, 1, 1, 1], T24),
              "all5_2024": ([1, 1, 1, 1, 1], T24)}
-    ref = {k: ref_sim(on, data["risk"], data["smult"], 500.0, t0, T1) for k, (on, t0) in cases.items()}
+    def ref_bot(on, t0):
+        x = BS.TR[(BS.TR[:, 0] >= t0 // 60000) & (BS.TR[:, 0] < T1 // 60000) & np.isin(BS.TR[:, 5], [i for i, o in enumerate(on) if o])]
+        r = BS.run(x, pol, 500.0)
+        return dict(final=round(r["final"], 2), ddw=round(r["dd"], 2), ddc=round(r["ddc"], 2), trades=len(x))
+    ref = {k: ref_bot(on, t0) for k, (on, t0) in cases.items()}
     json.dump(dict(cases={k: dict(on=v[0], t0=v[1], t1=T1) for k, v in cases.items()}, ref=ref), open(C.D.CACHE / "tbo_stats_ref.json", "w"))
     print(len(rows), "trades;", ref)

@@ -149,8 +149,19 @@ carry level + slippage). To do then: backtest the same days (replay / sizing_v4 
 compare fills, fees, funding, slippage. Expectation (research/crypto/three_months.py): typical $257, 1-in-10 bad
 $150-170, below $200 in ~1 of 4 windows, worst drop inside 3 months typical 26% / 1-in-10 ~40%, ~58 trades.
 Risk ladder (`research/crypto/ladder.py`, bot: portfolio.json "risk_ladder" rows {from_usdt, per-coin %, cap_pct},
-`portfolio_ladder.json` ready but NOT active): 7.5% <$1k, 5% $1-10k, 2.5% >=$10k (ETH/alts as listed). 2 yrs from
+now LIVE in portfolio.json): 7.5% <$1k, 5% $1-10k, 2.5% >=$10k (ETH/alts as listed). 2 yrs from
 $200: reach $10k 37% (boot) / 41% (real windows) vs flat 5% 29% / 23%; 1-in-4 bad end $1.9k vs $1.5k; drop after
 reaching $1k same as flat 5% (41% / 64%). Flat 7.5%: 39% / 48% but drop after $1k 54% / 74%, gave back half of a
 $5k+ peak 7%. 10% start: more ruin (5% end < $200). test_cap_sim CAPSIM_PORTFOLIO / CAPSIM_EQ: ladder rows OK.
+
+## v2.5 live settings (Oct 2026): risk ladder
+portfolio.json: ladder rows (from $0: BTC 7.5 / ETH 2.5 / alts 0.83, cap 8.25; $1k: 5 / 2.5 / 0.83, cap 5.5; $10k: 2.5 /
+1.25 / 0.42, cap 2.75), cap_exempt BTC. config_btc max_leverage 12, exchange_leverage 25 (8x would cut 19% of BTC trades
+at 7.5%). bot.py: risk_now / ladder_row / cap_frac(eq); BTC always counts in the post-fill trim, re-checked for 2 min
+after a fill (same-minute races: BTC first; that order is +10% vs BTC-last in 2024-26, drop 42 vs 46% in 2020-23).
+`research/crypto/botsim.py` = the bot's sizing (ladder, cap at fill, BTC exempt, same-minute entries BTC, ETH, BNB, SOL,
+ADA); every page generator uses it (make_monthly_report, make_risk_html -> risk_comparison + plan_ladder_plus50,
+make_cap_html, make_tbo_stats; the statistics page JS matches botsim to the cent, check in make_tbo_stats ref).
+Ladder from $200, 2 yrs (three_months.py): typical $5.8k / $5.6k (boot / real 2022-26 windows), P($10k) 39% / 29%,
+drop after $1k 40% / 63% (typ / 1-in-10). 3 months: typical $259-272, below $200 30%, drop typ 33%, 1-in-10 51%.
 
