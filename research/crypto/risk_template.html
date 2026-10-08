@@ -86,7 +86,7 @@ tr.sel td{background:var(--soft);font-weight:600}
 </div>
 <script>
 const D=/*DATA*/null;
-let S={m:D.mults.indexOf(1.5)>=0?D.mults.indexOf(1.0):0,d:0,s:'2022'};
+let S=Object.assign({m:D.mults.indexOf(1.0),d:0,s:'2022'},D.preset||{});
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const money=v=>'$'+Math.round(v).toLocaleString('en-US');
 const pc=v=>Math.round(v)+'%';

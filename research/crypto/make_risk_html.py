@@ -96,6 +96,11 @@ if __name__ == "__main__":
         data["res"][src] = summarize(res)
         s = data["res"][src]["1.5_0"]
         print(src, "1.5x no deposits: median", round(s["median"]), "P10k", round(s["p10k"], 1), "dd", round(s["dd_med"]))
-    html = open(C.ROOT / "research" / "crypto" / "risk_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
-    (C.ROOT / "cryptobot" / "risk_comparison.html").write_text(html)
-    print("written", len(html) // 1024, "KB")
+    tpl = open(C.ROOT / "research" / "crypto" / "risk_template.html").read()
+    for name, preset in (("risk_comparison.html", None), ("plan_2.5pct_plus50.html", dict(m=MULTS.index(0.5), d=DEPS.index(50)))):
+        dd = dict(data, preset=preset) if preset else data
+        html = tpl.replace("/*DATA*/null", json.dumps(dd, separators=(",", ":")))
+        if preset:
+            html = html.replace("<title>TBO Risk Comparison</title>", "<title>TBO Plan: 2.5% + $50/month</title>")
+        (C.ROOT / "cryptobot" / name).write_text(html)
+        print("written", name, len(html) // 1024, "KB")
