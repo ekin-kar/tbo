@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Is TBO Real</title>
+<style>
+:root{--surface-0:#f4f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7972;--grid:#e6e5df;--axis:#bdbcb4;
+--s1:#2a78d6;--s2:#eb6834;--hi:#0b0b0b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--s2:#d95926;--hi:#fff}}
+:root[data-theme="dark"]{--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--s2:#d95926;--hi:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--surface-0);color:var(--text-primary);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 40px}h1{font-size:21px;margin:0 0 4px}h2{font-size:16px;margin:0 0 6px}.sub{color:var(--text-secondary);margin:0 0 16px}
+.card{background:var(--surface-1);border-radius:10px;padding:16px;margin-bottom:14px}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.v{background:var(--surface-0);border-radius:8px;padding:12px}.v b{display:block;font-size:15px;margin-bottom:2px}.v span{color:var(--text-secondary);font-size:13px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--text-muted);font-size:11px}
+p{margin:6px 0}.muted{color:var(--text-secondary);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--grid);vertical-align:top}th{color:var(--text-secondary);font-weight:600}
+.hm{display:grid;gap:2px;font-variant-numeric:tabular-nums;font-size:12px}.hm div{padding:7px 4px;text-align:center;border-radius:4px}
+.hm .lab{color:var(--text-secondary);background:none}.hm .base{outline:2px solid var(--hi);outline-offset:-2px;font-weight:700}
+.legend{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);margin-top:6px;flex-wrap:wrap}.legend i{display:inline-block;width:18px;height:10px;border-radius:2px}
+</style></head><body><div class="wrap">
+<h1>Is TBO a real strategy, or lucky numbers?</h1>
+<p class="sub">Checks on the trading rules, done on the earlier 4-coin set (BTC, ETH, DOGE, ADA), 2020–23 and 2024–26 judged separately; the rules are unchanged, the bot now trades BTC, ETH, BNB, SOL, ADA with the risk ladder. All fees included.</p>
+<div class="card"><h2>Short answer</h2><div class="verdict" id="verdict"></div></div>
+<div class="card"><h2>Test 1: same rules, random entries</h2>
+<p class="muted">200 runs where only the entry moment is random: same coins, same trend filter, same 1-ATR stop, same breakeven, same 5-day exit, same position sizes. If the real entries were luck, they would sit inside this pile.</p>
+<div class="grid2"><div><svg id="h1" height="190"></svg></div><div><svg id="h2" height="190"></svg></div></div></div>
+<div class="card"><h2>Why each rule exists</h2><table id="logic"></table></div>
+<div class="card"><h2>Test 2: what happens if you change the numbers</h2>
+<p class="muted">Return per unit of drawdown (higher = smoother) for nearby settings, everything else as in the bot. The outlined cell is the bot. If the bot's numbers were a lucky pick, it would be a lone dark cell surrounded by pale ones.</p>
+<div id="maps"></div><div class="legend" id="lg"></div></div>
+<div class="card"><h2>Test 3: is there a small change that halves the drawdown?</h2><div id="half"></div></div>
+<div class="card"><h2>What can still go wrong</h2><table id="risks"></table></div>
+</div>
+<script>
+const D=/*DATA*/null;
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const dark=()=>matchMedia('(prefers-color-scheme:dark)').matches&&document.documentElement.dataset.theme!=='light'||document.documentElement.dataset.theme==='dark';
+const RAMP_L=['#cde2fb','#9ec5f4','#6da7ec','#3987e5','#256abf','#184f95','#0d366b'],RAMP_D=['#132a47','#184f95','#1c5cab','#256abf','#3987e5','#6da7ec','#9ec5f4'];
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function hist(id,p){const s=document.getElementById(id);s.innerHTML='';const W=s.clientWidth,H=190,L=34,R=10,T=26,B=30;s.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const r=D.bench[p].rand,real=D.bench[p].real,lo=Math.min(...r,0)-0.02,hi=Math.max(real,...r)+0.06,nb=24,bw=(hi-lo)/nb,c=new Array(nb).fill(0);
+ r.forEach(v=>c[Math.min(nb-1,Math.floor((v-lo)/bw))]++);const mx=Math.max(...c),x=v=>L+(v-lo)/(hi-lo)*(W-L-R),y=v=>T+(1-v/mx)*(H-T-B);
+ el('text',{x:L,y:12,style:'fill:var(--text-primary);font-weight:600;font-size:12px'},s).textContent=`${p}: profit per trade (R)`;
+ c.forEach((v,i)=>{if(v)el('rect',{x:x(lo+i*bw)+1,y:y(v),width:Math.max(1,(W-L-R)/nb-2),height:H-B-y(v),rx:2,fill:css('--axis')},s);});
+ el('line',{x1:L,x2:W-R,y1:H-B,y2:H-B,stroke:css('--axis')},s);
+ for(let t=Math.ceil(lo*10)/10;t<=hi;t+=0.1){el('text',{x:x(t),y:H-B+14,'text-anchor':'middle'},s).textContent=(t>0?'+':'')+t.toFixed(1);}
+ el('line',{x1:x(real),x2:x(real),y1:T-4,y2:H-B,stroke:css('--s1'),'stroke-width':2.5},s);
+ el('text',{x:x(real)-4,y:T+8,'text-anchor':'end',style:'fill:var(--text-primary);font-weight:600'},s).textContent=`real +${real.toFixed(2)}R`;
+ el('text',{x:x(r.reduce((a,b)=>a+b)/r.length),y:H-4,'text-anchor':'middle'},s).textContent='200 random runs';}
+function maps(){const ramp=dark()?RAMP_D:RAMP_L,all=D.maps.flatMap(m=>m.cells.flatMap(c=>[c['2020-23'].mar,c['2024-26'].mar])),lo=Math.min(...all),hi=Math.max(...all);
+ const col=v=>{const i=Math.min(ramp.length-1,Math.floor((v-lo)/(hi-lo+1e-9)*ramp.length));return [ramp[i],(dark()?i>=4:i>=3)?(dark()?'#0b0b0b':'#fff'):(dark()?'#fff':'#0b0b0b')];};
+ const lab={n:'channel',hold_h:'hold',sl_atr:'stop ATR',be_R:'breakeven',ema_n:'EMA',slope_d:'slope days'},fmt=(k,v)=>k==='hold_h'?(v/24)+'d':k==='be_R'&&v===0?'none':k==='be_R'?v+'R':k==='slope_d'&&v===0?'off':v;
+ let h='';for(const m of D.maps){h+=`<p style="margin-top:14px"><b>${m.title}</b></p><div class="grid2">`;
+  for(const p of ['2020-23','2024-26']){h+=`<div><div class="muted" style="margin-bottom:4px">${p}</div><div class="hm" style="grid-template-columns:70px repeat(${m.xs.length},1fr)"><div class="lab">${lab[m.a]} ↓ ${lab[m.b]} →</div>`+m.xs.map(x=>`<div class="lab">${fmt(m.b,x)}</div>`).join('');
+   for(const yv of m.ys){h+=`<div class="lab">${fmt(m.a,yv)}</div>`;for(const xv of m.xs){const c=m.cells.find(q=>q.x===xv&&q.y===yv),v=c[p].mar,[bg,fg]=col(v),base=(c.x===D.base_cfg[m.b]&&c.y===D.base_cfg[m.a]);
+     h+=`<div class="${base?'base':''}" style="background:${bg};color:${fg}" title="${p}: ${c[p].ryr}R/yr, drawdown ${c[p].dd}R">${v.toFixed(1)}</div>`;}}
+   h+='</div></div>';}h+='</div>';}
+ document.getElementById('maps').innerHTML=h;
+ document.getElementById('lg').innerHTML='lower '+ramp.map(c=>`<i style="background:${c}"></i>`).join('')+' higher return per unit of drawdown · outlined = the bot';}
+function render(){hist('h1','2020-23');hist('h2','2024-26');maps();}
+const b=D.bench;
+document.getElementById('verdict').innerHTML=[
+ ['The edge is real',`Real entries beat all 200 random-entry runs in both periods (+${b['2020-23'].real.toFixed(2)}R and +${b['2024-26'].real.toFixed(2)}R per trade vs random averages of +${(b['2020-23'].rand.reduce((a,c)=>a+c)/200).toFixed(2)}R and +${(b['2024-26'].rand.reduce((a,c)=>a+c)/200).toFixed(2)}R).`],
+ ['The profit comes from the entry','With random entries, the same stop, breakeven and 5-day exit made almost nothing in 2024–26. The exit just collects what the breakout earns.'],
+ ['No small change halves the drawdown',`0 of ${D.n_cfg} nearby settings have ≤60% of the drawdown with ≥85% of the profit in both periods. Drawdown is set by your risk %, not by a magic number.`],
+ ['The numbers are not a lone spike','Neighbouring settings give similar results. The 5-day hold, the 1-ATR stop and the breakeven are in good areas, not on a knife edge.']]
+ .map(([t,s])=>`<div class="v"><b>${t}</b><span>${s}</span></div>`).join('');
+document.getElementById('logic').innerHTML='<tr><th>Rule</th><th>The logic</th><th>Evidence from the tests</th></tr>'+[
+ ['Only trade with the daily trend (above / below the 50-day average, and it is rising / falling)','Crypto trends persist: strength tends to be followed by more strength for days to weeks. This "time-series momentum" is one of the best-documented effects in markets and in crypto research.','The feature study found 1–30 day momentum on BTC and ETH in both periods. Without the slope check results are worse in 2024–26.'],
+ ['Enter when price breaks the 20-candle (≈3 day) high or low','A move out of a several-day range means new buyers or sellers are pushing. Most breakouts fail, but the ones that work become trends.','Real breakout entries earn about +0.4–0.6R per trade; random entries with the same exits earn about +0.0–0.2R.'],
+ ['Stop 1 ATR away','A real breakout should not fall back through the range quickly. If it does, the idea was wrong: lose small and move on. ATR scales the stop to how wild the market is.','Most losing trades die within a day. Stops from 0.75 to 1.5 ATR all work; 1.0 is in the middle.'],
+ ['Move the stop to entry at +1.5R','Once the breakout has proven itself, it should not be allowed to become a full loss.','With no breakeven, results are clearly worse in 2020–23. Triggers from 1R to 2R give similar results.'],
+ ['Close after 5 days','A breakout move lasts days, not weeks; after that it usually fades. Trades still open on day 5 are the ones whose trend kept going (they are already at breakeven).','The 245 trades still open at day 5 made all the profit (+6.1R each on average). Holds of 4–10 days all work; 2–3 days cut the winners. Trailing stops (120 versions) and longer holds did worse.'],
+ ['No new orders on weekends','Weekend markets are thin: price pokes through a level, then falls back when big money returns on Monday.','Weekend entries averaged +0.12R per trade vs +0.59R on weekdays; allowing them raised the 2024–26 drawdown by half.'],
+ ['Shorts at half size','Crypto drops are fast and choppy; short breakouts follow through less often.','Shorts earned about a quarter of what longs earn on every coin, in both periods, but still make money in bear years.']]
+ .map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td class="muted">${r[2]}</td></tr>`).join('');
+document.getElementById('half').innerHTML=`<p>I searched all ${D.n_cfg} combinations of channel, stop, breakeven, hold, trend EMA and slope for a setting with <b>at most 60% of the bot's drawdown while keeping at least 85% of its profit, in both periods</b>. Result: <b>${D.n_half} found</b>.</p>
+<p>Only ${D.better.length} settings had a better return per unit of drawdown than the bot in both periods. All of them wait for bigger breakouts (40-candle channel, 100-day EMA): they trade about half as often and make 30–45% less profit. Their lower drawdown simply comes from trading less, which you can get by lowering your risk %.</p>
+<p class="muted">Bot in R units (equal coin weights here): 2020–23 ${D.base['2020-23'].ryr}R/yr, drawdown ${D.base['2020-23'].dd}R · 2024–26 ${D.base['2024-26'].ryr}R/yr, drawdown ${D.base['2024-26'].dd}R. Halve the drawdown by halving the risk %; there is no free version.</p>`;
+document.getElementById('risks').innerHTML='<tr><th>Risk</th><th>What it means for you</th></tr>'+[
+ ['Long flat periods','The money comes from about 2 big trades a month. Several months in a row with no big trade happen (up to ~8–10 months without a new high). The edge is real, but it is lumpy.'],
+ ['The edge could weaken','It depends on crypto keeping big trends. It has for 6+ years and on 12 coins, but nothing guarantees it. Watch live results vs the backtest every month.'],
+ ['Live is worse than backtest','Slippage in fast moves, bot downtime and exchange outages. Expect 10–30% less than the backtest.'],
+ ['Hindsight in the settings','Some choices were made after seeing the data. That is why the 2024–26 numbers and the random-entry test matter more than the 2020 equity curve.']]
+ .map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join('');
+render();addEventListener('resize',render);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',render);
+</script></body></html>

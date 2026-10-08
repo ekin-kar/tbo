@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TBO Monthly Report</title>
+<style>
+:root{--surface-0:#f4f4f1;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7972;
+--grid:#e6e5df;--axis:#bdbcb4;--s1:#2a78d6;--pos:#2a78d6;--neg:#eb6834;--btn:#ecebe6;--btn-on:#0b0b0b;--btn-on-text:#fff;--row:#f0efea}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;
+--text-muted:#8f8e86;--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--pos:#3987e5;--neg:#d95926;--btn:#2a2a28;--btn-on:#fff;--btn-on-text:#0b0b0b;--row:#222220}}
+:root[data-theme="dark"]{--surface-0:#121211;--surface-1:#1a1a19;--text-primary:#fff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;
+--grid:#2c2c2a;--axis:#4a4945;--s1:#3987e5;--pos:#3987e5;--neg:#d95926;--btn:#2a2a28;--btn-on:#fff;--btn-on-text:#0b0b0b;--row:#222220}
+*{box-sizing:border-box}body{margin:0;background:var(--surface-0);color:var(--text-primary);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}h1{font-size:20px;margin:0 0 4px}.sub{color:var(--text-secondary);margin:0 0 14px}
+h2{font-size:14px;margin:0 0 8px 2px;color:var(--text-secondary);font-weight:600}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.bar span{color:var(--text-secondary);font-size:12px}
+button{border:0;border-radius:6px;padding:6px 10px;background:var(--btn);color:var(--text-primary);font:inherit;font-size:13px;cursor:pointer}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-text)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px}
+.tile{background:var(--surface-1);border-radius:10px;padding:12px 14px}.tile .k{font-size:12px;color:var(--text-secondary)}
+.tile .v{font-size:21px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}.tile .m{font-size:12px;color:var(--text-secondary)}
+.card{background:var(--surface-1);border-radius:10px;padding:14px;margin-bottom:12px;position:relative}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--text-muted);font-size:11px}
+.tip{position:absolute;pointer-events:none;background:var(--surface-0);border:1px solid var(--axis);border-radius:8px;padding:7px 10px;font-size:12px;display:none;z-index:2;white-space:nowrap}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+th{color:var(--text-secondary);font-weight:600;position:sticky;top:0;background:var(--surface-1)}
+tr.yr td{background:var(--row);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:13px}.kv div:nth-child(odd){color:var(--text-secondary)}.kv div:nth-child(even){text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.months{max-height:520px;overflow:auto}.note{color:var(--text-secondary);font-size:12px;margin-top:6px}
+</style></head><body><div class="wrap">
+<h1>TBO backtest: monthly report</h1>
+<p class="sub" id="sub"></p>
+<div class="bar"><span>Start</span><button data-s="2020" aria-pressed="true">Mar 2020 (full history)</button><button data-s="2024">Jan 2024 (fresh start, unseen period)</button></div>
+<div class="tiles" id="tiles"></div>
+<div class="grid2">
+ <div class="card"><h2>Balance at each month end ($, log scale)</h2><svg id="bal" height="240"></svg><div class="tip" id="tip1"></div></div>
+ <div class="card"><h2>Return of each month (%)</h2><svg id="ret" height="240"></svg><div class="tip" id="tip2"></div></div>
+</div>
+<div class="card"><h2>Year by year</h2><div class="scroll"><table id="years"></table></div></div>
+<div class="card"><h2>Every month</h2><div class="months"><table id="months"></table></div>
+<p class="note">Win = closed above +0.2R, loss = below −0.2R, B/E = closed near the entry (breakeven stop). "From peak" = month-end balance vs the highest month-end so far.</p></div>
+<div class="grid2">
+ <div class="card"><h2>Trade statistics</h2><div class="kv" id="kv"></div></div>
+ <div class="card"><h2>By coin</h2><div class="scroll"><table id="coins"></table></div><h2 style="margin-top:14px">Long vs short</h2><div class="scroll"><table id="ls"></table></div></div>
+</div>
+<div class="card"><h2>10 biggest winning trades</h2><div class="scroll"><table id="tops"></table></div></div>
+<p class="note">Backtest, not a promise. BTC's settings were chosen on 2020–26 data, ADA on 2020–23, BNB/SOL on 2024–26 and the half-size shorts on all years, so the Mar 2020 run is optimistic. The Jan 2024 view is the most honest guide; expect live results somewhat below it.</p>
+</div>
+<script>
+const DATA=/*DATA*/null;let S='2020';
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const $=v=>(v<0?'−$':'$')+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:v>=1000||v<=-1000?0:2,minimumFractionDigits:Math.abs(v)<1000?2:0});
+const pct=v=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(1)+'%';
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function tip(t,html,ev,svg){const r=svg.parentNode.getBoundingClientRect();t.innerHTML=html;t.style.display='block';let x=ev.clientX-r.left+12;if(x>r.width-170)x=ev.clientX-r.left-170;t.style.left=x+'px';t.style.top=(ev.clientY-r.top+8)+'px';}
+function draw(){const D=DATA[S],s=D.summary,rows=D.rows,cf=DATA.cfg;
+ document.getElementById('sub').textContent=`${Object.keys(cf.risks).join(' + ')} on one ${$(cf.start)} account · risk ladder (BTC / ETH / each alt): ${cf.sizing} (shorts × ${cf.smult}) · ${cf.cap} · the bot's current settings · fees, slippage and funding included`;
+ const tile=(k,v,m)=>`<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="m">${m}</div></div>`;
+ document.getElementById('tiles').innerHTML=
+  tile('Final balance',$(s.final),`from ${$(s.start)} · ${pct(s.total)} total`)+
+  tile('Average per month',pct(s.mavg),`median month ${pct(s.mmed)} · ${pct(s.cagr)} a year`)+
+  tile('Positive months',`${s.mpos} of ${s.mn}`,`best ${pct(s.mbest)} · worst ${pct(s.mworst)}`)+
+  tile('Worst drawdown',pct(s.ddw),`closed trades ${pct(s.ddc)} · longest flat ${s.flat} days`)+
+  tile('Trades',`${s.tpm} / month`,`${s.trades} total · avg hold ${(s.hold/24).toFixed(1)} days`)+
+  tile('Winning trades',`${s.winp}%`,`${s.bep}% breakeven · ${s.lossp}% losses`);
+ // balance chart
+ const b=document.getElementById('bal');b.innerHTML='';const W=b.clientWidth,H=240,L=54,R=10,T=8,B=22;b.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const vals=rows.map(r=>r.end).concat([D.summary.start]),lo=Math.log10(Math.min(...vals)*0.9),hi=Math.log10(Math.max(...vals)*1.1);
+ const x=i=>L+(i+0.5)/rows.length*(W-L-R),y=v=>T+(1-(Math.log10(v)-lo)/(hi-lo))*(H-T-B);
+ for(let e=1;e<=8;e++)for(const m of[1,2,5]){const v=m*10**e;if(v<10**lo||v>10**hi)continue;el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--grid')},b);el('text',{x:L-6,y:y(v)+4,'text-anchor':'end'},b).textContent=v>=1000?'$'+(v/1000)+'k':'$'+v;}
+ rows.forEach((r,i)=>{if(r.month.endsWith('-01')){el('text',{x:x(i),y:H-6,'text-anchor':'middle'},b).textContent=r.month.slice(0,4);}});
+ let d='M'+L+','+y(D.summary.start);rows.forEach((r,i)=>{d+=`L${x(i).toFixed(1)},${y(r.end).toFixed(1)}`;});
+ el('path',{d,fill:'none',stroke:css('--s1'),'stroke-width':2,'stroke-linejoin':'round'},b);
+ const dot=el('circle',{r:4.5,fill:css('--s1'),stroke:css('--surface-1'),'stroke-width':2,visibility:'hidden'},b);
+ const t1=document.getElementById('tip1');
+ b.onmousemove=ev=>{const rc=b.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width);const i=Math.max(0,Math.min(rows.length-1,Math.round((px-L)/(W-L-R)*rows.length-0.5)));const r=rows[i];
+  dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(r.end));dot.setAttribute('visibility','visible');tip(t1,`<b>${r.month}</b><br>balance ${$(r.end)}<br>month ${pct(r.pct)} · from peak ${pct(r.dd)}`,ev,b);};
+ b.onmouseleave=()=>{t1.style.display='none';dot.setAttribute('visibility','hidden');};
+ // monthly returns bars
+ const g=document.getElementById('ret');g.innerHTML='';g.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const mx=Math.max(...rows.map(r=>Math.abs(r.pct)),5),top=Math.ceil(Math.max(...rows.map(r=>r.pct))/10)*10,bot=Math.floor(Math.min(...rows.map(r=>r.pct))/10)*10;
+ const yr=v=>T+(top-v)/(top-bot)*(H-T-B),bw=Math.max(1,(W-L-R)/rows.length-1);
+ for(let v=bot;v<=top;v+=10){el('line',{x1:L,x2:W-R,y1:yr(v),y2:yr(v),stroke:v===0?css('--axis'):css('--grid')},g);el('text',{x:L-6,y:yr(v)+4,'text-anchor':'end'},g).textContent=v+'%';}
+ rows.forEach((r,i)=>{const x0=L+i*(W-L-R)/rows.length;el('rect',{x:x0,y:Math.min(yr(r.pct),yr(0)),width:bw,height:Math.max(1,Math.abs(yr(r.pct)-yr(0))),rx:1.5,fill:r.pct>=0?css('--pos'):css('--neg')},g);
+  if(r.month.endsWith('-01'))el('text',{x:x0,y:H-6,'text-anchor':'middle'},g).textContent=r.month.slice(0,4);});
+ const t2=document.getElementById('tip2');
+ g.onmousemove=ev=>{const rc=g.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width);const i=Math.floor((px-L)/(W-L-R)*rows.length);if(i<0||i>=rows.length){t2.style.display='none';return;}const r=rows[i];
+  tip(t2,`<b>${r.month}</b> ${pct(r.pct)} (${$(r.chg)})<br>${r.trades} trades: ${r.wins} win · ${r.be} B/E · ${r.losses} loss`,ev,g);};
+ g.onmouseleave=()=>t2.style.display='none';
+ // tables
+ document.getElementById('years').innerHTML='<tr><th>Year</th><th>Start</th><th>End</th><th>Return</th><th>Trades</th><th>Positive months</th><th>Best month</th><th>Worst month</th><th>Worst drawdown</th></tr>'+
+  D.years.map(r=>`<tr><td>${r.year}</td><td>${$(r.start)}</td><td>${$(r.end)}</td><td>${pct(r.pct)}</td><td>${r.trades}</td><td>${r.pos} of ${r.n}</td><td>${pct(r.best)}</td><td>${pct(r.worst)}</td><td>${pct(r.dd)}</td></tr>`).join('');
+ let mh='<tr><th>Month</th><th>Start</th><th>End</th><th>Change</th><th>Return</th><th>Trades</th><th>Win / B/E / Loss</th><th>Best trade</th><th>From peak</th></tr>',ly='';
+ rows.forEach(r=>{const yv=r.month.slice(0,4);if(yv!==ly){const yy=D.years.find(q=>q.year.startsWith(yv));mh+=`<tr class="yr"><td>${yv}</td><td>${$(yy.start)}</td><td>${$(yy.end)}</td><td>${$(yy.end-yy.start)}</td><td>${pct(yy.pct)}</td><td>${yy.trades}</td><td></td><td></td><td></td></tr>`;ly=yv;}
+  mh+=`<tr><td><span class="dot" style="background:var(${r.pct>=0?'--pos':'--neg'})"></span>${r.month}</td><td>${$(r.start)}</td><td>${$(r.end)}</td><td>${$(r.chg)}</td><td>${pct(r.pct)}</td><td>${r.trades}</td><td>${r.wins} / ${r.be} / ${r.losses}</td><td>${r.best}</td><td>${pct(r.dd)}</td></tr>`;});
+ document.getElementById('months').innerHTML=mh;
+ const kv=[['Profit factor',s.pf],['Average winning trade',$(s.avgwin)],['Average losing trade',$(s.avgloss)],['Biggest win',$(s.bigwin)],['Biggest loss',$(s.bigloss)],
+  ['Longest losing run (breakevens in between not counted as breaks)',s.streak+' losses'],['Average holding time',(s.hold/24).toFixed(1)+' days'],['Longest time without a new high',s.flat+' days'],['Worst drawdown (all open trades stopped)',pct(s.ddw)],['Worst drawdown (closed trades)',pct(s.ddc)]];
+ document.getElementById('kv').innerHTML=kv.map(([k,v])=>`<div>${k}</div><div>${v}</div>`).join('');
+ document.getElementById('coins').innerHTML='<tr><th>Coin</th><th>Trades</th><th>Win %</th><th>Profit</th><th>R</th><th>Best trade</th></tr>'+D.coins.map(c=>`<tr><td>${c.coin}</td><td>${c.trades}</td><td>${c.winp}%</td><td>${$(c.pnl)}</td><td>${c.R>0?'+':''}${c.R}</td><td>${$(c.best)}</td></tr>`).join('');
+ document.getElementById('ls').innerHTML=`<tr><th>Side</th><th>Trades</th><th>Profit</th></tr><tr><td>Long</td><td>${s.longn}</td><td>${$(s.longpnl)}</td></tr><tr><td>Short (half size)</td><td>${s.shortn}</td><td>${$(s.shortpnl)}</td></tr>`;
+ document.getElementById('tops').innerHTML='<tr><th>Entry date</th><th>Coin</th><th>Side</th><th>Result (R)</th><th>Profit</th><th>Held (days)</th></tr>'+D.tops.map(t=>`<tr><td>${t.date}</td><td>${t.coin}</td><td>${t.side}</td><td>+${t.R}</td><td>${$(t.pnl)}</td><td>${t.days}</td></tr>`).join('');}
+document.querySelectorAll('.bar button').forEach(b=>b.onclick=()=>{S=b.dataset.s;document.querySelectorAll('.bar button').forEach(x=>x.setAttribute('aria-pressed',x===b));draw();});
+addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);draw();
+</script></body></html>

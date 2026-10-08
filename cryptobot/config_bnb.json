@@ -1,0 +1,26 @@
+{
+  "risk_pct": 0.83,
+  "short_risk_mult": 0.5,
+  "max_leverage": 8,
+  "exchange_leverage": 20,
+  "poll_s": 5,
+  "strategy": {
+    "symbol": "BNBUSDT",
+    "tf_min": 240,
+    "n": 20,
+    "atr_n": 14,
+    "sl_atr": 1.0,
+    "ema_n": 50,
+    "trail_m": 0,
+    "trail_atr": 0.0,
+    "max_hold_h": 120,
+    "sides": "both",
+    "slope_d": 5,
+    "no_weekend": true,
+    "be_R": 1.5,
+    "be_off": 0.0,
+    "max_ext": 4.0,
+    "oi_lookback_h": 72,
+    "oi_min_chg": -0.03
+  }
+}

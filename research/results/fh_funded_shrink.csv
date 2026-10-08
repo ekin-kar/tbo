@@ -1,9 +1,0 @@
-setting,2y lost%,2y withdrawable med%,2y p25%,3y lost%,3y withdrawable med%,3y p25%,10y lost%,10y withdrawable med%,10y p25%,10y ever B book%
-ladder + manual B-book cuts (plan until 5 Oct),1.1,24.3,9.5,2.2,17.4,4.0,7.4,6.8,0.0,77
-ladder + shrink + manual cuts,0.0,21.7,5.1,0.0,14.4,0.0,0.0,2.2,0.0,78
-"ladder + shrink, no manual cuts (plan now)",0.3,24.7,9.7,0.3,17.8,3.9,2.6,6.5,0.0,78
-flat 0.3/0.4 + shrink,0.6,20.1,10.8,1.0,16.4,7.6,5.1,8.6,0.0,75
-flat 0.4/0.5 + shrink (= evaluation),2.8,25.3,13.1,4.0,20.2,8.9,12.2,10.9,0.0,78
-flat 0.4/0.5 + shrink + manual cuts,0.0,19.2,1.9,0.0,13.3,0.0,0.0,2.1,0.0,78
-"flat 0.4/0.5, manual cuts, no shrink",1.8,22.3,8.9,2.9,17.0,3.3,10.0,7.9,0.0,77
-flat 0.5/0.6 + shrink,8.2,27.7,12.0,10.2,21.4,5.2,22.8,9.4,0.0,83

@@ -1,219 +1,170 @@
-# Trading handoff (v8, 5 Oct 2026)
+# Crypto (Binance futures) - Oct 2026
 
-Two cTrader bots trade prop-firm accounts: **PDAYT on gold** and **VOLC on USDJPY**. **v7 = v6 + risk scaling below the starting
-balance** (new bot versions GoldPDay v1.4 / JpyVolContraction v5.5, settings for every account, plan and statistics pages rebuilt with
-it) + the October 2026 research (eight markets and ~5,000 strategy variants tested, nothing new adopted; see section 4).
-The trading rules of both bots are **unchanged** from v6: only the position size changes when an account is below its start.
-**v8 = v7 + the first live week's fixes and the funded plans** (list below).
-Upload this zip plus the data files (section 7) to a new chat and ask Claude to read this file first.
+**Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
+(keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
+guide in `cryptobot/README.md` ("GO LIVE"). Pages: `stats/tbo_crypto_statistics.html`, `cryptobot/robustness.html`,
+`cryptobot/monthly_report.html`.
 
-**What changed in v8 (4-5 Oct 2026):**
-- **GoldPDay v1.5:** a 2-second reconnect made cTrader reload only recent history (133 days -> 48, in a test 4), so the trend filter
-  skipped the day (5 Oct). v1.5 reloads the m1 history at order time when it is short and checks again; the trend filter uses m1
-  bars only (h1 fallback removed). Tested live with `extras/HistoryReloadTest.cs` (no orders): 129 -> 4 days after a 47-s drop -> reload -> 129.
-  Trades unchanged. JpyVolContraction stays v5.5.
-- **Funded settings:** Funding Pips funded 0.5 / 0.6 with the same risk scaling as the challenge (full to -4%, min 0.3x): funded
-  accounts lost in year 1 1.4% instead of 8.5% (10y), payouts about the same. FundedHive Low funded = the ladder + risk scaling from
-  the start, no manual B-book cuts: lost 2.6% instead of 7.4% (10y funded table), same payouts. The model repays the fee / B-book
-  debt at once from any profit above the start (FundedHive: the balance stays at the start until the debt is 0; corrected 5 Oct). Settings files for every level in
-  `clibots/funded/` and `cloudbots/*_funded/` (`cloudbots/FUNDED_README.txt`). FundedHive **Moderate dropped**.
-- **Launcher (`run-bot.ps1`, `start-bots.bat`):** tidy console (header, time column, settings in two columns, wrapped lines),
-  start-up checks (BUILD OK / OLD BUILD for GoldPDay < 1.5 or JpyVolContraction < 5.5, SCALING ON / OFF), repeated lines hidden,
-  a cTrader started without internet (endless reconnect spam) is stopped after 30 s and retried, first restart after 5 s, then once
-  a minute if it keeps failing; drops while running are left to cTrader ("lost ... restored").
-- **Pages** rebuilt (funded numbers, Low only, v1.5). Research: dropped-market scripts and data removed (git history); tests of the
-  daily stop (1.5% kept; 1.6% optional), loss-count rules (rejected), the user's cat3 bot (curve-fitted) are in the git history only.
-- **Restart caveat (not fixed, by choice):** a bot restarted during the day rebuilds the day's start from closed trades, so open profit
-  at the reset (USDJPY held over 21:00 UTC) is missing from its daily-stop level; check the firm dashboard after such a restart.
+The repo is crypto only (the old prop-firm gold/USDJPY work was removed Oct 2026). The user trades **Binance USD-M futures** with their own bots.
+Data: `data/BTCUSDT_1m_2020_2026_part*.parquet`, `data/ETHUSDT_...` (Binance 1m, 2020-01 .. 2026-09).
+**BTC bot = TBO v2.1** (v2.0 + no new order when the daily close is > 4 daily ATR from the daily EMA50) (`cryptobot/`, see `cryptobot/README.md`): 4h 20-candle breakout, long AND short with the
+daily EMA50 (side + 5-day slope), no weekend orders, SL 1.0 ATR, breakeven at +1.5R, max hold 120 h, 2% risk
+($1k account). Found by walk-forward (`research/crypto/wf_*.py`): 2022-26 out of sample 3.3%/month at 2% risk
+vs 2.0% for v1.0; ETH (untouched) +178R vs +88R. User wants ~8-9%/month: told it is not realistic. Round 3 (`wf2.py`): finer core tuning = noise, v2 core kept.
+(v1.0 = long only, SL 1.5 ATR, trail exit; holdout 2024..2026 PF 1.66.) Research: `research/crypto/` (`common.py` costs/split, `families.py`, `scan1.py` grids,
+`bench.py` random entries, `holdout.py`). Dev = 2020-03..2023, holdout = 2024..2026-09 (already used once
+for TBO). Tested and rejected on BTC dev: hourly VOLC (-140R), RSI(2) dip-buying (-123R, costs), hourly
+seasonality (edges < costs). Williams volatility breakout: long-only works mildly, weaker than TBO.
+Second-strategy search (Oct 2026, user wants a smoother equity curve; `families3.py`, `pairs.py`, `weekend_scan.py`,
+`gold_tbo.py`): failed-breakout fade (864 settings, none pass), crash/spike fade (432, all negative), ETH/BTC ratio
+mean reversion (384, all negative: the ratio trends), daily reversal (noise), "CME gap fill" (gaps fill LESS than a
+same-distance baseline; weekend moves CONTINUE: strong 2020-23, gone 2024-26 -> rejected), TBO on gold with
+Binance XAUUSDT fees (stop 0.4% of price, fees 0.3R/trade: -81R 2020-24). Nothing adopted.
+1/5/15-minute scalping (`families4.py`, `scan4.py`, BTC+ETH dev, maker/taker fees): Bollinger fade, VWAP reversion
+(both lose even BEFORE fees), RSI(2/6) fade, EMA cross, squeeze breakout, 5/15m channel: momentum families are
+profitable before fees on both coins (EMA 199/288, squeeze 96/128, channel 130/144) but 0 survive fees except 3
+weak 15m channel settings (= TBO's idea on a smaller timeframe, weaker). Nothing adopted.
+Feature study (`feature_study.py`, daily, 24 conditions, robust = same sign BTC+ETH in 2020-21 AND 2022-23):
+1-30 day momentum, 20-day range position / EMA20 distance (continuation) and 7d/90d volatility ratio (calm ->
+better, wild -> worse) are the only consistent ones; weekday, volume, trade count, average trade size, wicks,
+streaks, long-term highs/EMA200 are not. Daily score strategy from them (`score_strat.py`): MAR ~0.5-0.65 on dev,
+long side only -> rejected (holdout not used). Vol-ratio filter on TBO (`vr_max`): within noise -> not adopted.
+EMA 9/21 retest (`families4.ema_retest`, 5/15m setup, 1h/4h trend, maker limit at the EMA, 1h-ATR stop, maker TP;
+768 settings): before fees +100R BTC / +140R ETH per ~2,000 trades (0.05R/trade), after fees 0 settings profitable
+on both coins (fees ~0.07R/trade). TBO waiting time: one coin median 35 d to a new equity high, BTC+ETH 15 d.
+10 TBO improvement ideas (`ideas10.py`, BTC+ETH, walk-forward 2022-26 pooled): add to winners, partial TP, hold
+>xR winners longer, close dead trades, close-confirmed entry, swing stop, efficiency-ratio filter, size tilt, BTC/ETH
+confirmation, own rules for shorts -> none beats v2.1 out of sample on both coins. Closest: hold winners above +6R
+at day 5 up to 10 days (picked every year; BTC MAR 2.90 -> 3.14, ETH 1.65 -> 1.66): marginal, not adopted yet.
+Entry ideas (`ideas_entry.py`): channel 5/10/15 (DD 12 -> 18-30R), same 80h window on 1h/2h candles with the
+4h stop (~same, slightly worse), scale-in half at n=5/10/15 (worse), limit retest of the broken level (the best
+breakouts never come back: 57-115R vs 269R). None picked by the walk-forward in any year.
+12 coins (Oct 2026, `portfolio.py`, `portfolio_sim.py`, `portfolio_sets.py`): TBO v2.1 untouched; more coins = more
+trades but not better return/DD (crypto drawdowns coincide; alts weaker). Chosen set BTC+ETH+DOGE+ADA (2020-23
+return/DD >= 1), 0.5-0.6% risk each: same return/DD as BTC+ETH at 1%, 2x trades, shorter flat periods.
+Winners vs losers (`trade_features.py`, `sizing_rules.py`): only shorts-at-half-size improves both periods ->
+TBO v2.2 (`short_risk_mult` 0.5); configs 4 coins at 0.75% (shorts 0.375%): 2020-26 6.0%/mo DD 27%, 2024-26 4.5%/mo DD 20%.
+Deep winners-vs-losers study (Oct 2026, `loser_study.py` 85 measurements per trade, `loser_eval.py`, `filter_test.py`,
+`filter_rand.py`): single conditions pass both periods at about chance rate (2.3% vs 2.0% random); the best 2020-23 pairs
+fail 2024-26 (median x0.72); gradient boosting AUC 0.49-0.53 (= coin flip). Some 'tired setup' conditions are consistent
+across sub-periods and coins (8/8 for 7.6% of conditions vs 2.6% random): level touched 6+ times, very quiet last 10
+candles (std10 <= 0.37 ATR). Inside the engine (skip the order) they remove only ~5-9% of trades (the breakout fills a
+candle later) and add ~+0.6%/month with ~4 points less DD at 2x risk, above the random-skip 90th percentile, but they were
+picked using all years -> not adopted; re-check on live/new data after 6-12 months.
+10 ideas, round 3 (Oct 2026; `tradesim.py` minute replay = engine on 1472/1474 trades, `ideas_v3.py`, `ideas_v3b.py`):
+partial take-profit (1/3 at +1R) is the only near-neutral one: 2024-26 net/DD x0.99 (2020-23 x0.83), trades in profit 46%
+vs 16%, longest full-loss streak 8 vs 12; at 1.3x risk about the same money and DD as now ($8.2k vs $8.7k from $200
+2024-26). Rejected: earlier breakeven (all worse out of sample), failed-breakout exit (x0.37-1.0), re-entry (x0.43-0.66),
+adding at +1R/+2R (2024-26 x0.49-0.61), trend-strength sizing (none beats random sizing in both periods), several channel
+lengths (2020-23 better, 2024-26 x0.80-0.84). Ideas 6, 7, 10 need Binance data the cloud cannot reach:
+`fetch_binance_extra.py` (run on the user's PC, push data/extra/).
+Ideas 6, 7, 10 (data/extra from data.binance.vision; `ideas_v3c.py`, `filter_test2.py`, `filter_test3.py`, `carry.py`):
+**open-interest filter works**: skip the order when OI (USD value, Binance metrics) fell over the last 3 days by >= 3%:
+2022-23 7.8 -> 10.8%/mo (DD 64 -> 58%), 2024-26 12.0 -> 13.8%/mo (DD 49 -> 44%), $200 2024-26 $8.3k -> $14.0k at 2x risk;
+24 of 32 lookback/threshold/measure settings beat the bot in both periods; random skipping (25 seeds) never got there
+(90th pct 9.7 / 12.3%/mo). Trades -22%, win rate barely changes (15.5 -> 16.6%), avg R per trade +0.35 -> +0.50.
+OI data only from Dec 2021 (2020-21 untested). Taker buy share: weaker, near chance. Funding filter: nothing.
+Funding carry: ~0.4%/month 2024-26 on capital, 1-3%/yr in 2025-26 -> not worth it at $200.
+5 more Binance-data ideas on top of v2.4 (Oct 2026, `ideas_v4.py`; spot 4h + premium index 1h added to data/extra):
+OI-falling exit during a trade (x0.06-1.06, worse or flat), bigger size when OI rises (0 of 18 settings >10% better in
+both periods), spot-led vs futures-led (0 of 36; luck 1.3%), futures premium (0 of 24), top traders vs crowd (0 of 36),
+any of them as size x1.5 (0 of 78). Nothing adopted; v2.4 stays.
+Fakeout detection on v2.4 (Oct 2026, `ideas_v5.py`, 1m taker volume via `fetch_taker_1m.py` into cache/, not in git):
+RSI/MACD divergence vs the level candle (0 of 24 filters), other coins not joining (0 of 23; "one other coin near its
+break" x1.40 / x1.09 but not monotonic: 0/1/2/3 coins = +0.48/+0.07/+0.28/-0.64R 2020-23), rejected pokes / grinding
+under the level (0 of 14), early exits on absorption (0 of 42), trigger-minute trade spike / OI drop after the fill
+(0 of 12), gap / spike through the level (0 of 18): none beats base and random exits in both periods. Early exits lose
+because most breakouts that stall in the first hour still end as winners. Order book: no history; untestable.
+Coins together (Oct 2026, `ideas_v6.py`): per-coin win rate BTC 20.4% (avg +0.92R), ADA 18.3%, ETH 16.7%, DOGE 13.3%.
+BTC confirming alt trades (BTC in a trade / entered within 24-48 h / near its own level / 4h trend; skip or size x1.5),
+BTC dominance proxy (BTC vs 11-alt index, 7d/30d) and USDT dominance proxy (12-coin market trend): none beats random skips in
+both periods. Alt trades with BTC already in the same direction average +0.38R vs +0.20R without, but skipping the others
+loses in 2024-26 (x0.87). External dominance data (CoinGecko) is blocked from the cloud.
+All 12 coins on v2.4 at 1% risk each from $200 (Oct 2026, `all12.py`, OI metrics downloaded for all 12):
+2024-26 %/month BTC 2.47, ETH 1.97, BNB 1.72, TRX 1.39, DOGE 1.08, AVAX 0.94, SOL 0.93, ADA 0.86, XRP 0.69, LINK 0.11,
+DOT -0.19, LTC -0.69 (2020-23: BTC 3.56, DOGE 2.98, ADA 2.11, SOL 1.84, ETH 1.82, BNB 1.29 ...). Adding BNB at 1.25% raises
+money and drawdown in proportion (return/drop 0.358 -> 0.361, 0.312 -> 0.314) = like more risk, not a better edge;
++BNB+SOL better 2020-23, worse 2024-26. Kept BTC/ETH/DOGE/ADA.
+Hedge idea (Oct 2026, `hedge_test.py`): half-size opposite trade opened with every entry (or after -0.5/-0.8R), kept after
+a stop-out until its TP (1-3R; stop at its entry), closed when the main trade is +0.5..1.5R: all 20 variants worse than
+no hedge (net/drop 2020-23 10.5-20.0 vs 21.5; 2024-26 5.0-13.5 vs 13.6), profit -5..-30%, drops not smaller. Not adopted
+(and it would need Binance hedge mode).
+Market-neutral cross-sectional study (Oct 2026, `mn_study.py`, `mn_carry.py`; funding/premium/4h taker data for all 12
+coins): long top-N / short bottom-N, gross 1x, fees + slippage + funding. Momentum (3-90 d) Sharpe 1.4-1.7 in 2020-23 but
+negative 2024-26 -> dead. Reversal, low-vol, OI, taker: no. Funding carry (long low / short high funding, 12 coins):
+Sharpe > 0 in both periods for 92% of 140 settings, median 0.69 / 0.75, ~10-16%/yr at 1x, losing years 2020/2022/2025,
+corr with TBO 0.02; TBO+carry 1-2x: Sharpe 1.58 -> 1.64-1.68, drawdown not lower. On the 7 coins TBO does not trade
+(needed in one-way mode) carry fails (median Sharpe ~0, 2022 -48%). TBO's own daily Sharpe ~1.6 beats every
+market-neutral factor; its drawdown is the chosen risk (BTC 2.5% -> worst drop ~25-28%).
+Big grid (Oct 2026, `grid_v25.py` 4,320 structures x 5 coins with OI filter; `grid_v25_eval.py`; `grid_v25b.py` 30 filters
+x 5 structures): live (4h, n20, ATR 1.0 stop, BE 1.5R, 120 h) ranks 41/4320 on a neighbourhood-smoothed min(dev, holdout)
+score; only 4 configs beat it in both periods, none by >10%. 1h/2h/1d clearly worse; 8h (n15-30, ATR 0.75) a sibling plateau,
+better 2020-23 (x1.2-1.5) but equal/worse 2024-26 (x0.8-1.05). ATR stops beat %-of-price, channel-width and swing stops;
+120 h beats 72/240 h; BE 1-1.5R beats 2R/none. Filters: every RSI/ADX/volume/EMA-length/slope variant is worse on average
+(median across structures x0.11-0.97 in 2024-26); OI 168 h -3% helps the live structure (x1.17/x1.18) but hurts the others
+(median x0.91/x0.88) -> noise. 4h+8h half/half: x1.16/x1.04 but 83% of 8h trades duplicate 4h ones. No change adopted.
+Portfolio sizing rules (Oct 2026, `sizing_v3.py`, compounding account sim, BTC 5% settings, $200): shorts x0.5 stays best
+(0/0.25/0.75/1/bear-only all worse in a period); BTC-volatility and account-volatility sizing, drawdown brakes,
+same-direction scaling: no better than simply lower risk. **Open-risk cap with shrink** (risk of trades not yet at
+breakeven <= cap x equity; a new trade is shrunk to fit, skipped if < 25% would fit) is a smooth plateau 4.5-6.5%, better in
+both periods; 5.5% (= 1.1 x BTC risk): 2020-23 x1.03, 2024-26 x1.17 (worst drop 44.8 -> 38.0%, $15.3k -> $14.6k),
+2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). **Better: BTC exempt** (BTC trades never shrunk or
+skipped, but their open risk still counts against the cap for ETH/alts): 1.1x -> 2020-23 x1.03, 2024-26 x1.23 ($18.0k,
+drop 38.0%), 2022-26 x1.08; plateau 0.9-1.1x (x1.22-1.23), fades at 1.3x (x1.07) / 1.5x (x0.99). A cap among ETH+alts
+only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: cryptobot/cap_comparison.html. **In the bot as v2.5** (`portfolio.json`
+open_risk_cap_pct 5.5, cap_exempt BTCUSDT; bot.py size/capped/open_risk/resize_entry/trim_to_cap). Timing
+(`sizing_v4.py`): sizing only at the 4h close loses part of it (2024-26 $17.0k, drop 41%); the bot therefore re-sizes
+a waiting entry order every minute and trims at the fill -> equals the fill-time rule ($18.2k, 38%).
+`cryptobot/test_cap_sim.py`: the five bots on one simulated account, each entry checked against the rule.
+BTC 7.5% (Oct 2026, fill-time cap 1.1x BTC, $200): 7.5/2.5/0.83 -> 2020-23 22.5%/mo drop 61%, 2024-26 $31.8k drop
+48%; 2-yr bootstrap from $250 (2022-26 blocks): drop median 64% / 1-in-10 80%, P(>=$10k) 45%, P(>=$20k) 33%
+(5% + cap: 51% / 68%, 35%, 22%). Lowering ETH/alts with BTC 7.5 (1.5/0.5) cuts profit a lot ($20.5k) for little
+drop (58% / 46%, MC 61%): BTC drives the drops. 6/2.5/0.83: $24.3k, 54% / 42%, MC 56%.
+ETH under the cap (`sizing_v5.py`): ETH trades starting while BTC is in a fresh same-direction trade average 0.33R
+(win 12.5%, n=72) vs 0.79R otherwise (both periods: 0.19 vs 0.71, 0.54 vs 0.93); alts 0.31 vs 0.51R. Letting ETH
+trade anyway hurts: ETH exempt too -> 2024-26 $15.0k drop 43%; cap 7.5% -> $15.4k 44.8%; ETH taking the 0.5% crumb
+-> $17.4k 38.7%; never-shrink -> $17.4k. Current rule (skip if < 25% fits) best with min fraction 0.25-0.5.
+Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
+volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
+(market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
+walk-forward 1.43 vs 1.80). As sizing at the breakout: RSI>=70 n=50/45 (noise), OBV already leading -> WORSE
+breakouts on 7 of 8 coin-periods but half/skip size is mixed (2.95|3.33). Nothing adopted.
+4-coin grid (`portfolio_grid.py`, `portfolio_grid_eval.py`, `pgrid_dollars.py`; 1,728 settings x short size 0/0.5/1):
+v2.2 ranks 21/5,184 on min(2020-23, 2024-26) return/DD. Higher: channel 40 + 1.25 ATR + EMA100 (3.75|3.91 vs
+3.64|3.11) but half the trades (8.7 vs 18.7/month), neighbours median 2.92 (a peak), walk-forward re-picking 1.25 vs
+v2.2 fixed 1.87. At matched drawdown (1.25-1.5% risk): 2024-26 5.5-6.4%/mo vs 4.5%, but months positive 49% vs 62%
+and longest flat 450-498 d vs 318 d over 2020-26. Not adopted; offered to the user as an option.
+'Quality' search (`portfolio_grid.py` PGRID=quality, `quality_eval.py`, `quality_other.py`; 1,512 settings, chosen on
+2020-23 with neighbour smoothing, >= 6 trades/month): channel 40 (rest = v2.2). 2020-23 8.64 vs 3.64 (selection
+period), but 2024-26 4 coins 2.65 vs 3.11 (worse); 8 other coins 1.15 vs 0.88 (better, DD 62R vs 90R, 5 of 8);
+leave-one-coin-out better 3 of 4 (not BTC); 20+40 half each 2.98 in 2024-26. Not adopted (v2.2 kept).
+Round 2 (user wanted daily, two-sided trades): session breakouts, 1h breakouts, mean reversion, pullbacks,
+always-in momentum all fail after fees on BTC (`families2.py`, `holdout2.py`). ETH (Oct 2026): ETH-specific tuning lost to the BTC v2.1 settings out of sample -> ETH runs BTC settings
+(`config_eth.json`): +191R 2020-26, DD 15.7R, 3.7%/month at 2% (DD 28%). Both bots: ~1% risk each.
 
----
+## Live trial (from Oct 2026)
+User runs v2.5 for 3 months from $200 (BTC 5 / ETH 2.5 / alts 0.83, cap 5.5% BTC exempt), then sends
+cryptobot/reports/ (report.py, run monthly: summary + trades/income CSV from Binance) and cryptobot/logs/ (FILLED lines
+carry level + slippage). To do then: backtest the same days (replay / sizing_v4 with the live equity), match trades,
+compare fills, fees, funding, slippage. Expectation (research/crypto/three_months.py): typical $257, 1-in-10 bad
+$150-170, below $200 in ~1 of 4 windows, worst drop inside 3 months typical 26% / 1-in-10 ~40%, ~58 trades.
+Risk ladder (`research/crypto/ladder.py`, bot: portfolio.json "risk_ladder" rows {from_usdt, per-coin %, cap_pct},
+now LIVE in portfolio.json): 7.5% <$1k, 5% $1-10k, 2.5% >=$10k (ETH/alts as listed). 2 yrs from
+$200: reach $10k 37% (boot) / 41% (real windows) vs flat 5% 29% / 23%; 1-in-4 bad end $1.9k vs $1.5k; drop after
+reaching $1k same as flat 5% (41% / 64%). Flat 7.5%: 39% / 48% but drop after $1k 54% / 74%, gave back half of a
+$5k+ peak 7%. 10% start: more ruin (5% end < $200). test_cap_sim CAPSIM_PORTFOLIO / CAPSIM_EQ: ladder rows OK.
 
-## 1. The bots (live)
+## v2.5 live settings (Oct 2026): risk ladder
+portfolio.json: ladder rows (from $0: BTC 7.5 / ETH 2.5 / alts 0.83, cap 8.25; $1k: 5 / 2.5 / 0.83, cap 5.5; $10k: 2.5 /
+1.25 / 0.42, cap 2.75), cap_exempt BTC. config_btc max_leverage 12, exchange_leverage 25 (8x would cut 19% of BTC trades
+at 7.5%). bot.py: risk_now / ladder_row / cap_frac(eq); BTC counts in the post-fill trim if it filled in the same minute or
+before, re-checked for 2 min after a fill (same-minute races: BTC first; that order is +10% vs BTC-last in 2024-26, drop 42 vs 46% in 2020-23).
+`research/crypto/botsim.py` = the bot's sizing (ladder, cap at fill, BTC exempt, same-minute entries BTC, ETH, BNB, SOL,
+ADA); every page generator uses it (make_monthly_report, make_risk_html -> risk_comparison + plan_ladder_plus50,
+make_cap_html, make_tbo_stats; the statistics page JS matches botsim to the cent, check in make_tbo_stats ref).
+Ladder from $200, 2 yrs (three_months.py): typical $5.8k / $5.6k (boot / real 2022-26 windows), P($10k) 39% / 29%,
+drop after $1k 40% / 63% (typ / 1-in-10). 3 months: typical $259-272, below $200 30%, drop typ 33%, 1-in-10 51%.
+Trade explorer `cryptobot/trades.html` (`make_trades_html.py` + `trades_template.html`): every trade from $200 (start 2024 /
+2022 / 2020) sized by botsim, equity chart with a dot per trade, 4h price chart per trade (entry, stop, breakeven, exit),
+filters, cap cut / skip marked. Prices from `trade_prices.py` (rebuilds the v2.4 trades with prices: 1551 / 1551 match).
 
-| | Gold: `cloudbots/GoldPDay.cs` (PDAYT, **v1.5**: v1.4 + reloads its m1 history at order time if a reconnect shortened it; trend filter from m1 only) | USDJPY: `cloudbots/JpyVolContraction.cs` (VOLC, **v5.5**) |
-|---|---|---|
-| Idea | Breakout of the previous day's high/low, only in the direction of the daily trend | Breakout after volatility contracts |
-| Entry | **01:15 UTC** (04:15 Turkey): one stop order at yesterday's high (buy) or low (sell), valid until 20:00 UTC | Each hour: if ATR14(h1) < 0.8 x ATR100 -> stop orders at the 10-candle high and low, valid 24h |
-| Trend filter | Only the side agreeing with yesterday's close vs the **daily EMA40** | - |
-| Stop / target | 2.0 x ATR14 (15-min, exponential) / **2R** | 1.5 x ATR14 (1-hour) / **2.5R** |
-| Exit | stop, target, or flat 20:00 UTC (23:00 Turkey); max 1 trade/day; never overnight | stop, target, **closed after 20 hours**, or flat Friday 20:00 UTC (23:00 Turkey) |
-| Other | Warm-up 120 days; "Max actual risk %" 0.9 (skips a day when even the minimum lot would risk more) | No orders 20:30-23:00 UTC; one position at a time; cancels resting orders while a position is open; hourly status line |
-| **New in v7** | **Risk scaling** (group "Risk scaling", off by default), v1.4 | **Risk scaling** (same), v5.5 |
-
-**Risk scaling (v1.4 / v5.5).** Four parameters: `StartBalance` (0 = off), `FloorPercent` (the firm's fail level as % of the start:
-88 = 12% max loss, 95 = 5%, 94 = 6%), `ShrinkFromPercent` and `MinScale`. Full risk while the balance is at or above the shrink level
-= `StartBalance x (1 - ShrinkFromPercent/100)`. Below it the risk is multiplied by `max(MinScale, (balance - floor) / (level - floor))`,
-so it shrinks with the room left to the firm's static floor. Funding Pips 10k (floor 8,800, shrink from 4%, MinScale 0.3):
-9,600 or more -> 1.0x, 9,400 -> 0.75x, 9,200 -> 0.5x, 9,040 or less -> 0.3x. FundedHive (shrink from 0%, floor 95%, MinScale 0.3):
-200k: 198k -> 0.8x, 196k -> 0.6x, 193k or less -> 0.3x. (v1.3 / v5.4 = the same without `ShrinkFromPercent`.) Each bot sizes
-from the same account balance, so both scale together. The bots print the scaling status at start and a line whenever a trade is
-sized down. **There is no step-up above the start** (tested, not worth it: section 4).
-
-Both bots run on **UTC** (Server.Time = UTC), so summer/winter time never moves their schedule; Turkey is UTC+3 all year.
-Server-side SL/TP, restart-safe, account-wide daily loss stop: **1.5%**.
-
-**Performance** (backtest at current costs, 2016 - 18 Sep 2026, USDJPY with the 20-hour max hold; interactive version in
-`stats/fundingpips_statistics.html` / `stats/fundedhive_statistics.html`):
-
-| | Trades | Win rate | Profit factor | Net | Max DD |
-|---|---|---|---|---|---|
-| Gold, full history | 1,488 | 41.1% | 1.25 | +228R | 35R |
-| USDJPY, full history | 1,617 | 36.7% | 1.22 | +224R | 22R |
-| Combined, full history | 3,105 | 38.8% | 1.24 | +452R | 31R |
-| Combined, last 3 years | 932 | 40.9% | 1.32 | +176R | 13R |
-
-Live check (Funding Pips cTrader tick backtest, Feb 2024 - Sep 2026, gold): 377 of 380 engine trades on the same day, 375 same
-direction, 95% same outcome; cTrader about 14% below the engine. Entry slippage median $0.12.
-
-## 2. Accounts and settings (agreed 4 Oct 2026)
-
-| Account | Firm rules | Gold | USDJPY | Risk scaling (cbotset) | Daily stop / reset | Expected (live-equity simulator) |
-|---|---|---|---|---|---|---|
-| **Funding Pips 1-Step Flex 10k** (#***REMOVED***, cTrader CLI, Swing add-on), challenge | +12% target, **12% static** floor (8,800), 2% daily from max(bal, eq) at 21:00 UTC, no per-trade limit | **0.7%** | **0.9%** | StartBalance 10000, FloorPercent 88, ShrinkFromPercent **4**, MinScale **0.3** | 1.5% / **21** | fail 1.3 / 1.5 / 5.7 / 2.4% (2y / 3y / 10y / real order), median 2.4 / 2.9 / 3.2 / 3.3 months |
-| Funding Pips, **once funded** | same floor/daily; bi-weekly payouts 80% | 0.5% | 0.6% | StartBalance 10000, FloorPercent 88, ShrinkFromPercent **4**, MinScale **0.3** (as in the challenge; decided 5 Oct 2026) | 1.5% / 21 | keep **$100** (1%) in the account: request a payout at $10,200+, withdraw above $10,100 (decided 5 Oct 2026: with a 12% floor a bigger buffer only cost money; `plans/fundingpips_plan.html`) |
-| **FundedHive 200k 1-step Low** (~208k, +4%), evaluation | 1%/trade, 2% daily, **5% static** max loss (190k), +10% target | **0.4%** (lowered from 0.5) | **0.5%** (lowered from 0.6) | StartBalance 200000, FloorPercent 95, ShrinkFromPercent 0, MinScale **0.3** | 1.5% / 0 | from +4%: fail 0.2 / 0.2 / 2.5%, median 1.9 / 2.1 / 2.5 months |
-| **FundedHive 10k Low** | as 200k Low | 0.4% | 0.5% | StartBalance 10000, FloorPercent 95, ShrinkFromPercent 0, MinScale 0.3 | 1.5% / 0 | |
-| FundedHive Low, **new** account (any size) | as 200k Low | 0.4% | 0.5% | StartBalance = size, FloorPercent 95, ShrinkFromPercent 0, MinScale 0.3 | 1.5% / 0 | fail 2.0 / 1.8 / 9.6%, median 3.7 / 4.2 / 5.1 months (fixed 0.4/0.5: fail 12.7 / 11.4 / 21.4%) |
-| FundedHive Low, **funded** | + fee (1%) from profits, B book below 99% (flat 1% debt) | ladder | ladder | StartBalance = funded size, FloorPercent 95, ShrinkFromPercent 0, MinScale 0.3 (decided 5 Oct 2026); **no manual B-book cuts** | 1.5% / 0 | ladder by buffer (debt repaid first): 0.25/0.35, from +1% 0.30/0.40, +2% 0.40/0.50, +4% 0.50/0.60 (`plans/fundedhive_plan.html`): same payouts as the ladder alone, funded accounts lost 2.6% instead of 7.4% (10y) |
-
-Settings files: `clibots/` = Funding Pips 10k (CLI); `cloudbots/FundedHive_200k_Low/`, `cloudbots/FundedHive_10k_Low/`.
-Funded settings files (5 Oct 2026): `clibots/funded/` (Funding Pips, copy over the challenge files when funded); `cloudbots/FundedHive_200k_Low_funded/` and `cloudbots/FundedHive_10k_Low_funded/`, one sub-folder per ladder level (`1_start`, `2_buffer_1pct`, `3_buffer_2pct`, `4_buffer_4pct`), explained in `cloudbots/FUNDED_README.txt`.
-**After passing a challenge, set `StartBalance` to 0** (scaling was only tested for challenges/evaluations).
-FundedHive only allows the same trade on one funded account at a time, so FundedHive stays at the one 200k account; growth goes
-through Funding Pips (up to $400k allocation). Several Funding Pips accounts with the same bots fail or pass together: start
-challenges a few weeks apart instead of buying several at once.
-
-**Documents:** `plans/fundingpips_plan.html` (Funding Pips 10k: pass dates, equity paths, payouts, challenge and funded risk options
-incl. the scaling rows) and `plans/fundedhive_plan.html` (FundedHive Low (Moderate dropped 5 Oct 2026): pass dates, payouts, risk options incl. scaling,
-already-in-profit table, funded ladders, B book). Both use the live-equity simulators with the risk scaling built in.
-
-**Open checks:** (1) ask Funding Pips whether the daily reset moves to 22:00 UTC in winter (if yes: `DailyResetHourUtc` 22 in both
-cbotsets on the weekend of 24-25 Oct 2026, back to 21 on 27-28 Mar 2027); (2) confirm FundedHive's rules: static (not trailing)
-5% max loss, reset 00:00 UTC, B-book mechanics.
-
-## 3. How the settings were found
-
-- **Method:** fixed data split (tuning on 2019-2022 only, one-shot tests on 2016-18, 2023-24, 2025-26), plateau centres rather than
-  best cells, comparison with random entries, long/short and year-by-year checks, costs at the broker's real level (plus a 2x stress
-  test). The engine was verified against a cTrader tick backtest (226 of 226 trades matched on day and direction).
-- **Gold:** a daily trend filter (EMA40) halved the drawdown of the original 07:00 breakout; a scan of every order time 00:00-08:00
-  found a broad strong area at 01:00-01:45 UTC (Asian-session breakouts), 01:15 is its centre. Stop 2.0 ATR / target 2R re-checked.
-- **USDJPY:** VOLC's parameters form a broad plateau; "Close before weekend" after a weekend gap cost -8R in 2017; v5.3 max hold 20h
-  (12-24h tested, 20h best: drawdown 27R -> 22R, +30R).
-- **Simulators:** `research/fundingpips_sim.py` (and the scripts built on it) is minute-level on live equity: every open trade's
-  floating P&L, the daily baseline max(balance, equity) at the firm's reset, the static floor, the bots' daily stop. Paths are random
-  4-week blocks of the real trades (2y / 3y / 10y windows) plus a fresh account started every week 2016-2024 on the real order.
-  **v7:** `fundingpips_sim.sim` (+ `boot` / `rolling`), `fundingpips_report.phase`, `fundedhive_sim.evaluate` take `minm` (risk-scaling
-  minimum) and `dz` (shrink from, fraction); `fundedhive_report.phase` takes `minm`.
-- **Risk scaling (Oct 2026):** a per-bot "trade smaller after a losing streak" filter does NOT work (streak lengths are random; USDJPY's
-  bad stretches are followed by BETTER trades). Account-level scaling by the room left to the static floor does: it cuts failures by
-  more than half. Grids (live equity) over base risk x minimum (0.3-0.75) per firm; judge speed on 2-3 years, safety on 10 years.
-  Shrinking alone trades a little time for far fewer failed (paid) attempts; starting slightly higher with shrinking (Funding Pips
-  0.7/0.9) is both safer and about as fast as the old fixed setting. With a tight floor (5-6%) a low minimum (0.3x) is best.
-  Shape (`research/scans/shape_grid.py`): on Funding Pips (12% room) waiting until -4% and then shrinking harder (min 0.3x) beats
-  shrinking from the start (min 0.6x): fail 1.3 / 1.5 / 5.7 / 2.4% vs 1.8 / 1.9 / 6.4 / 0.7%, median 2.4 / 2.9 / 3.2 / 3.3 vs 2.6 / 3.1 /
-  3.5 / 3.9 months, and it keeps more profit after a dip (last 6 months +9.5% vs +5.8%, no scaling +13.6%). On FundedHive (5% room)
-  a delayed start adds failures: shrink from the start. A "curve" (room squared) shrinks more everywhere: fewest failures, slowest.
-  Step-up above the start (single jump 1.25x/1.5x at +1/2/4/6%, or a ladder to 1.25x/1.5x by +4/6/8%) gains ~0.3 months on the median
-  for 1-2 points more failures in a bad year: not adopted.
-
-## 4. Known not to work (do not redo without a new idea)
-
-From v6:
-- **Gold, quiet markets:** mean reversion, fading previous-day levels or failed breaks, London-fix fade, London false breakouts,
-  momentum continuation. **Gold variations:** several trades per day, intraday trend / volatility / NR-day filters, London-range
-  breakout into New York. **USDJPY:** re-tuned VOLC, breakeven stops, trend filter, blocking US-data hours; Gotobi Tokyo-fix (watchlist).
-- **Other markets (v6):** EURUSD/GBPUSD failed their holdout; Nasdaq, S&P, EURJPY, XAGUSD nothing robust; BTC 14 ideas, nothing survived.
-
-October 2026 (scripts in `research/scans/`, raw numbers in `research/results/`):
-- **Gold + USDJPY new strategies** (`oct2026_b*.py`): USDJPY previous-day breakout + EMA40 at 00:00-07:00 (2023-26 negative); VOLC on
-  gold and VOLC h4/m30 (flat); daily channel trend-following (gold: ~6 trades/year, nearly all from 2025); previous-week breakouts.
-- **Gold exits / variants** (`improve_*.py`, exact exit simulator `improve_lab.py`): flat 17-19 UTC, breakeven 1.0/1.5R, TP 2.5/3R,
-  scale-out 50% at 1-1.5R, time-decay exit, breakout buffer 0.1-0.3 ATR, m15 close confirmation, weekly trend, order cancel time
-  09:00-16:00 (cancelling at 11:00-12:30 halves the drawdown but lowers profit by as much: same speed/safety line in the pass sims).
-  Far-away orders (`gold_far.py`): on 44% of days PDAYT does not trade; far orders fill rarely but are the BEST trades (never cancel
-  them); add-on trades on those days and risk tilts by distance: no gain.
-- **Gold session scan** (`gold_sessions.py`, 582 configs): liquidity sweeps (0 of 198 robust), Asia-range breakouts in London/NY,
-  session direction: not robust. Only Asian-session breakouts of earlier levels hold -> **ASIAB** (stop orders at yesterday's Asia
-  00:00-07:00 high/low placed 00:00 UTC, SL 2 ATR, TP 3R, flat 20:00): +147R, PF 1.33, robust, daily corr 0.16 with PDAYT. But on a
-  NETTING account (one gold position) merged with PDAYT it adds no pass speed, and replacing PDAYT with it is slower (`gold_netting*.py`,
-  `asiab_replace.py`). Not adopted.
-- **USDJPY variants**: scale-out, time-decay exit, buffers: worse; order life 6/12h: same. Same-dollar exposure halving (gold long +
-  USDJPY short open together, 9% of trades): portfolio DD 22% -> 17% but slower passing: optional only.
-- **EURUSD / EURJPY** (scripts and data removed from the repo; in the git history): every intraday idea loses, mostly before costs;
-  3,492-combination window scan: 3 survivors, checkerboard on London/NY time -> chance. VOLC on 4-hour candles: small (+4R/year).
-- **AUDUSD** (removed, in the git history): breakouts, Tokyo box, VOLC, trend, mean reversion, fades: all negative.
-- **Nasdaq / S&P** (removed, in the git history): the user's **NasTrend** (first-hour trend, 10:30 NY entry, BE 1R, exit 15:30): PF 1.41,
-  +275R, but the top 2% of trades make +229R (without them +37R; negative since Apr 2025) and the Funding Pips tick test was flat from
-  Sep 2024 -> not adopted. Last-30-minute momentum and overnight long: no.
-- **XAGUSD:** broker spreads (FundedHive $0.03-0.04, Funding Pips $0.10) cost 0.1-0.45R per trade vs 0.006R on gold -> untradeable.
-- **Account choice / risk** (`acct_speed.py`, `fp_highrisk.py`, `scaling_grid.py`, `fp3_grid.py`): closed-trade sims overstate high-risk
-  pass rates by 15-25 points (the 2% daily rule on live equity); the Funding Pips 3% daily option is faster at the same risk
-  (1.0/1.25, stop 2.5%: 2.4 months, fail 15%) - not bought to keep one account type.
-- **USDJPY losing-streak rule** ("after N losses in a row, x risk until a win", on top of the risk scaling; `research/scans/streak_rule.py`
-  -> `results/streak_rule.csv`, live equity). Closed trades looked promising (USDJPY trades after 3-5 losses in a row earn ~0R; after 4
-  losses -> 0.5x: same R, DD 21.9R -> 16.8R; gold: no pattern). With equity and the scaling already on, it sits on the same speed/safety
-  line as simply lowering risk: Funding Pips after 4 -> 0.5x: fail 1.1 / 1.5 / 5.9 / 2.4% -> 0.7 / 0.8 / 4.6 / 0.9% (2y / 3y / 10y / real),
-  median +0.15-0.25 months, expected months incl. retries slightly longer; FundedHive Low: 2.0 / 1.8 / 9.6 / 4.0% -> 1.4 / 1.0 / 7.5 /
-  2.9%, median +0.1-0.3 months. Not adopted (no free gain, extra bot state).
-- **Position sizing by conditions** (`research/scans/size_features.py`): USDJPY by entry hour, weekday, quietness (ATR14/ATR100),
-  volatility regime, distance from the daily EMA40, tick volume before entry; gold by volatility regime, EMA40 distance, tick volume
-  before entry, weekday, fill hour. No condition ranks trades the same way in all four periods; the one bucket that looked consistent
-  (USDJPY 25-50% volatility percentile) disappears with other bucket edges -> curve fitting, nothing adopted. (Gold fills 12-16 UTC
-  are weak in every period, as found before; cancelling those orders did not speed up passing.)
-- **Parked:** skipping gold days with low pre-session tick volume (chosen on already-used data).
-
-## 5. Open items
-
-1. **Build GoldPDay v1.5 / JpyVolContraction v5.5** in the cTrader app from `cloudbots/*.cs` (both compile with 0 errors / 0 warnings
-   against cTrader.Automate) and copy the `.algo` files to `C:\bots`. A FundedHive cTrader backtest (Nov 2024 - Oct 2026) matched the
-   research engine: 94% / 90% of trades identical, 98% same outcome.
-2. Ask Funding Pips (weekend of 24-25 Oct) whether the daily reset moves to 22:00 UTC in winter (then `DailyResetHourUtc` 22).
-3. After passing a challenge: load the funded settings files (`clibots/funded/`, `cloudbots/*_funded/1_start/`), not StartBalance 0.
-4. If the bots were off over 20:00 UTC and a gold trade is still open next morning, close it by hand before 01:15 UTC.
-5. Possible next research: JP225 (the last Asian-session market with a reason; log its spread first).
-
-## 6. Running the bots live (cTrader CLI, Windows)
-
-- Folder `C:\bots`: `GoldPDay.algo`, `JpyVolContraction.algo` (built from `cloudbots/`), the two cbotsets from `clibots/`,
-  `pw.pwd` (cTrader ID password only), `start-bots.bat` and `run-bot.ps1` from `clibots/`.
-- Cloud / app accounts (FundedHive): the same `.cs` files, settings from `cloudbots/FundedHive_200k_Low/` or `FundedHive_10k_Low/`.
-- `start-bots.bat` opens one Windows Terminal window, gold left / USDJPY right; `run-bot.ps1` colours the log, writes
-  `C:\bots\logs\<BOT>_<date>.log` and restarts a bot 5 s after it exits (then once a minute if it keeps failing). Account and cTrader ID are parameters at the top of
-  `run-bot.ps1` (default account ***REMOVED***). First log lines must show `v1.5` / `v5.5` and `Risk scaling below start balance: start
-  10000, floor 88%, shrink from 4% below start, min 0.3x, now 1.00x` (or less if the account is below 9,600).
-- Before a new account: run `extras/LiveSafetyTest.cs` once per symbol via the CLI (13/13 PASS on Funding Pips).
-- PC: never sleep, no automatic Windows Update restarts, auto-login + startup shortcut to `start-bots.bat`.
-  Avoid restarting (Turkey time): 04:00-04:30, 23:00-23:45, Friday 22:45-23:15, and the :00 minute.
-
-## 7. Research environment
-
-1. Python 3.10+, `pip install -r research/requirements.txt` (numpy, pandas, numba).
-2. Data in a `data` folder next to `research/` (or `TRADING_DATA`): `XAUUSD_M1.m1pack`, `USDJPY_M1.m1pack`,
-   `XAUUSD_DUKA_BID/ASK.m1pack`, `USDJPY_DUKA_BID/ASK.m1pack`, `XAUUSD_SPREAD.csv`, `USDJPY_SPREAD.csv`, all in `data/` on the
-   GitHub repo (`ekin-kar/trade2`). The EURUSD / EURJPY / AUDUSD / Nasdaq / S&P data used in October 2026 were removed (git history).
-3. Pack new CSVs with `extras/pack_dukascopy.py` (dukascopy-node bid/ask CSVs in `./download` and cTrader DataExporter
-   `*_M1*.csv` on the Desktop -> `claude_upload_duka/*.m1pack`, each verified).
-4. `python research/run_live.py` backtests both bots (first run builds `cache/`); `python -m engine.test_engine` (from `research/`).
-5. Pages: `fundingpips_sim.py` (risk table) + `fundingpips_report.py` + `make_plan_html.py` -> `plans/fundingpips_plan.html`;
-   `fundedhive_sim.py` (risk tables) + `fh_report_parallel.py` (or `fundedhive_report.py`) + `make_fundedhive_html.py` ->
-   `plans/fundedhive_plan.html`; `make_stats_html.py` -> `stats/*.html`. Raw results in `research/results/`.
-6. `research/scans/` = the October 2026 research scripts (run from the repo root, e.g. `python research/scans/gold_sessions.py`).
-   Note: the grid scripts that patch the simulators (`scaling_grid.py`, `ladder_grid.py`, ...) were written against the v6 simulator
-   source; the v7 simulators have the scaling built in (`minm`), so use those for new runs.
-
-## 8. Files
-
-- `cloudbots/` - **the live bots** `GoldPDay.cs` (v1.5), `JpyVolContraction.cs` (v5.5); evaluation settings `FundedHive_200k_Low/`,
-  `FundedHive_10k_Low/`; funded settings `FundedHive_200k_Low_funded/`, `FundedHive_10k_Low_funded/` (one folder per ladder level,
-  see `FUNDED_README.txt`).
-- `clibots/` - Funding Pips 10k (CLI): the two challenge cbotsets, `funded/` (funded cbotsets + README), `start-bots.bat`,
-  `run-bot.ps1`, `pw.pwd`. Build the `.algo` files yourself (or use the ones added to the zip by the user).
-- `extras/` - `pack_dukascopy.py` (data packer), `LiveSafetyTest.cs`, `HistoryReloadTest.cs` (+ cbotset, `test-history.bat`: no-order
-  test of the v1.5 history reload), `SpreadLogger.cs`, `ApexDataExporterV2.cs`, SignalRelay (Telegram, unused).
-- `plans/` - `fundingpips_plan.html`, `fundedhive_plan.html` (rebuilt for v8: funded with risk scaling, Low only).
-  `accounts_outlook.html` (5 Oct 2026): FundedHive 200k / 10k and Funding Pips 10k / 50k started fresh on the same simulated market:
-  pass, fail, first payout, payout per month, an 18-month chart (`research/scans/income_plan.py` + `research/make_outlook_html.py`).
-- `stats/` - `fundingpips_statistics.html`, `fundedhive_statistics.html` (v8: "Shrink from (% below start)" and "Shrink: min
-  risk x" boxes run the bots' risk scaling in every percent figure and in the prop account check; min 1 = off).
-- `research/` - engine, simulators, page builders, `scans/` (Oct 2026), `results/`.

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Win Rate vs Reward</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#fcfcfb;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;
+--neg:#e34948;--mid:#f0efec;--pos:#2a78d6}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#1a1a19;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--neg:#e66767;--mid:#383835;--pos:#3987e5}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#1a1a19;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;--neg:#e66767;--mid:#383835;--pos:#3987e5}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700}
+h2{font-size:20px;margin:36px 0 4px;font-weight:600}
+.lede{color:var(--muted);margin:0 0 20px;max-width:80ch}.lede b{color:var(--ink);font-weight:600}
+.hint{color:var(--muted);margin:0 0 12px;font-size:14px;max-width:84ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:14px}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button:focus-visible{outline:2px solid var(--pos);outline-offset:2px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 14px 10px;position:relative}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:0 0 8px;align-items:center}
+.legend i{display:inline-block;vertical-align:middle;margin-right:6px}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.14);white-space:nowrap;color:var(--ink)}
+.tip .m{color:var(--muted)}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.big div{background:var(--surface);padding:12px 14px}.big b{display:block;font-size:22px;font-weight:600}.big span{font-size:13px;color:var(--muted)}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr.tot td{font-weight:600}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.notes li{margin-bottom:6px}
+</style></head><body><div class="wrap">
+<h1>Win rate vs reward: where the bot sits</h1>
+<p class="lede">Every point on the map is a possible strategy: how often it wins (left to right) and how big the average win is compared with the average loss (bottom to top). The colour is what it earns <b>per trade</b>, in multiples of the risk (R): <b style="color:var(--pos)">blue</b> makes money, <b style="color:var(--neg)">red</b> loses, grey is breakeven. The dots are the bot's real trades (TBO v2.4, after fees and funding).</p>
+<div class="controls"><div><div class="ctl-title">Trades from</div><div class="seg" id="per"></div></div></div>
+<div class="big" id="tiles"></div>
+<div class="panel">
+ <div class="legend" id="leg"></div>
+ <svg id="map" height="520" role="img" aria-label="Expectancy heatmap of win rate versus reward-to-risk with the bot's coins plotted"></svg>
+ <div class="tip" id="tip"></div>
+</div>
+<h2>The numbers behind the dots</h2>
+<p class="hint">Win = a trade closed above 0R. Average loss includes the many breakeven exits (stop moved to entry at +1.5R, then hit: about −0.05R after fees), which is why it is below 1R. Win rate × average win − loss rate × average loss = the real average per trade.</p>
+<div class="scroll panel"><table id="tbl"></table></div>
+<h2>How to read it</h2>
+<ul class="notes">
+<li>The solid line is breakeven: to make money at a win rate p you need a reward-to-risk above (1 − p) ÷ p. At 50% that is 1, at 30% it is 2.3, at 17% (this bot) it is 4.9. The bot's is about 9, so it sits far above the line.</li>
+<li>Dashed lines mark +0.5R and +1R per trade. The bot earns about +0.5–0.6R per trade on average: every trade is, on average, worth half of what it risks.</li>
+<li>Strategies high on the right (win often <i>and</i> win big) barely exist; markets do not offer them for long. Most real strategies live near the line: either many small wins (right, low) or few big wins (left, high). This bot is a "few big wins" strategy, which is why it has long losing runs.</li>
+<li>The vertical axis is logarithmic so both small and large ratios fit.</li>
+</ul>
+</div>
+<script>
+const D={"all": [{"name": "BTC", "n": 323, "win": 20.743034055727556, "rr": 9.64872104457474, "avgw": 7.337826192796393, "avgl": 0.7604972885937342, "e": 0.9193407090940013, "be": 27.55417956656347}, {"name": "ETH", "n": 318, "win": 17.29559748427673, "rr": 10.356802248887066, "avgw": 7.357184176413067, "avgl": 0.710372178555757, "e": 0.6849598954168383, "be": 30.81761006289308}, {"name": "BNB", "n": 332, "win": 15.36144578313253, "rr": 9.317804256228191, "avgw": 7.34163509439866, "avgl": 0.7879147160117016, "e": 0.46090167052723957, "be": 23.49397590361446}, {"name": "SOL", "n": 272, "win": 16.176470588235293, "rr": 8.859167439492685, "avgw": 6.581293067237354, "avgl": 0.7428794084982582, "e": 0.4419131978707379, "be": 27.205882352941174}, {"name": "ADA", "n": 306, "win": 18.30065359477124, "rr": 8.215689276332887, "avgw": 5.941527695842979, "avgl": 0.7231928443251701, "e": 0.4964945747905695, "be": 29.08496732026144}, {"name": "All 5 coins", "n": 1551, "win": 17.60154738878143, "rr": 9.297888482676901, "avgw": 6.934085422564319, "avgl": 0.7457699063054332, "e": 0.6060034687954322, "be": 27.595099935525468}], "2024": [{"name": "BTC", "n": 133, "win": 19.548872180451127, "rr": 9.182636725749324, "avgw": 6.898993320109816, "avgl": 0.7513085321957831, "e": 0.7442391983301236, "be": 29.32330827067669}, {"name": "ETH", "n": 118, "win": 18.64406779661017, "rr": 10.324599406755135, "avgw": 7.730024373958276, "avgl": 0.748699689878593, "e": 0.8320793728706541, "be": 26.27118644067797}, {"name": "BNB", "n": 133, "win": 15.037593984962406, "rr": 9.863756177871917, "avgw": 7.770656014332358, "avgl": 0.787798874404949, "e": 0.4991868231495334, "be": 22.55639097744361}, {"name": "SOL", "n": 130, "win": 14.615384615384617, "rr": 8.549095826316941, "avgw": 6.433144300923257, "avgl": 0.7524941153566104, "e": 0.29771457625352427, "be": 27.692307692307693}, {"name": "ADA", "n": 117, "win": 17.094017094017094, "rr": 7.2062030668512875, "avgw": 5.282308283214371, "avgl": 0.7330224022569, "e": 0.29523925337921453, "be": 29.059829059829063}, {"name": "All 5 coins", "n": 631, "win": 16.957210776545168, "rr": 9.063250626619826, "avgw": 6.847882151573961, "avgl": 0.755565793520145, "e": 0.5337669008143547, "be": 26.94136291600634}]};
+let S={per:'all'};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+// OKLab interpolation for the diverging scale
+const hex2rgb=h=>{h=h.replace('#','');return [0,2,4].map(i=>parseInt(h.substr(i,2),16)/255);};
+const lin=c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4),dlin=c=>c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;
+function toLab(h){const [r,g,b]=hex2rgb(h).map(lin);const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b),m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b),s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+ return [0.2104542553*l+0.7936177850*m-0.0040720468*s,1.9779984951*l-2.4285922050*m+0.4505937099*s,0.0259040371*l+0.7827717662*m-0.8086757660*s];}
+function fromLab([L,a,b]){const l=(L+0.3963377774*a+0.2158037573*b)**3,m=(L-0.1055613458*a-0.0638541728*b)**3,s=(L-0.0894841775*a-1.2914855480*b)**3;
+ const rgb=[4.0767416621*l-3.3077115913*m+0.2309699292*s,-1.2684380046*l+2.6097574011*m-0.3413193965*s,-0.0041960863*l-0.7034186147*m+1.7076147010*s].map(c=>Math.round(Math.min(1,Math.max(0,dlin(c)))*255));
+ return `rgb(${rgb.join(',')})`;}
+const EMAX=1.5;
+function colour(e){const t=Math.max(-1,Math.min(1,e/EMAX)),A=toLab(css('--mid')),B=toLab(css(t<0?'--neg':'--pos')),k=Math.abs(t);return fromLab(A.map((v,i)=>v+(B[i]-v)*k));}
+const fmtE=e=>(e>=0?'+':'−')+Math.abs(e).toFixed(2)+'R';
+function draw(){
+ const segE=document.getElementById('per');
+ segE.innerHTML=[['all','2020 – Sep 2026'],['2024','2024 – Sep 2026']].map(([k,t])=>`<button aria-pressed="${S.per===k}" data-k="${k}">${t}</button>`).join('');
+ segE.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.per=b.dataset.k;draw();});
+ const P=D[S.per],tot=P[P.length-1];
+ document.getElementById('tiles').innerHTML=[[tot.win.toFixed(1)+'%','of trades win (all 5 coins)'],[tot.rr.toFixed(1)+' : 1','average win ÷ average loss'],
+  [((1-tot.win/100)/(tot.win/100)).toFixed(1)+' : 1','ratio needed just to break even at this win rate'],[fmtE(tot.e),'earned per trade on average, after costs']]
+  .map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+ const sv=document.getElementById('map');sv.innerHTML='';const W=sv.clientWidth,H=520,L=56,R=16,T=12,B=40;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const X0=5,X1=80,Y0=Math.log10(0.25),Y1=Math.log10(20);
+ const x=p=>L+(p-X0)/(X1-X0)*(W-L-R),y=rr=>T+(1-(Math.log10(rr)-Y0)/(Y1-Y0))*(H-T-B);
+ const nx=75,ny=60;
+ for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
+  const p0=X0+i*(X1-X0)/nx,p1=X0+(i+1)*(X1-X0)/nx,l0=Y0+j*(Y1-Y0)/ny,l1=Y0+(j+1)*(Y1-Y0)/ny;
+  const pm=(p0+p1)/2/100,rr=10**((l0+l1)/2),e=pm*rr-(1-pm);
+  el('rect',{x:x(p0).toFixed(2),y:y(10**l1).toFixed(2),width:(x(p1)-x(p0)+0.6).toFixed(2),height:(y(10**l0)-y(10**l1)+0.6).toFixed(2),fill:colour(e)},sv);}
+ // axes
+ for(let p=10;p<=80;p+=10){el('line',{x1:x(p),x2:x(p),y1:H-B,y2:H-B+5,stroke:css('--muted')},sv);el('text',{x:x(p),y:H-B+18,'text-anchor':'middle'},sv).textContent=p+'%';}
+ el('text',{x:(L+W-R)/2,y:H-4,'text-anchor':'middle'},sv).textContent='win rate (share of trades that make money)';
+ for(const rr of [0.25,0.5,1,2,3,5,10,20]){el('line',{x1:L-5,x2:L,y1:y(rr),y2:y(rr),stroke:css('--muted')},sv);el('text',{x:L-8,y:y(rr)+4,'text-anchor':'end'},sv).textContent=rr+':1';}
+ const yl=el('text',{x:14,y:(T+H-B)/2,'text-anchor':'middle',transform:`rotate(-90 14 ${(T+H-B)/2})`},sv);yl.textContent='average win ÷ average loss';
+ // breakeven and +0.5R / +1R lines
+ for(const [E,dash,lab] of [[0,'','breakeven'],[0.5,'6 4','+0.5R per trade'],[1,'2 4','+1R per trade']]){
+  let d='';for(let p=X0;p<=X1;p+=0.5){const rr=(E+(1-p/100))/(p/100);if(rr<0.25||rr>20)continue;d+=(d?'L':'M')+x(p).toFixed(1)+','+y(rr).toFixed(1);}
+  el('path',{d,fill:'none',stroke:css('--ink'),'stroke-width':E===0?2:1.5,'stroke-dasharray':dash,'stroke-opacity':0.75},sv);
+  const pl=E===0?62:E===0.5?58:52,rl=(E+(1-pl/100))/(pl/100);
+  const t=el('text',{x:x(pl)+6,y:y(rl)-6,style:'fill:var(--ink);font-weight:600'},sv);t.textContent=lab;}
+ // the bot's points
+ const pts=P.slice(0,-1);const lab=[];
+ for(const q of P){const isT=q===tot;const cx=x(q.win),cy=y(q.rr);
+  el('circle',{cx,cy,r:isT?9:6,fill:css('--ink'),stroke:css('--surface'),'stroke-width':2},sv);
+  lab.push({q,cx,cy,isT});}
+ const OFF={BTC:[11,4,'start'],ETH:[0,-12,'middle'],BNB:[-10,-6,'end'],SOL:[-10,14,'end'],ADA:[0,22,'middle'],'All 5 coins':[14,18,'start']};
+ for(const o of lab){const [dx,dy,an]=OFF[o.q.name]||[11,4,'start'];
+  const t=el('text',{x:o.cx+dx,y:o.cy+dy,'text-anchor':an,style:`fill:var(--ink);font-weight:${o.isT?700:500};paint-order:stroke;stroke:var(--surface);stroke-width:3px`},sv);t.textContent=o.q.name;}
+ // legend (colour bar)
+ const steps=[-1.5,-1,-0.5,0,0.5,1,1.5];
+ document.getElementById('leg').innerHTML='<span>Earned per trade:</span>'+steps.map(e=>`<span><i style="width:16px;height:12px;border-radius:3px;background:${colour(e)};border:1px solid var(--rule)"></i>${fmtE(e)}</span>`).join('')+
+  '<span><i style="width:10px;height:10px;border-radius:50%;background:var(--ink)"></i>the bot (per coin; big dot = all 5)</span>';
+ // hover
+ const tip=document.getElementById('tip');
+ sv.onmousemove=ev=>{const rc=sv.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width),py=(ev.clientY-rc.top)*(H/rc.height);
+  if(px<L||px>W-R||py<T||py>H-B){tip.style.display='none';return;}
+  const near=lab.find(o=>Math.hypot(o.cx-px,o.cy-py)<12);
+  if(near){const q=near.q;tip.innerHTML=`<b>${q.name}</b> · ${q.n} trades<br>win rate ${q.win.toFixed(1)}% · ratio ${q.rr.toFixed(1)}:1<br><span class="m">avg win +${q.avgw.toFixed(2)}R · avg loss −${q.avgl.toFixed(2)}R</span><br><b>${fmtE(q.e)}</b> per trade`;}
+  else{const p=X0+(px-L)/(W-L-R)*(X1-X0),rr=10**(Y0+(1-(py-T)/(H-T-B))*(Y1-Y0)),e=p/100*rr-(1-p/100);
+   tip.innerHTML=`win rate ${p.toFixed(0)}% · ratio ${rr<2?rr.toFixed(2):rr.toFixed(1)}:1<br><b>${fmtE(e)}</b> per trade<br><span class="m">breakeven needs ${((1-p/100)/(p/100)).toFixed(2)}:1</span>`;}
+  tip.style.display='block';const pr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-pr.left+14;if(lx>pr.width-220)lx=ev.clientX-pr.left-220;tip.style.left=lx+'px';tip.style.top=(ev.clientY-pr.top+12)+'px';};
+ sv.onmouseleave=()=>tip.style.display='none';
+ // table
+ document.getElementById('tbl').innerHTML='<thead><tr><th>Coin</th><th>Trades</th><th>Win rate</th><th>Avg win</th><th>Avg loss</th><th>Win ÷ loss</th><th>Needed to break even</th><th>Breakeven exits</th><th>Per trade</th></tr></thead><tbody>'+
+  P.map(q=>`<tr class="${q===tot?'tot':''}"><td>${q.name}</td><td>${q.n}</td><td>${q.win.toFixed(1)}%</td><td>+${q.avgw.toFixed(2)}R</td><td>−${q.avgl.toFixed(2)}R</td><td>${q.rr.toFixed(1)}:1</td><td>${((1-q.win/100)/(q.win/100)).toFixed(1)}:1</td><td>${q.be.toFixed(0)}%</td><td>${fmtE(q.e)}</td></tr>`).join('')+'</tbody>';}
+draw();addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+</script></body></html>

@@ -1,0 +1,12 @@
+BTCUSDT A both fee 0.06% {'trades': 205, 'win_rate': 29.8, 'total_R': np.float64(37.7), 'PF': np.float64(1.29), 'maxDD_R': 20.1, 'avg_hold_h': np.float64(38.7), 'long_R': np.float64(45.5), 'short_R': np.float64(-7.8), 'pos_months': '17/33'} {2024: 18.4, 2025: 3.8, 2026: 15.5}
+BTCUSDT A both fee 0.10% {'trades': 205, 'win_rate': 27.8, 'total_R': np.float64(28.1), 'PF': np.float64(1.21), 'maxDD_R': 22.0, 'avg_hold_h': np.float64(38.7), 'long_R': np.float64(40.1), 'short_R': np.float64(-11.9), 'pos_months': '16/33'} {2024: 15.3, 2025: -0.0, 2026: 12.9}
+   random entries: mean 6.9R sd 21.3 max 52.7; real 37.7R beats 90%
+BTCUSDT B long fee 0.06% {'trades': 108, 'win_rate': 31.5, 'total_R': np.float64(45.5), 'PF': np.float64(1.66), 'maxDD_R': 11.7, 'avg_hold_h': np.float64(43.3), 'long_R': np.float64(45.5), 'short_R': np.float64(0.0), 'pos_months': '13/28'} {2024: 27.8, 2025: 5.3, 2026: 12.3}
+BTCUSDT B long fee 0.10% {'trades': 108, 'win_rate': 29.6, 'total_R': np.float64(40.1), 'PF': np.float64(1.55), 'maxDD_R': 12.6, 'avg_hold_h': np.float64(43.3), 'long_R': np.float64(40.1), 'short_R': np.float64(0.0), 'pos_months': '12/28'} {2024: 25.8, 2025: 3.2, 2026: 11.1}
+   random entries: mean 13.2R sd 15.5 max 50.9; real 45.5R beats 95%
+ETHUSDT A both fee 0.06% {'trades': 193, 'win_rate': 31.1, 'total_R': np.float64(43.9), 'PF': np.float64(1.37), 'maxDD_R': 21.8, 'avg_hold_h': np.float64(38.3), 'long_R': np.float64(35.4), 'short_R': np.float64(8.5), 'pos_months': '16/33'} {2024: -2.4, 2025: 16.3, 2026: 29.9}
+ETHUSDT A both fee 0.10% {'trades': 193, 'win_rate': 30.1, 'total_R': np.float64(37.6), 'PF': np.float64(1.31), 'maxDD_R': 23.6, 'avg_hold_h': np.float64(38.3), 'long_R': np.float64(31.8), 'short_R': np.float64(5.8), 'pos_months': '16/33'} {2024: -4.7, 2025: 14.4, 2026: 27.9}
+   random entries: mean 6.5R sd 16.2 max 41.0; real 43.9R beats 100%
+ETHUSDT B long fee 0.06% {'trades': 98, 'win_rate': 30.6, 'total_R': np.float64(35.4), 'PF': np.float64(1.55), 'maxDD_R': 21.8, 'avg_hold_h': np.float64(39.3), 'long_R': np.float64(35.4), 'short_R': np.float64(0.0), 'pos_months': '10/25'} {2024: -5.1, 2025: 14.6, 2026: 25.9}
+ETHUSDT B long fee 0.10% {'trades': 98, 'win_rate': 28.6, 'total_R': np.float64(31.8), 'PF': np.float64(1.48), 'maxDD_R': 23.0, 'avg_hold_h': np.float64(39.3), 'long_R': np.float64(31.8), 'short_R': np.float64(0.0), 'pos_months': '9/25'} {2024: -6.4, 2025: 13.6, 2026: 24.6}
+   random entries: mean 5.9R sd 12.6 max 38.1; real 35.4R beats 95%

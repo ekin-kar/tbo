@@ -1,0 +1,16 @@
+# Linux (systemd): copy to /etc/systemd/system/tbo.service, adjust User and paths, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now tbo && journalctl -u tbo -f
+[Unit]
+Description=TBO crypto bots (Binance USD-M futures)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=tbo
+WorkingDirectory=/home/tbo/trade3/cryptobot
+ExecStart=/usr/bin/python3 /home/tbo/trade3/cryptobot/run_all.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

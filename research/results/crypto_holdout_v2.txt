@@ -1,0 +1,8 @@
+B 4h n40 sl2.5 tp4R hold24 ema100 dev {'trades': 251, 'win_rate': 47.8, 'total_R': np.float64(29.5), 'PF': np.float64(1.37), 'maxDD_R': 7.0, 'avg_hold_h': np.float64(21.7), 'long_R': np.float64(25.3), 'short_R': np.float64(4.2)} trades/yr 65, months positive 50% {2020: 14.6, 2021: 4.1, 2022: 7.0, 2023: 3.9}
+B 4h n40 sl2.5 tp4R hold24 ema100 holdout {'trades': 195, 'win_rate': 45.6, 'total_R': np.float64(7.6), 'PF': np.float64(1.12), 'maxDD_R': 7.9, 'avg_hold_h': np.float64(21.3), 'long_R': np.float64(8.1), 'short_R': np.float64(-0.5)} trades/yr 71, months positive 42% {2024: 9.3, 2025: -3.2, 2026: 1.5}
+   $1000 at 2% risk -> $1129 after 2.7y, max DD 15%
+   $1000 at 3% risk -> $1173 after 2.7y, max DD 22%
+B2 2h n40 sl2.5 hold48 ema100 dev {'trades': 300, 'win_rate': 39.3, 'total_R': np.float64(55.2), 'PF': np.float64(1.34), 'maxDD_R': 15.6, 'avg_hold_h': np.float64(33.6), 'long_R': np.float64(50.8), 'short_R': np.float64(4.4)} trades/yr 78, months positive 57% {2020: 41.5, 2021: -2.1, 2022: 13.0, 2023: 2.8}
+B2 2h n40 sl2.5 hold48 ema100 holdout {'trades': 215, 'win_rate': 40.0, 'total_R': np.float64(30.9), 'PF': np.float64(1.26), 'maxDD_R': 14.9, 'avg_hold_h': np.float64(33.9), 'long_R': np.float64(19.8), 'short_R': np.float64(11.1)} trades/yr 78, months positive 55% {2024: 28.3, 2025: -5.5, 2026: 8.1}
+   $1000 at 2% risk -> $1633 after 2.7y, max DD 28%
+   $1000 at 3% risk -> $1911 after 2.7y, max DD 40%
