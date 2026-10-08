@@ -89,6 +89,13 @@ Hedge idea (Oct 2026, `hedge_test.py`): half-size opposite trade opened with eve
 a stop-out until its TP (1-3R; stop at its entry), closed when the main trade is +0.5..1.5R: all 20 variants worse than
 no hedge (net/drop 2020-23 10.5-20.0 vs 21.5; 2024-26 5.0-13.5 vs 13.6), profit -5..-30%, drops not smaller. Not adopted
 (and it would need Binance hedge mode).
+Market-neutral cross-sectional study (Oct 2026, `mn_study.py`, `mn_carry.py`; funding/premium/4h taker data for all 12
+coins): long top-N / short bottom-N, gross 1x, fees + slippage + funding. Momentum (3-90 d) Sharpe 1.4-1.7 in 2020-23 but
+negative 2024-26 -> dead. Reversal, low-vol, OI, taker: no. Funding carry (long low / short high funding, 12 coins):
+Sharpe > 0 in both periods for 92% of 140 settings, median 0.69 / 0.75, ~10-16%/yr at 1x, losing years 2020/2022/2025,
+corr with TBO 0.02; TBO+carry 1-2x: Sharpe 1.58 -> 1.64-1.68, drawdown not lower. On the 7 coins TBO does not trade
+(needed in one-way mode) carry fails (median Sharpe ~0, 2022 -48%). TBO's own daily Sharpe ~1.6 beats every
+market-neutral factor; its drawdown is the chosen risk (BTC 2.5% -> worst drop ~25-28%).
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
