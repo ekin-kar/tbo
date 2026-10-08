@@ -103,6 +103,12 @@ better 2020-23 (x1.2-1.5) but equal/worse 2024-26 (x0.8-1.05). ATR stops beat %-
 120 h beats 72/240 h; BE 1-1.5R beats 2R/none. Filters: every RSI/ADX/volume/EMA-length/slope variant is worse on average
 (median across structures x0.11-0.97 in 2024-26); OI 168 h -3% helps the live structure (x1.17/x1.18) but hurts the others
 (median x0.91/x0.88) -> noise. 4h+8h half/half: x1.16/x1.04 but 83% of 8h trades duplicate 4h ones. No change adopted.
+Portfolio sizing rules (Oct 2026, `sizing_v3.py`, compounding account sim, BTC 5% settings, $200): shorts x0.5 stays best
+(0/0.25/0.75/1/bear-only all worse in a period); BTC-volatility and account-volatility sizing, drawdown brakes,
+same-direction scaling: no better than simply lower risk. **Open-risk cap with shrink** (risk of trades not yet at
+breakeven <= cap x equity; a new trade is shrunk to fit, skipped if < 25% would fit) is a smooth plateau 4.5-6.5%, better in
+both periods; 5.5% (= 1.1 x BTC risk): 2020-23 x1.03, 2024-26 x1.17 (worst drop 44.8 -> 38.0%, $15.3k -> $14.6k),
+2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). Not yet in the bot.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
