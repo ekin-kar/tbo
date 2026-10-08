@@ -183,6 +183,8 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   always full size; the others shrunk to the room left by the coins that filled before them).
   2024-01..2026-09: 594 entries, all 130 BTC full size, 41 shrunk, 4 cut or closed right after a same-minute fill,
   0 off the rule.
+  With the ladder (`CAPSIM_EQ=500 / 3000 / 20000`, one year each at the 7.5% / 5% / 2.5% step): 220 / 225 / 126
+  entries, every BTC entry full size, 0 off the rule.
 
 ## Risk ladder (v2.5, live from Oct 2026): `portfolio.json`
 
