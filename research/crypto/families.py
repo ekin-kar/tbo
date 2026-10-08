@@ -44,7 +44,7 @@ def _ema_daily_side(m1, d, ema_n, at_idx):
 def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0, atr_n=14, sides="both",
                      trail_m=0, trail_atr=0.0, rand_seed=None, buffer_atr=0.0, be_R=0.0, be_off=0.0,
                      vol_lo=0.0, vol_hi=1.0, slope_d=0, ema2_n=0, no_weekend=False, max_ext=99.0, vratio=0.0, trail_k=0.0, trail_start=0.0, vr_max=99.0,
-                     early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6,
+                     early_h=0, early_R=0.0, ext_h=0, ext_R=0.0, confirm_tf=0, sl_mode="atr", swing_k=6, sl_pct=0.02, sl_chan=0.5,
                      er_n=0, er_min=0.0, co_m1=None, entry_mask=None, atr_tf=0, retest_h=0, retest_off=0.0,
                      antic_d=0.0, antic_cond="none", antic_only=False, antic_sl=0.0,
                      trail_after_h=0, rand_p=0.0, rand_seed2=0, skip_fn=None):
@@ -148,6 +148,10 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         sw_lo = I.rolling_min(c["l"], swing_k); sw_hi = I.rolling_max(c["h"], swing_k)
         sl_l = np.clip(hi + buf - sw_lo + 0.1 * a, 0.5 * a, 2.5 * a)
         sl_s = np.clip(sw_hi - (lo - buf) + 0.1 * a, 0.5 * a, 2.5 * a)
+    if sl_mode == "pct":                               # fixed share of the price
+        sl_l = sl_s = sl_pct * c["c"]
+    elif sl_mode == "chan":                            # share of the channel's height (high - low of the last n candles)
+        sl_l = sl_s = sl_chan * (hi - lo)
     tp_l = tp_R * sl_l if tp_R > 0 else np.zeros(len(a)); tp_s = tp_R * sl_s if tp_R > 0 else np.zeros(len(a))
     if rand_p > 0:                                     # BENCHMARK: random entry candles, identical filters and exits
         rg = np.random.default_rng(rand_seed2)
