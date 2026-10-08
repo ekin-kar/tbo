@@ -109,7 +109,7 @@ class Bot:
     def size(self, sl_dist, price, side=1, quiet=False):
         """(quantity, cap note, no_room). Raises if the cap applies and the account cannot be read."""
         eq = self.equity()
-        want = eq * self.risk * (self.short_mult if side < 0 else 1.0)
+        want = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0)
         risk, note = self.capped(eq, want)
         if risk <= 0:
             return 0.0, note, True
@@ -132,11 +132,29 @@ class Bot:
             log.warning(f"portfolio.json unreadable ({e}): no open-risk cap")
             return {}
 
-    def cap_frac(self):
-        """The cap as a fraction of equity, 0 when it does not apply to this coin (off, or exempt like BTC)."""
+    def ladder_row(self, eq, pf=None):
+        """portfolio.json "risk_ladder": the row for this balance (risk steps down as the account grows), or None."""
+        row = None
+        for r in sorted((pf or self.portfolio()).get("risk_ladder") or [], key=lambda r: float(r["from_usdt"])):
+            if eq >= float(r["from_usdt"]):
+                row = r
+        return row
+
+    def risk_now(self, eq):
+        """This coin's risk per trade: from the ladder row for the balance if there is one, else risk_pct."""
+        row = self.ladder_row(eq)
+        return float(row[self.sym]) / 100 if row and self.sym in row else self.risk
+
+    def cap_frac(self, eq=None):
+        """The cap as a fraction of equity, 0 when it does not apply to this coin (off, or exempt like BTC).
+        With a risk ladder the cap comes from the balance's row (cap_pct)."""
         pf = self.portfolio()
         if self.sym in pf.get("cap_exempt", []):
             return 0.0
+        if pf.get("risk_ladder"):
+            row = self.ladder_row(self.equity() if eq is None else eq, pf)
+            if row and "cap_pct" in row:
+                return max(0.0, float(row["cap_pct"])) / 100
         return max(0.0, float(pf.get("open_risk_cap_pct", 0) or 0)) / 100
 
     def coin_state(self, sym):
@@ -183,7 +201,7 @@ class Bot:
 
     def capped(self, eq, want, filled_before=None):
         """Risk (USDT) this coin may take now under the cap (0 = no room) and a note for the log."""
-        cap = self.cap_frac()
+        cap = self.cap_frac(eq)
         if cap <= 0:
             return want, ""
         used, parts = self.open_risk(filled_before)
@@ -325,7 +343,7 @@ class Bot:
                     continue
                 log.info(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
                          f"{fmt(trig, self.f['tick'])}  (SL dist {dec.sl_dist:.2f} = {dec.sl_dist / trig * 100:.2f}%, "
-                         f"valid until the next 4h close)")
+                         f"risk {qty * dec.sl_dist:.2f} USDT, valid until the next 4h close)")
                 self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_from=open_ms + self.p.tf_min * 60_000)
                 if self.dry:
                     break

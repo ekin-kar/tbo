@@ -209,6 +209,30 @@ alone for the 3 months (changing settings mid-way makes the result impossible to
   About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
   time in 4 and says little; a drop beyond 50% would be outside the backtest's range: stop and review then.
 
+### Optional: risk ladder (`research/crypto/ladder.py`)
+
+`portfolio_ladder.json` (not active): risk set by the balance, high while the account is small, lower as it grows.
+To use it, copy it over `portfolio.json` (read live; `check_setup.py` shows the row that applies).
+
+| Balance | BTC | ETH | BNB / SOL / ADA | cap |
+|---|---|---|---|---|
+| below $1,000 | 7.5% | 2.5% | 0.83% | 8.25% |
+| $1,000 - 10,000 | 5% | 2.5% | 0.83% | 5.5% |
+| from $10,000 | 2.5% | 1.25% | 0.42% | 2.75% |
+
+2 years from $200 (4,000 reshuffled runs of 2022-26 trades / every real 2-year window 2020-26):
+
+| | flat 5% | ladder | flat 7.5% |
+|---|---|---|---|
+| typical end | $4.1k / $5.6k | $5.5k / $7.4k | $6.0k / $8.3k |
+| 1 in 4 bad end | $1.5k / $3.1k | $1.9k / $4.6k | $1.7k / $4.4k |
+| reach $10k | 29% / 23% | 37% / 41% | 39% / 48% |
+| worst drop once above $1k (typical / 1 in 10) | 41% / 60% | 41% / 64% | 54% / 74% |
+| fell below half of a $5k+ peak | 2% | 1% | 7% |
+
+The extra drops of the ladder happen while the account is under $1,000; above it, it is the same as flat 5%.
+If the balance falls back under a step, the risk goes back up (that is what was tested).
+
 ## GO LIVE: step by step (v2.5)
 
 **Where to run it.** Recommended: a small Linux VPS (~$5/month, e.g. Hetzner in Germany/Finland), **not in the USA**

@@ -7,6 +7,7 @@ Open-risk cap test: the five coin bots (bot.py, live configs) run together on ON
     breakeven) of the coins that filled before it, otherwise the room left (or no trade if < cap_min_fraction fits)
 
     python cryptobot/test_cap_sim.py [2024-01-01] [2024-07-01]
+    CAPSIM_PORTFOLIO=other.json CAPSIM_EQ=500 python cryptobot/test_cap_sim.py ...   # another portfolio file / balance
 """
 import json
 import logging
@@ -25,11 +26,19 @@ from replay import C                                 # noqa: E402
 from test_bot_sim import FakeFutures                 # noqa: E402
 
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
-EQ = 10_000.0
+EQ = float(os.environ.get("CAPSIM_EQ", 10_000))
+PF = Path(os.environ.get("CAPSIM_PORTFOLIO", HERE / "portfolio.json"))
+
+
+def coin_risk(pf, sym, cfg):
+    """(risk %, cap %) at the test balance: the ladder row if portfolio.json has one, else the config / cap."""
+    rows = [r for r in sorted(pf.get("risk_ladder") or [], key=lambda r: r["from_usdt"]) if EQ >= r["from_usdt"]]
+    row = rows[-1] if rows else {}
+    return float(row.get(sym, cfg["risk_pct"])), float(row.get("cap_pct", pf.get("open_risk_cap_pct", 0)))
 
 
 def run(start, end):
-    pf = json.loads((HERE / "portfolio.json").read_text())
+    pf = json.loads(PF.read_text())
     tmp = Path(f"/tmp/claude_tbo_capsim_{os.getpid()}"); shutil.rmtree(tmp, ignore_errors=True); tmp.mkdir()
     (tmp / "portfolio.json").write_text(json.dumps(pf))
     fxs, bots = [], []
@@ -46,6 +55,7 @@ def run(start, end):
         fxs.append(fx); bots.append(b)
     for fx in fxs:
         fx.group = fxs
+        fx.account = lambda: {"totalMarginBalance": str(EQ)}
     t0, t1 = C.D.minutes(start), C.D.minutes(end)
     clock = fxs[0].m["t"]; clock = clock[(clock >= t0) & (clock < t1)]
     idx = [np.searchsorted(fx.m["t"], clock) for fx in fxs]
@@ -102,14 +112,17 @@ if __name__ == "__main__":
     start = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"
     end = sys.argv[2] if len(sys.argv) > 2 else "2024-07-01"
     fxs, pf = run(start, end)
-    cap, ex, mf = pf["open_risk_cap_pct"] / 100, set(pf["cap_exempt"]), pf.get("cap_min_fraction", 0.25)
+    print(f"balance {EQ:,.0f}, portfolio {PF.name}: " + ", ".join(f"{s[:-4]} {coin_risk(pf, s, json.loads((HERE / f'config_{s[:-4].lower()}.json').read_text()))[0]:g}%" for s in COINS)
+          + f", cap {coin_risk(pf, 'ETHUSDT', {'risk_pct': 0})[1]:g}%")
+    ex, mf = set(pf["cap_exempt"]), pf.get("cap_min_fraction", 0.25)
     cfg = {s: json.loads((HERE / f"config_{s[:-4].lower()}.json").read_text()) for s in COINS}
     T = sorted([tr for fx in fxs for tr in trades_of(fx)], key=lambda r: r["t"])
     bad, n_short, n_full = [], 0, 0
     for i, tr in enumerate(T):
         dist = abs(tr["entry"] - tr["stop"])
         c = cfg[tr["sym"]]
-        want = EQ * c["risk_pct"] / 100 * (c.get("short_risk_mult", 1) if tr["dir"] < 0 else 1)
+        rp, cp = coin_risk(pf, tr["sym"], c); cap = cp / 100
+        want = EQ * rp / 100 * (c.get("short_risk_mult", 1) if tr["dir"] < 0 else 1)
         lev_cap = EQ * c["max_leverage"] / tr["entry"] * dist                     # risk at the leverage size cap
         have = (tr["qty"] - tr["cut"]) * dist
         if tr["how"] == "market" and tr["exit"] - tr["t"] <= 2 and not np.isnan(tr["stop"]):
@@ -130,7 +143,7 @@ if __name__ == "__main__":
           f"cut after the fill: {sum(1 for tr in T if tr['cut'] > 0)}, closed at once after the fill: {sum(1 for tr in T if tr.get('closed_at_once'))}")
     btc = [tr for tr in T if tr["sym"] == "BTCUSDT"]
     cb = cfg["BTCUSDT"]
-    full = [(tr["qty"] - tr["cut"]) * abs(tr["entry"] - tr["stop"]) >= 0.94 * min(EQ * cb["risk_pct"] / 100 * (cb["short_risk_mult"] if tr["dir"] < 0 else 1),
+    full = [(tr["qty"] - tr["cut"]) * abs(tr["entry"] - tr["stop"]) >= 0.94 * min(EQ * coin_risk(pf, "BTCUSDT", cb)[0] / 100 * (cb["short_risk_mult"] if tr["dir"] < 0 else 1),
                                                                           EQ * cb["max_leverage"] / tr["entry"] * abs(tr["entry"] - tr["stop"])) for tr in btc]
     print(f"BTC entries: {len(btc)}, full size: {sum(full)} (exempt from the cap)")
     print("cap actions:", counts)

@@ -148,4 +148,9 @@ cryptobot/reports/ (report.py, run monthly: summary + trades/income CSV from Bin
 carry level + slippage). To do then: backtest the same days (replay / sizing_v4 with the live equity), match trades,
 compare fills, fees, funding, slippage. Expectation (research/crypto/three_months.py): typical $257, 1-in-10 bad
 $150-170, below $200 in ~1 of 4 windows, worst drop inside 3 months typical 26% / 1-in-10 ~40%, ~58 trades.
+Risk ladder (`research/crypto/ladder.py`, bot: portfolio.json "risk_ladder" rows {from_usdt, per-coin %, cap_pct},
+`portfolio_ladder.json` ready but NOT active): 7.5% <$1k, 5% $1-10k, 2.5% >=$10k (ETH/alts as listed). 2 yrs from
+$200: reach $10k 37% (boot) / 41% (real windows) vs flat 5% 29% / 23%; 1-in-4 bad end $1.9k vs $1.5k; drop after
+reaching $1k same as flat 5% (41% / 64%). Flat 7.5%: 39% / 48% but drop after $1k 54% / 74%, gave back half of a
+$5k+ peak 7%. 10% start: more ruin (5% end < $200). test_cap_sim CAPSIM_PORTFOLIO / CAPSIM_EQ: ladder rows OK.
 

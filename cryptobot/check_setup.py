@@ -57,8 +57,21 @@ try:
 except Exception:
     pass
 total_risk = 0.0; total_notional = 0.0
+pf_path = Path(__file__).resolve().parent / "portfolio.json"
+pf = json.loads(pf_path.read_text()) if pf_path.exists() else {}
+row = None
+for r in sorted(pf.get("risk_ladder") or [], key=lambda r: float(r["from_usdt"])):
+    if bal >= float(r["from_usdt"]):
+        row = r
+if pf.get("risk_ladder"):
+    print(" risk ladder (portfolio.json), risk % by balance: " + " | ".join(
+        f"from ${float(r['from_usdt']):,.0f}: BTC {r.get('BTCUSDT')} ETH {r.get('ETHUSDT')} alts {r.get('ADAUSDT')} cap {r.get('cap_pct')}"
+        for r in sorted(pf["risk_ladder"], key=lambda r: float(r["from_usdt"]))))
+    print(f" -> at your balance ${bal:,.2f} the row from ${float(row['from_usdt']):,.0f} applies" if row else " -> no row applies: config risk_pct")
 for c in cfgs:
-    p = S.Params(**c["strategy"]); sym = p.symbol; risk = c["risk_pct"] / 100; sm = c.get("short_risk_mult", 1.0)
+    p = S.Params(**c["strategy"]); sym = p.symbol; sm = c.get("short_risk_mult", 1.0)
+    c = dict(c, risk_pct=float(row[sym]) if row and sym in row else c["risk_pct"])
+    risk = c["risk_pct"] / 100
     total_risk += risk
     print(f" {sym}: risk {c['risk_pct']}% (shorts x{sm}), size cap {c.get('max_leverage')}x balance, Binance leverage {c.get('exchange_leverage', c.get('max_leverage'))}x")
     try:
@@ -96,13 +109,12 @@ for c in cfgs:
     except BinanceError as e:
         res(False, f"{sym}: {e}")
 print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${bal * total_risk:.2f})")
-pf_path = Path(__file__).resolve().parent / "portfolio.json"
-pf = json.loads(pf_path.read_text()) if pf_path.exists() else {}
-cap = float(pf.get("open_risk_cap_pct", 0) or 0)
+cap = float(row["cap_pct"]) if row and "cap_pct" in row else float(pf.get("open_risk_cap_pct", 0) or 0)
 if cap > 0:
     ex = [c["strategy"]["symbol"] for c in cfgs if c["strategy"]["symbol"] in pf.get("cap_exempt", [])]
-    capped = [c["risk_pct"] for c in cfgs if c["strategy"]["symbol"] not in ex] or [0]
-    btc = next((c["risk_pct"] for c in cfgs if c["strategy"]["symbol"] == "BTCUSDT"), None)
+    rk = lambda c: float(row[c["strategy"]["symbol"]]) if row and c["strategy"]["symbol"] in row else c["risk_pct"]
+    capped = [rk(c) for c in cfgs if c["strategy"]["symbol"] not in ex] or [0]
+    btc = next((rk(c) for c in cfgs if c["strategy"]["symbol"] == "BTCUSDT"), None)
     print(f" open-risk cap (portfolio.json): {cap:g}% of the balance (${bal * cap / 100:.2f})"
           + (f" = {cap / btc:.2f} x the BTC risk (tested best: about 1.1x)" if btc else "") + f"; never shrunk: {', '.join(ex) or 'none'}")
     res(cap >= max(capped), f"cap {cap:g}% vs the biggest capped coin risk {max(capped):g}%" + ("" if cap >= max(capped) else
