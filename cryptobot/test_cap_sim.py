@@ -77,9 +77,9 @@ def trades_of(fx):
         elif kind == "market" and round(q, 9) < round(cur["qty"] - cur["cut"], 9):
             cur["cut"] += q; cur["cut_t"] = t
         else:
-            cur["exit"] = t; out.append(cur); cur = None
+            cur.update(exit=t, how=kind); out.append(cur); cur = None
     if cur:
-        cur["exit"] = 10 ** 12; out.append(cur)
+        cur.update(exit=10 ** 12, how=None); out.append(cur)
     for tr in out:                                         # first stop = risk at entry; a later stop at entry = breakeven
         sls = [(t, trig) for t, trig in fx.sl_log if tr["t"] <= t <= tr["exit"]]
         tr["stop"] = sls[0][1] if sls else np.nan
@@ -112,6 +112,8 @@ if __name__ == "__main__":
         want = EQ * c["risk_pct"] / 100 * (c.get("short_risk_mult", 1) if tr["dir"] < 0 else 1)
         lev_cap = EQ * c["max_leverage"] / tr["entry"] * dist                     # risk at the leverage size cap
         have = (tr["qty"] - tr["cut"]) * dist
+        if tr["how"] == "market" and tr["exit"] - tr["t"] <= 2 and not np.isnan(tr["stop"]):
+            have = 0.0; tr["closed_at_once"] = True     # closed right after the fill (the cap had no room)
         others = sum(abs(o["entry"] - o["stop"]) * (o["qty"] - o["cut"]) for o in T[:i]
                      if o["sym"] != tr["sym"] and o["exit"] > tr["t"] and o["be"] > tr["t"])
         exp = want
@@ -125,7 +127,7 @@ if __name__ == "__main__":
         if not ok:
             bad.append((tr["sym"], C.D.to_datetime([tr["t"]])[0], round(want, 1), round(others, 1), round(exp, 1), round(have, 1)))
     print(f"{len(T)} entries on one account {start}..{end}: {n_full} full size, {n_short} shrunk by the cap; "
-          f"cut after the fill: {sum(1 for tr in T if tr['cut'] > 0)}")
+          f"cut after the fill: {sum(1 for tr in T if tr['cut'] > 0)}, closed at once after the fill: {sum(1 for tr in T if tr.get('closed_at_once'))}")
     btc = [tr for tr in T if tr["sym"] == "BTCUSDT"]
     cb = cfg["BTCUSDT"]
     full = [(tr["qty"] - tr["cut"]) * abs(tr["entry"] - tr["stop"]) >= 0.94 * min(EQ * cb["risk_pct"] / 100 * (cb["short_risk_mult"] if tr["dir"] < 0 else 1),
