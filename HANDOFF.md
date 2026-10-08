@@ -108,7 +108,10 @@ Portfolio sizing rules (Oct 2026, `sizing_v3.py`, compounding account sim, BTC 5
 same-direction scaling: no better than simply lower risk. **Open-risk cap with shrink** (risk of trades not yet at
 breakeven <= cap x equity; a new trade is shrunk to fit, skipped if < 25% would fit) is a smooth plateau 4.5-6.5%, better in
 both periods; 5.5% (= 1.1 x BTC risk): 2020-23 x1.03, 2024-26 x1.17 (worst drop 44.8 -> 38.0%, $15.3k -> $14.6k),
-2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). Not yet in the bot.
+2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). **Better: BTC exempt** (BTC trades never shrunk or
+skipped, but their open risk still counts against the cap for ETH/alts): 1.1x -> 2020-23 x1.03, 2024-26 x1.23 ($18.0k,
+drop 38.0%), 2022-26 x1.08; plateau 0.9-1.1x (x1.22-1.23), fades at 1.3x (x1.07) / 1.5x (x0.99). A cap among ETH+alts
+only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: cryptobot/cap_comparison.html. Not yet in the bot.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;

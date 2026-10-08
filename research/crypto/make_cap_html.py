@@ -1,5 +1,5 @@
 """cryptobot/cap_comparison.html: equity and drawdown of the bot with and without the open-risk cap (and the
-'just lower the risk' alternative), from $200, for three start dates and three risk levels. Uses sizing_v3.sim."""
+'just lower the risk' alternative; recommended: BTC never shrunk, its risk still counts against the cap for the others), from $200, for three start dates and three risk levels. Uses sizing_v3.sim."""
 import json
 from multiprocessing import Pool
 import numpy as np, pandas as pd
@@ -10,16 +10,17 @@ STARTS = {"2020": "2020-03-01", "2022": "2022-01-01", "2024": "2024-01-01"}
 END = "2026-10-01"
 MULTS = [0.5, 1.0, 1.5]
 VARIANTS = [("now", "Now (no cap)", lambda m: dict(mult=m)),
-            ("cap11", "Cap 1.1× BTC risk (recommended)", lambda m: dict(mult=m, cap=0.055 * m, cap_mode="shrink")),
+            ("capbtc", "Cap 1.1×, BTC never shrunk (recommended)", lambda m: dict(mult=m, cap=0.055 * m, cap_mode="shrink", exempt=("BTCUSDT",))),
+            ("cap11", "Cap 1.1×, all coins", lambda m: dict(mult=m, cap=0.055 * m, cap_mode="shrink")),
             ("low", "Lower risk instead (0.8×)", lambda m: dict(mult=0.8 * m)),
-            ("cap10", "Cap 1.0× BTC risk", lambda m: dict(mult=m, cap=0.05 * m, cap_mode="shrink")),
-            ("cap13", "Cap 1.3× BTC risk", lambda m: dict(mult=m, cap=0.065 * m, cap_mode="shrink"))]
+            ("cap10", "Cap 1.0×, all coins", lambda m: dict(mult=m, cap=0.05 * m, cap_mode="shrink")),
+            ("cap13", "Cap 1.3×, all coins", lambda m: dict(mult=m, cap=0.065 * m, cap_mode="shrink"))]
 
 
 def job(args):
     sk, m, vk = args
     f = dict((k, fn) for k, _, fn in VARIANTS)[vk]
-    st, bal, dd = S.sim(f(m), STARTS[sk], END, curve=True)
+    st, bal, dd = S.sim(f(m), STARTS[sk], END, want_curve=True)
     return sk, m, vk, st, bal, dd
 
 
@@ -36,6 +37,6 @@ if __name__ == "__main__":
     html = open(C.ROOT / "research" / "crypto" / "cap_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
     (C.ROOT / "cryptobot" / "cap_comparison.html").write_text(html)
     s = data["series"]
-    for k in ("2024_1_now", "2024_1_cap11", "2024_1_low", "2020_1_now", "2020_1_cap11"):
+    for k in ("2024_1_now", "2024_1_capbtc", "2024_1_cap11", "2024_1_low", "2020_1_now", "2020_1_capbtc", "2022_1_now", "2022_1_capbtc"):
         st = s[k]["stats"]; print(k, round(st["final"]), round(st["pm"], 2), round(st["dd"], 1))
     print("written", len(html) // 1024, "KB")

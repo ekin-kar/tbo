@@ -31,7 +31,7 @@ def at(series, t):
     return series.iloc[i] if i >= 0 else np.nan
 
 
-def sim(rule, start, end, eq0=200.0, curve=False):
+def sim(rule, start, end, eq0=200.0, want_curve=False):
     tr = T[(T.entry_time >= start) & (T.entry_time < end)].reset_index(drop=True)
     eps = pd.Timedelta(microseconds=1); ev = []
     for i, r in tr.iterrows():
@@ -66,8 +66,10 @@ def sim(rule, start, end, eq0=200.0, curve=False):
             if rule.get("same_dir"):
                 k = sum(1 for v in at_risk if v["dir"] == dr)
                 fs = rule["same_dir"]; amt *= fs[min(k, len(fs) - 1)]
-            if rule.get("cap"):
-                room = rule["cap"] * eq - sum(v["amt"] for v in at_risk)
+            exempt = sym in rule.get("exempt", ())
+            if rule.get("cap") and not exempt:
+                counted = [v for v in at_risk if rule.get("count_exempt", True) or v["sym"] not in rule.get("exempt", ())]
+                room = rule["cap"] * eq - sum(v["amt"] for v in counted)
                 if amt > room:
                     if rule.get("cap_mode") == "shrink" and room > 0.25 * amt:
                         amt = room
@@ -75,7 +77,7 @@ def sim(rule, start, end, eq0=200.0, curve=False):
                         skipped += 1; continue
             if amt <= 0:
                 skipped += 1; continue
-            open_[i] = dict(amt=amt, be=False, dir=dr)
+            open_[i] = dict(amt=amt, be=False, dir=dr, sym=sym)
         elif kind == 0 and i in open_:
             open_[i]["be"] = True
         elif kind == 2 and i in open_:
@@ -89,7 +91,7 @@ def sim(rule, start, end, eq0=200.0, curve=False):
     hw = cv.bal.cummax(); nh = cv.index[cv.bal >= hw]; flat = np.diff(nh.values).astype("timedelta64[D]").astype(int).max()
     mm = cv.bal.resample("ME").last().ffill().pct_change().dropna()
     st = dict(final=cv.bal.iloc[-1], pm=pm, dd=dd, ratio=pm / dd, flat=int(flat), pos=(mm > 0).mean() * 100, worst_m=mm.min() * 100, skipped=skipped)
-    if curve:
+    if want_curve:
         idx = pd.date_range(pd.Timestamp(start), pd.Timestamp(end) - pd.Timedelta(days=1), freq="D")
         bal = cv.bal.resample("D").last().reindex(idx).ffill().fillna(eq0)
         wst = cv.worst.resample("D").min().reindex(idx).ffill().fillna(eq0)
