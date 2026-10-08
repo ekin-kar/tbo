@@ -75,6 +75,7 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
     ev.sort(key=lambda z: (z[0], rank[z[1]]))
     eq = eq0; opn = {}; pk = eq0; dd = 0.0; pkc = eq0; ddc = 0.0; top = eq0; low = eq0; inv = eq0
     reach = {L: None for L in levels}; out_ev = [] if keep == "events" else None; amts = {} if keep == "trades" else None
+    full = {} if keep == "trades" else None; bal_at = {} if keep == "trades" else None
     nxt = MON; mbal = [] if deposit or keep == "months" else None; skipped = 0
     for t, kind, i in ev:
         if end is not None and t > end:
@@ -89,6 +90,8 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
         if kind == 1:
             fr, rk, cap = row_at(pol, eq)
             amt = eq * rk[c] / 100 * pol["mult"] * (pol["smult"] if d < 0 else 1.0)
+            if full is not None:
+                full[i] = (amt, eq)
             if cap > 0 and c not in pol["exempt"]:
                 room = cap / 100 * pol["mult"] * eq - sum(v[0] for v in opn.values() if not v[1])
                 if amt > room:
@@ -102,7 +105,7 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
         elif kind == 2 and i in opn:
             a = opn.pop(i)[0]; eq += a * R; top = max(top, eq); low = min(low, eq)
             if amts is not None:
-                amts[i] = a
+                amts[i] = a; bal_at[i] = eq
             for L in levels:
                 if reach[L] is None and eq >= L:
                     reach[L] = t
@@ -116,7 +119,7 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
             if deposit:
                 eq += deposit; inv += deposit
             nxt += MON
-    return dict(final=eq, dd=dd * 100, ddc=ddc * 100, top=top, low=low, invested=inv, reach=reach, events=out_ev, amts=amts,
+    return dict(final=eq, dd=dd * 100, ddc=ddc * 100, top=top, low=low, invested=inv, reach=reach, events=out_ev, amts=amts, full=full, bal_after=bal_at,
                 months=mbal, skipped=skipped)
 
 

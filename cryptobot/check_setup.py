@@ -126,6 +126,6 @@ if cap > 0:
 else:
     print(" open-risk cap: off (no portfolio.json or open_risk_cap_pct 0)")
 if bal > 0:
-    res(total_notional < 0.8 * bal, f"margin locked if all four are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
+    res(total_notional < 0.8 * bal, f"margin locked if all coins are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
         + ("" if total_notional < 0.8 * bal else " (raise exchange_leverage in the configs)"), warn=True)
 print("RESULT:", "ready" if ok_all else "fix the FAIL lines first")

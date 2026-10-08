@@ -8,7 +8,7 @@
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
 | Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
-| Coins (Oct 2026) | BTC 5%, ETH 2.5%, BNB / SOL / ADA 0.83% each (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/all12.py`, `combos22.py`). At $200 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
+| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/all12.py`, `combos22.py`). At $200 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
 | Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
@@ -94,6 +94,8 @@ None beats the 5-day close: tight trails (1-4R) cut the trend trades that dip mi
 worse than the 5-day close on both coins. Trades that reach the 5-day close keep 71% of their best point
 on average (best +10R, exit +7R). Kept: no trailing stop.
 
+## History: earlier research (the live setup is in "Risk ladder", "3-month trial" and "GO LIVE" below)
+
 ## More coins (Oct 2026): `research/crypto/portfolio*.py`
 
 TBO v2.1 untouched on 12 coins (alts charged 0.03% slippage per taker fill): all 12 positive in 2020-23, 9 of 12 in
@@ -136,7 +138,7 @@ DOGE 0.5x, ADA 0.5x: 4-coin return/DD 4.31 | 4.44 vs equal weights 3.64 | 3.11 (
 Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 start), base risk = 1x coin:
 1.25% (BTC 2.5%): P(hit $100) 0.01%, P(< $250) 2.4%, max drop typical 37% / 1-in-20 58%, $1k typically in 8 months.
 1.5%: P(< $250) 5%, 1-in-20 drop 65%. Above 1.5% the bad cases stop improving (volatility drag).
-**Configs now: BTC 2.5%, ETH 1.25%, DOGE 0.625%, ADA 0.625% (shorts half).** With all four open: up to ~5% of
+**Configs then (4 coins, before v2.5): BTC 2.5%, ETH 1.25%, DOGE 0.625%, ADA 0.625% (shorts half).** With all four open: up to ~5% of
 equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
 The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
 
@@ -210,6 +212,7 @@ leverage 25x (only sets the margin a position locks; in cross margin it does not
 | gave back half of a $5k+ peak | 2% | **1%** | 7% |
 
 The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
+`trades.html` (equity chart with every trade: click one to see it on its 4h price chart with entry, stop, breakeven and exit),
 `tbo_statistics.html` (equity chart, every statistic, random journeys), `risk_comparison.html`, `plan_ladder_plus50.html`,
 `monthly_report.html`, `cap_comparison.html` all size trades like the bot.
 
@@ -251,7 +254,8 @@ entries, breakeven moves and the 5-day exit until it is back.
 
 1. **Binance account (website/app):** open a USD-M Futures account and move the USDT you want to trade into the
    USD-M Futures wallet. Futures settings: **Position Mode = One-way**. Margin mode **Cross** for BTCUSDT, ETHUSDT,
-   DOGEUSDT, ADAUSDT. Do not trade these four coins by hand on this account.
+   BNBUSDT, SOLUSDT, ADAUSDT. Do not trade these five coins by hand on this account. Keep some BNB in the USD-M
+   Futures wallet with the BNB fee discount on (10% off fees).
 2. **API key:** API Management -> create a key (system generated). Tick **Enable Futures**. **Do NOT enable
    withdrawals.** Restrict it to your server's IP address (on a home PC: your home IP, if it is fixed).
 3. **Install** (Python 3.10+): `git clone` this repo (branch `claude/sweet-meitner-lubkf9`), then
