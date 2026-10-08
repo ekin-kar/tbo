@@ -96,6 +96,13 @@ Sharpe > 0 in both periods for 92% of 140 settings, median 0.69 / 0.75, ~10-16%/
 corr with TBO 0.02; TBO+carry 1-2x: Sharpe 1.58 -> 1.64-1.68, drawdown not lower. On the 7 coins TBO does not trade
 (needed in one-way mode) carry fails (median Sharpe ~0, 2022 -48%). TBO's own daily Sharpe ~1.6 beats every
 market-neutral factor; its drawdown is the chosen risk (BTC 2.5% -> worst drop ~25-28%).
+Big grid (Oct 2026, `grid_v25.py` 4,320 structures x 5 coins with OI filter; `grid_v25_eval.py`; `grid_v25b.py` 30 filters
+x 5 structures): live (4h, n20, ATR 1.0 stop, BE 1.5R, 120 h) ranks 41/4320 on a neighbourhood-smoothed min(dev, holdout)
+score; only 4 configs beat it in both periods, none by >10%. 1h/2h/1d clearly worse; 8h (n15-30, ATR 0.75) a sibling plateau,
+better 2020-23 (x1.2-1.5) but equal/worse 2024-26 (x0.8-1.05). ATR stops beat %-of-price, channel-width and swing stops;
+120 h beats 72/240 h; BE 1-1.5R beats 2R/none. Filters: every RSI/ADX/volume/EMA-length/slope variant is worse on average
+(median across structures x0.11-0.97 in 2024-26); OI 168 h -3% helps the live structure (x1.17/x1.18) but hurts the others
+(median x0.91/x0.88) -> noise. 4h+8h half/half: x1.16/x1.04 but 83% of 8h trades duplicate 4h ones. No change adopted.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;
