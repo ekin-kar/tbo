@@ -120,6 +120,10 @@ BTC 7.5% (Oct 2026, fill-time cap 1.1x BTC, $200): 7.5/2.5/0.83 -> 2020-23 22.5%
 48%; 2-yr bootstrap from $250 (2022-26 blocks): drop median 64% / 1-in-10 80%, P(>=$10k) 45%, P(>=$20k) 33%
 (5% + cap: 51% / 68%, 35%, 22%). Lowering ETH/alts with BTC 7.5 (1.5/0.5) cuts profit a lot ($20.5k) for little
 drop (58% / 46%, MC 61%): BTC drives the drops. 6/2.5/0.83: $24.3k, 54% / 42%, MC 56%.
+ETH under the cap (`sizing_v5.py`): ETH trades starting while BTC is in a fresh same-direction trade average 0.33R
+(win 12.5%, n=72) vs 0.79R otherwise (both periods: 0.19 vs 0.71, 0.54 vs 0.93); alts 0.31 vs 0.51R. Letting ETH
+trade anyway hurts: ETH exempt too -> 2024-26 $15.0k drop 43%; cap 7.5% -> $15.4k 44.8%; ETH taking the 0.5% crumb
+-> $17.4k 38.7%; never-shrink -> $17.4k. Current rule (skip if < 25% fits) best with min fraction 0.25-0.5.
 Pre-breakout (`pre_breakout.py`, `antic_test.py`, `rsi_size.py`): near the level, RSI>=70 / OBV high + higher lows /
 volume build-up raise the break rate (67-72% -> 76-87%) and the 5-day move, in both periods; but entering early
 (market, 0.25-1 ATR before the level, on top of TBO or alone) never beats v2.1 (best: 3.24|2.53 vs 3.21|2.50;

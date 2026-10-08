@@ -20,7 +20,7 @@ TR = np.c_[m_("entry_time"), m_("exit_time"), m_("be_time"), T.dir.values, T.R.v
 FEE = 0.0005 + 0.0003           # taker fee + slippage on a trimmed part (fraction of its notional)
 
 
-def sim(x, risk, cap=0.0, exempt=(0,), mode="fill", eq0=200.0, end=None):
+def sim(x, risk, cap=0.0, exempt=(0,), mode="fill", eq0=200.0, end=None, minf=0.25):
     """x: rows (entry, exit, be, dir, R, coin) in minutes. risk: per-coin fraction. cap: fraction of equity (0 = off).
     Returns final, worst drop % (open risk not at breakeven counted as lost), time series (t, balance, worst)."""
     ev = []
@@ -39,7 +39,7 @@ def sim(x, risk, cap=0.0, exempt=(0,), mode="fill", eq0=200.0, end=None):
             if cap and c not in exempt:
                 room = cap * eq - sum(v[0] for v in opn.values() if not v[1])
                 if amt > room:
-                    if room > 0.25 * amt:
+                    if room > minf * amt:
                         amt = room
                     else:
                         amt = 0.0
@@ -51,7 +51,7 @@ def sim(x, risk, cap=0.0, exempt=(0,), mode="fill", eq0=200.0, end=None):
             if amt > 0 and mode == "place_trim" and cap and c not in exempt:
                 room = cap * eq - sum(v[0] for v in opn.values() if not v[1])
                 if amt > room:
-                    cut = amt - room if room > 0.25 * amt else amt
+                    cut = amt - room if room > minf * amt else amt
                     eq -= cut * 2 * FEE / 0.02             # fees in and out on the trimmed part (stop ~2% away)
                     amt -= cut; trims += 1
         if kind == 1:
@@ -77,6 +77,16 @@ def hist(args):
         f, dd, tr_, sk = sim(x, risk, cap, mode=mode)
         mo = (t1 - t0) / 1440 / 30.44
         out.append((f, ((f / 200) ** (1 / mo) - 1) * 100, dd))
+    return out
+
+
+def hist_kw(kw, risk=None):
+    """(final, %/month, worst drop) for 2020-23, 2024-26, 2022-26 with sim keyword arguments kw (fill-time rule)."""
+    out = []
+    for a, b in (("2020-03-01", "2024-01-01"), ("2024-01-01", "2026-10-01"), ("2022-01-01", "2026-10-01")):
+        t0, t1 = pd.Timestamp(a).value // MIN, pd.Timestamp(b).value // MIN
+        f, dd, _, _ = sim(TR[(TR[:, 0] >= t0) & (TR[:, 0] < t1)], R(5, 2.5, 0.83) if risk is None else risk, **kw)
+        out.append((f, ((f / 200) ** (1 / ((t1 - t0) / 1440 / 30.44)) - 1) * 100, dd))
     return out
 
 
