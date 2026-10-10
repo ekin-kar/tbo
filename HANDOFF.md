@@ -227,5 +227,12 @@ in 2020-23 on the fixed R account (x0.11-0.93); some better in 2024-26 (skip 7 d
 Range reading on v2.6 (Oct 2026, `range_test.py`; fixed R account net/DD vs bot 2020-23 / 2024-26): ATR buffer 0.1 / 0.25 /
 0.5 x0.87/0.78, x0.63/0.73, x0.59/0.61; skip ranges wider than 6 ATR x1.02/0.83, wider than 8 x1.00/0.98, tighter than 3
 x0.86/1.12, tighter than 4 x0.62/0.63; RSI(14) zones x0.66-0.99 / 0.79-0.95; entry after a 1h / 2h close beyond the
-level x0.54/0.41, x0.44/0.47; efficiency ratio >= 0.2 / 0.3 x0.32/0.49, x0.29/0.59. None better in both periods. (The
+level (after the engine fix below) 1h x0.73/0.48, 2h x0.69/0.45, 4h x0.47/0.22 (4h from $200 2024-26: $579, drop 79%); efficiency ratio >= 0.2 / 0.3 x0.32/0.49, x0.29/0.59. None better in both periods. (The
 engine's confirm-close path now also applies skip_fn / the OI filter.)
+Engine fix (Oct 2026, families.channel_breakout confirm_tf): the governing level for a close-confirmed entry was taken
+from the decision at the confirm candle's own close (channel incl. the same bars), so a confirm candle ending on a 4h
+close could never break it: 4h confirm gave 0 trades, 1h/2h missed the last 1-2 h of every 4h block. Now: the last tf
+candle closed when the confirm candle opened (checked: 40/40 4h-confirm entries = next 4h open after a close beyond the
+previous 20-candle level). Earlier close-confirm results (v2 research) were biased low, but the fixed ones are still far
+worse than the stop order.
+

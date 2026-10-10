@@ -57,6 +57,7 @@ for lo_r, hi_r in ((50, 100), (55, 100), (0, 75), (0, 80), (45, 75)):
     VARS[f"RSI(14) at the order {lo_r}-{hi_r} (side-adjusted)"] = dict(rsi=(lo_r, hi_r))
 VARS["enter after a 1h close beyond the level"] = dict(confirm_tf=60)
 VARS["enter after a 2h close beyond the level"] = dict(confirm_tf=120)
+VARS["enter after a 4h close beyond the level"] = dict(confirm_tf=240)
 for n_, er in ((20, 0.2), (20, 0.3)):
     VARS[f"efficiency ratio({n_}) >= {er}"] = dict(er_n=n_, er_min=er)
 

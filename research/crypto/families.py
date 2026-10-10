@@ -200,7 +200,10 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
                    early_bars=int(early_h * 60), early_R=early_R, ext_bars=int(ext_h * 60), ext_R=ext_R)
     if confirm_tf > 0:                                 # enter at market after a confirm_tf candle CLOSES beyond the level
         cf = resample(m1, confirm_tf)
-        k4 = np.searchsorted(act, cf["act"], side="right") - 1       # governing 4h decision for each small candle
+        # governing decision = the last tf candle CLOSED when the confirm candle opened (its level was live during that
+        # candle). Using the decision at the confirm candle's own close compared the close with a channel that already
+        # contains the same bars, so a close could never break it (4h confirm on 4h candles gave 0 trades).
+        k4 = np.searchsorted(c["t"] + tf, cf["t"], side="right") - 1
         valid = (k4 >= 0) & (cf["act"] < len(m1["t"]))
         k4c = np.clip(k4, 0, None)
         skl = skip_fn(c, a, hi, lo, 1) if skip_fn else np.zeros(len(a), bool)     # (open-interest filter etc. here too)
