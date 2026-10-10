@@ -218,3 +218,9 @@ d, after a big win + 2-3 losses, after big BTC moves): none better in both perio
 x0.95-1.00); equity-average filters cut drops (to 28-33%) but lose 25-35% of the edge (x0.64-0.75); skipping kills it.
 Ladder-only gains (e.g. x0.5 for 3 d after +5R: 2024-26 $34k) are compounding path luck (fixed account x1.00 / x0.98).
 Nothing adopted.
+Pause from breakout confirmation (Oct 2026, `confirm_test.py`, v2.6): +1.5 / 2 / 3 / 5R reached by 46 / 36 / 26 / 17% of
+trades after a median 6 / 10 / 16 / 30 h (those end avg +2.5 / 3.3 / 4.5 / 6.7R). Trades entered while another coin's
+trade is confirmed: 2020-23 BETTER (+0.82..+1.28R vs +0.49R); 2024-26 better at +1.5R (+0.67 vs +0.49), worse at +3/+5R
+(+0.31 vs +0.60). 64 rules (skip / x0.5 while confirmed or 2-7 d from confirmation, same / any direction): every one worse
+in 2020-23 on the fixed R account (x0.11-0.93); some better in 2024-26 (skip 7 d after +5R x1.42) but they cost 35%+ in
+2020-23 -> regime-dependent, not adopted.
