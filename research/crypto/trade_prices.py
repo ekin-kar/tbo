@@ -17,7 +17,7 @@ def prices(sym):
     C.SLIP = 0.0001 if sym in ("BTCUSDT", "ETHUSDT") else 0.0003
     kw = dict(V21, tf=240, n=20, be_R=1.5, hold_h=120, **G.STOPS[LIVE["stop"]][1])
     kw["skip_fn"] = G.oi_skip(sym, 240)
-    x = C.between(F.channel_breakout(m, **kw), "2020-03-01", "2026-10-01")
+    x = C.between(F.channel_breakout(m, **kw), "2020-01-01", "2026-10-01")
     return x.assign(sym=sym)[["sym", "entry_time", "exit_time", "dir", "entry", "exit", "sl_dist", "reason", "R"]]
 
 

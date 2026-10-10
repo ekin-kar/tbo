@@ -6,10 +6,10 @@ import numpy as np, pandas as pd
 import common as C
 import botsim as BS
 
-STARTS = {"2020": "2020-03-01", "2022": "2022-01-01", "2024": "2024-01-01"}
+STARTS = {"2020": "2020-01-01", "2022": "2022-01-01", "2024": "2024-01-01"}
 END = "2026-10-01"
 LAD = [(r[0], r[1][0], r[1][1], r[1][2]) for r in BS.bot_policy()["rows"]]
-SETS = [("lad", "Ladder: 7.5% → 5% from $1k → 2.5% from $10k (the bot)", None), ("now", "5% / 2.5% / 0.83%", (5, 2.5, 0.83)),
+SETS = [("lad", "Ladder " + BS.label(BS.bot_policy()) + " (the bot)", None), ("now", "5% / 2.5% / 0.83%", (5, 2.5, 0.83)),
         ("b75", "7.5% / 2.5% / 0.83%", (7.5, 2.5, 0.83)), ("b75lo", "7.5% / 1.5% / 0.5%", (7.5, 1.5, 0.5))]
 VARIANTS = [("now", "No cap", dict(cap_x=0)),
             ("capbtc", "Cap 1.1× BTC risk, BTC never shrunk (the bot)", dict(cap_x=1.1)),
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     jobs = [(sk, m, vk) for sk in STARTS for m, _, _ in SETS for vk, _, _ in VARIANTS]
     with Pool(4) as p:
         res = p.map(job, jobs)
-    data = dict(variants=[(k, lab) for k, lab, _ in VARIANTS], sets=[(k, l) for k, l, _ in SETS], starts={"2020": "Mar 2020 (full history)", "2022": "2022 (no 2020-21 bull run)", "2024": "2024 (most recent)"},
+    data = dict(variants=[(k, lab) for k, lab, _ in VARIANTS], sets=[(k, l) for k, l, _ in SETS], starts={"2020": "Feb 2020 (full history, from the first trade)", "2022": "2022 (no 2020-21 bull run)", "2024": "2024 (most recent)"},
                 series={})
     for sk, m, vk, st, bal, dd in res:
         key = f"{sk}_{m}_{vk}"

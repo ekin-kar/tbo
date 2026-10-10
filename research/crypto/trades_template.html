@@ -57,7 +57,7 @@ tbody tr{cursor:pointer}
 .tag{display:inline-block;font-size:12px;padding:1px 7px;border-radius:10px;border:1px solid var(--rule);color:var(--muted)}
 </style></head><body><div class="wrap">
 <h1>TBO trade by trade</h1>
-<p class="lede">Every trade of <b>TBO v2.6</b> on <b>one $300 account</b>, sized exactly like the bot: the <b>risk ladder</b> (BTC 7.5% of the balance under $1,000, 5% up to $10,000, 2.5% above) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size, fees, slippage and funding included. <b>Click a trade</b> in the list or a dot on the balance chart to see where it happened and what the price did.</p>
+<p class="lede">Every trade of <b>TBO v2.6</b> on <b>one $300 account</b>, sized exactly like the bot: the <b>risk ladder</b> (/*LADDER*/) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size, fees, slippage and funding included. <b>Click a trade</b> in the list or a dot on the balance chart to see where it happened and what the price did.</p>
 <div class="controls">
  <div><div class="ctl-title">Start the $300 account in</div><div class="seg" id="run"></div></div>
  <div><div class="ctl-title">Coin</div><div class="seg" id="fcoin"></div></div>
@@ -101,7 +101,7 @@ const cls=v=>v>0?'pos':v<0?'neg':'';
 function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 const kind=R=>R>0.2?'win':R<-0.2?'loss':'be';
 const KCOL={win:'--pos',loss:'--neg',be:'--muted'};
-let S={run:'2024',coin:-1,side:0,res:'all',scale:'log',sel:null};
+let S={run:D.order[0],coin:-1,side:0,res:'all',scale:'log',sel:null};
 // trade objects for the chosen start
 function build(){const run=D.runs[S.run];return run.rows.map(([ti,full,amt,bal0,bal1],n)=>{const t=D.trades[ti];
  return {n:n+1,ti,c:t[0],dir:t[1],e:t[2],x:t[3],be:t[4],ep:t[5],xp:t[6],sl:t[7],how:t[8],R:t[9],full,amt,bal0,bal1,pnl:amt*t[9],

@@ -1,5 +1,7 @@
 # Crypto (Binance futures) - Oct 2026
 
+**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. Older sections below describe how it got here (their ladder numbers are the old ones).
+
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
 guide in `cryptobot/README.md` ("GO LIVE"). Pages: all in `reports/` (rebuilt by research/crypto/make_*.py from the live settings; robustness page retired).
@@ -257,3 +259,17 @@ trailing winners past 120 h: none beats the bot beyond the noise floor (shifting
 net/DD by x0.78-1.13). Stress test: every 0.1R/trade of live shortfall roughly halves 5-yr growth -> after ~50/100/200
 live trades compare with the same-days backtest; edge alarm: running avg < -0.17R (50) / -0.04R (100) / +0.13R (200).
 BNB fee discount (taker 0.045%): 2024-26 $26.7k -> $29.9k from $200, same drop.
+
+Ladder change (Oct 2026, before going live; scratchpad riskgrid/capgrid/capbtc scripts, botsim sizing): 62 profiles x 1,000
+reshuffled 2-yr runs from $300 + real windows + every trade 0.2R worse: ETH at ~2/3 of BTC's risk is on the best
+return/drawdown line; alts are the first to fail under the stress. Chosen ladder 6/4/.83 -> 5/3.3/.83 @1k -> 2.5/1.7/.42 @10k
+vs old 7.5/2.5/.83: 2-yr typical $11.0k vs $10.7k (reshuffled), 1-in-10 drop 70% vs 73%, stress P(<$300) 12% vs 13%; from
+$300 since 2022 $368k vs $274k, since 2024 $39.1k vs $36.4k (same drops). Cap grid (0.9-2.5x, none, ETH exempt) on 4 ladders:
+1.1x best everywhere (looser = less money AND deeper drops; 13% of ETH trades skipped while BTC is fresh, they are the weak
+ones). BTC capped too / BTC not counted / trim ETH+alts when BTC joins: all worse (BTC joining a move late averages +1.10R
+vs +0.83R). portfolio.json + config_eth risk_pct 3.3 (fallback = the $1k row) updated; README tables re-run (three_months.py
+now also shows the old ladder). Real funding (data/extra) instead of the flat 0.01%/8h: +2R of 911R, no change.
+Trade list from the FIRST trade: build_trades / trade_prices now keep trades from 2020-01-01 (indicator warm-up on Jan-Feb
+2020 data); adds one ETH trade on 2020-02-24 (-1.06R) -> 1,559 trades (other 1,558 identical). Pages' "2020" runs start
+there (trades.html opens on it by default: from $300 -> $4.89M, worst drop 35.5%; 2022 run $368k / 46.4%; 2024 run
+$39.1k / 41.8%). All pages rebuilt and checked in headless Chromium (no JS errors, numbers match botsim).

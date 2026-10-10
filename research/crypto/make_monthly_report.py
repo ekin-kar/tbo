@@ -1,6 +1,6 @@
 """reports/monthly_report.html: TBO, BTC+ETH+BNB+SOL+ADA sized exactly like the bot (botsim.py: portfolio.json risk
 ladder + open-risk cap, BTC exempt, shorts at short_risk_mult), starting balance START.
-Two runs: from Mar 2020 and a fresh start in Jan 2024 (the period no choice was based on)."""
+Two runs: from the first trade (Feb 2020) and a fresh start in Jan 2024 (the period no choice was based on)."""
 import json, pickle
 import numpy as np, pandas as pd
 import common as C
@@ -83,7 +83,7 @@ def build(start):
     return dict(rows=rows, years=years, summary=summary, coins=coins, tops=tops, curve=curve)
 
 
-data = {"2020": build("2020-03-01"), "2024": build("2024-01-01"),
+data = {"2020": build("2020-02-01"), "2024": build("2024-01-01"),
         "cfg": dict(risks={s[:-4]: CFG[s]["risk_pct"] for s in COINS}, smult=SM, start=START, sizing=BS.label(POL),
                     cap=f"open-risk cap {POL['rows'][0][2]:g}% / {POL['rows'][-1][2]:g}% of the balance by ladder step (1.1x the BTC risk), BTC exempt")}
 html = open("monthly_report_template.html").read().replace("/*DATA*/null", json.dumps(data))

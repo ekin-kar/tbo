@@ -22,7 +22,7 @@ def build(args):
     kw["skip_fn"] = G.oi_skip(sym, 240)
     if lock:
         kw.update(lock_R=5.0, lock_to=1.5)
-    x = C.between(F.channel_breakout(m, **kw), "2020-03-01", "2026-10-01").reset_index(drop=True)
+    x = C.between(F.channel_breakout(m, **kw), "2020-01-01", "2026-10-01").reset_index(drop=True)
     t = m["t"]; e = x.entry_time.values.astype("datetime64[m]").astype(np.int64); xm = x.exit_time.values.astype("datetime64[m]").astype(np.int64)
     be = []
     for k in range(len(x)):                                   # first full minute after the fill at +1.5R (before the exit)

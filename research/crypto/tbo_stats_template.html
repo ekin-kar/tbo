@@ -47,7 +47,7 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.n
 details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
 </style></head><body><div class="wrap">
 <h1>TBO crypto bot statistics</h1>
-<p class="lede">Every trade of <b>TBO v2.6</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, March 2020 to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: the <b>risk ladder</b> (BTC 7.5% of the balance under $1,000, 5% up to $10,000, 2.5% above) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size. Pick coins, period and starting balance, or switch to fixed risks; everything recalculates.</p>
+<p class="lede">Every trade of <b>TBO v2.6</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, February 2020 (first trade) to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: the <b>risk ladder</b> (BTC 6% / ETH 4% of the balance under $1,000, 5% / 3.3% up to $10,000, 2.5% / 1.7% above; alts 0.83%, from $10,000 0.42%) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size. Pick coins, period and starting balance, or switch to fixed risks; everything recalculates.</p>
 <div class="controls">
  <div><div class="ctl-title">Coins</div><div class="seg" id="coins"></div></div>
  <div><div class="ctl-title">Period</div><div class="seg" id="periods"></div></div>
@@ -122,7 +122,7 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 const D=/*DATA*/null;
 const COINS=D.coins,CV=['--btc','--eth','--bnb','--sol','--ada'];
 const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
-const PERIODS=[['All (Mar 2020 – Sep 2026)',M(2020,2),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,2),Y(2024)]];
+const PERIODS=[['All (Feb 2020 – Sep 2026)',M(2020,1),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,1),Y(2024)]];
 let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:300,scale:'log',which:-1,mode:'bot',cap:1};
 const spec=()=>({mode:S.mode,risk:S.risk.slice(),smult:S.smult,cap:S.cap});
 // the bot's sizing (bot.py v2.5): ladder row for the balance -> each coin's risk % and the open-risk cap %; BTC exempt but counted
@@ -248,7 +248,7 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
  // years (full history, independent of the period buttons)
  const yrs=[2020,2021,2022,2023,2024,2025,2026];
  document.getElementById('years').innerHTML=`<thead><tr><th>Year</th>${sel.map(i=>`<th><span class="dot" style="background:var(${CV[i]})"></span>${COINS[i]} R</th><th>win %</th>`).join('')}<th>Combined R</th><th>Combined account</th><th>Max drawdown</th></tr></thead><tbody>`+
-  yrs.map(yy=>{const a=yy===2020?M(2020,2):Y(yy),b=yy===2026?M(2026,9):Y(yy+1),A=acct(on,a,b);
+  yrs.map(yy=>{const a=yy===2020?M(2020,1):Y(yy),b=yy===2026?M(2026,9):Y(yy+1),A=acct(on,a,b);
    const cells=sel.map(i=>{const r=rstats(D.trades.filter(t=>t[0]===i&&t[1]>=a&&t[1]<b));return r?`<td class="${cls(r.net)}">${sgn(r.net,1)}</td><td>${r.win.toFixed(0)}%</td>`:'<td>-</td><td>-</td>';}).join('');
    const rc=rstats(A.res.tr);return `<tr><td>${yy}${yy===2020?' (from Mar)':yy===2026?' (to Sep)':''}</td>${cells}<td class="${cls(rc?rc.net:0)}">${rc?sgn(rc.net,1):'-'}</td><td class="${cls(A.ret)}">${pct(A.ret,0)}</td><td>${pct(-A.res.ddw)}</td></tr>`;}).join('')+'</tbody>';
  // months
@@ -261,7 +261,7 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
 
 // ── simulated journeys (random 4-week blocks of the real trades) ──
 const J={src:0,hz:1,seed:7,cache:{}};
-const JSRC=[['2024 – Sep 2026 (unseen by the design)',Y(2024),M(2026,9)],['All years 2020 – 2026',M(2020,2),M(2026,9)]],JHZ=[6,12,24];
+const JSRC=[['2024 – Sep 2026 (unseen by the design)',Y(2024),M(2026,9)],['All years 2020 – 2026',M(2020,1),M(2026,9)]],JHZ=[6,12,24];
 const MO=30.44*864e5,BLK=28*864e5,NJ=800;
 const PROF=[['The bot: risk ladder + cap',{mode:'bot'}],['Fixed 2.5 / 1.25 / 0.42% + cap',{mode:'flat',risk:[2.5,1.25,0.42,0.42,0.42],cap:1}],
  ['Fixed 5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[5,2.5,0.83,0.83,0.83],cap:1}],['Fixed 7.5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[7.5,2.5,0.83,0.83,0.83],cap:1}],
@@ -354,7 +354,7 @@ document.getElementById('specs').innerHTML=`
 <dt>Open-risk cap</dt><dd>The risk of all open trades not yet at breakeven may not exceed 1.1× the BTC risk (${D.ladder.map(x=>x[2]+'%').join(' / ')} by step). A new ETH / BNB / SOL / ADA trade that would go over is made smaller, or skipped if less than a quarter fits; BTC is never shrunk but counts. In practice: while BTC is in a fresh trade, the others do not pile on.</dd>
 <dt>Shorts</dt><dd>× ${D.smult} of that (shorts earn about a quarter of what longs earn on every coin)</dd>
 <dt>Size formula</dt><dd>quantity = balance × risk % ÷ stop distance, rounded down to Binance's step size</dd>
-<dt>Leverage</dt><dd>Position size = risk % ÷ stop distance (BTC at 7.5% risk with a 1.5% stop = 5× the balance), capped at ${D.maxlev}× per position for BTC (8× for the others); Binance leverage ${D.exlev}× for BTC so all coins fit in margin at once</dd>
+<dt>Leverage</dt><dd>Position size = risk % ÷ stop distance (BTC at 6% risk with a 1.5% stop = 4× the balance), capped at ${D.maxlev}× per position for BTC (8× for the others); Binance leverage ${D.exlev}× for BTC so all coins fit in margin at once</dd>
 <dt>Expect</dt><dd>About 19 trades a month in total; ~1 in 6 is a winner, ~3 in 10 end at breakeven, the rest are small losses. About 2 big trades a month pay for everything.</dd></dl></div>
 <div class="spec"><h3>How the bot runs</h3><p class="hint" style="margin:0">One small Python process per coin (<code>cryptobot/bot.py config_xxx.json</code>), talking to Binance USD-M futures through its REST API.</p><dl>
 <dt>Every 5 s</dt><dd>Checks the position. A new fill gets its stop-loss at once; the breakeven move and the 5-day exit are checked from 1-minute candles.</dd>

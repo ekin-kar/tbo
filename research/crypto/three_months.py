@@ -8,7 +8,7 @@ import botsim as B
 START = 300.0                                       # the live account starts with $300 (Oct 2026)
 
 POL = B.bot_policy()
-PROFILES = {"ladder (the bot)": POL, "flat 5% + cap": B.flat_policy(5, 2.5, 0.83), "flat 7.5% + cap": B.flat_policy(7.5, 2.5, 0.83)}
+PROFILES = {"ladder (the bot)": POL, "old ladder 7.5/2.5/.83 (before Oct 2026)": B.ladder_policy([(0, 7.5, 2.5, .83), (1000, 5, 2.5, .83), (10000, 2.5, 1.25, .42)]), "flat 5% + cap": B.flat_policy(5, 2.5, 0.83), "flat 7.5% + cap": B.flat_policy(7.5, 2.5, 0.83)}
 
 
 def dd_after(ev, level=1000.0):

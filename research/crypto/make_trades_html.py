@@ -7,8 +7,8 @@ import common as C, families as F
 import botsim as BS
 
 START_BAL = 300.0
-RUNS = {"2024": ("2024-01-01", "Jan 2024 – Sep 2026 (most recent)"), "2022": ("2022-01-01", "Jan 2022 – Sep 2026 (no 2020-21 boom)"),
-        "2020": ("2020-03-01", "Mar 2020 – Sep 2026 (everything)")}
+RUNS = {"2020": ("2020-01-01", "Feb 2020 – Sep 2026 (every trade since the first)"), "2022": ("2022-01-01", "Jan 2022 – Sep 2026 (no 2020-21 boom)"),
+        "2024": ("2024-01-01", "Jan 2024 – Sep 2026 (most recent)")}
 END = "2026-10-01"
 r5 = lambda v: float(f"{v:.6g}")
 
@@ -41,13 +41,16 @@ def main():
     candles = {}
     for s in BS.COINS:
         c = F.resample(C.load(s), 240)
-        keep = (c["t"] >= pd.Timestamp("2020-02-01").value // BS.MIN) & (c["t"] < pd.Timestamp(END).value // BS.MIN)
+        keep = (c["t"] >= pd.Timestamp("2020-01-01").value // BS.MIN) & (c["t"] < pd.Timestamp(END).value // BS.MIN)
         t = c["t"][keep].astype(np.int64); t0 = int(t[0])
         candles[s[:-4]] = dict(t0=t0, k=((t - t0) // 240).astype(int).tolist(),
                                o=[r5(v) for v in c["o"][keep]], h=[r5(v) for v in c["h"][keep]], l=[r5(v) for v in c["l"][keep]], c=[r5(v) for v in c["c"][keep]])
     data = dict(coins=[s[:-4] for s in BS.COINS], trades=trades, runs=runs, order=list(RUNS), candles=candles, start=START_BAL,
                 ladder=[[f, r, cp] for f, r, cp in pol["rows"]], smult=pol["smult"], beR=1.5)
-    html = open(C.ROOT / "research" / "crypto" / "trades_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
+    lad = "; ".join((f"under ${pol['rows'][1][0]:,.0f}: " if i == 0 else f"from ${r[0]:,.0f}: ") + f"BTC {r[1][0]:g}% / ETH {r[1][1]:g}% / each alt {r[1][2]:g}%"
+                    for i, r in enumerate(pol["rows"]))
+    html = (open(C.ROOT / "research" / "crypto" / "trades_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
+            .replace("/*LADDER*/", lad))
     (C.ROOT / "reports" / "trades.html").write_text(html)
     print("written trades.html", len(html) // 1024, "KB")
 
