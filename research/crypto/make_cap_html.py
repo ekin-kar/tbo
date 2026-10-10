@@ -1,5 +1,5 @@
 """reports/cap_comparison.html: equity and drawdown of the bot with and without the open-risk cap (and the
-'just lower the risk' alternative), from $200, for three start dates and risk sets (the bot's ladder first). botsim.py."""
+'just lower the risk' alternative), from $300, for three start dates and risk sets (the bot's ladder first). botsim.py."""
 import json
 from multiprocessing import Pool
 import numpy as np, pandas as pd
@@ -26,10 +26,10 @@ def policy(m, kw):
 
 def job(args):
     sk, m, vk = args
-    h = BS.history(policy(m, dict((k, kw) for k, _, kw in VARIANTS)[vk]), STARTS[sk], END, 200.0)
+    h = BS.history(policy(m, dict((k, kw) for k, _, kw in VARIANTS)[vk]), STARTS[sk], END, 300.0)
     bal, dd, r = h["bal"], h["dd"], h["r"]
     mo = (pd.Timestamp(END) - pd.Timestamp(STARTS[sk])).days / 30.44
-    pm = ((r["final"] / 200) ** (1 / mo) - 1) * 100
+    pm = ((r["final"] / 300) ** (1 / mo) - 1) * 100
     hw = bal.cummax(); nh = bal.index[bal >= hw]; flat = int(np.diff(nh.values).astype("timedelta64[D]").astype(int).max())
     mm = bal.resample("ME").last().pct_change().dropna()
     st = dict(final=r["final"], pm=pm, dd=r["dd"], ratio=pm / r["dd"], flat=flat, pos=float((mm > 0).mean() * 100),

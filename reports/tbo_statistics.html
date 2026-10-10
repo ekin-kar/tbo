@@ -123,7 +123,7 @@ const D={"trades":[[1,1583169480000,1583222580000,1583222580000,1,-1.045329,14.7
 const COINS=D.coins,CV=['--btc','--eth','--bnb','--sol','--ada'];
 const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
 const PERIODS=[['All (Mar 2020 – Sep 2026)',M(2020,2),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,2),Y(2024)]];
-let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:200,scale:'log',which:-1,mode:'bot',cap:1};
+let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:300,scale:'log',which:-1,mode:'bot',cap:1};
 const spec=()=>({mode:S.mode,risk:S.risk.slice(),smult:S.smult,cap:S.cap});
 // the bot's sizing (bot.py v2.5): ladder row for the balance -> each coin's risk % and the open-risk cap %; BTC exempt but counted
 function rowAt(sp,eq){if(sp.mode==='bot'){let r=D.ladder[0];for(const x of D.ladder)if(eq>=x[0])r=x;return r;}return [0,sp.risk,sp.cap?1.1*sp.risk[0]:0];}

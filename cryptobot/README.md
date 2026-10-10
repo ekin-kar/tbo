@@ -8,7 +8,7 @@
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
 | Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
-| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/all12.py`, `combos22.py`). At $200 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
+| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/all12.py`, `combos22.py`). At $300 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
 | Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
@@ -229,16 +229,16 @@ Shorts at half size. `risk_pct` in the configs is only used if `portfolio.json` 
 12x the balance (`max_leverage`; at 7.5% risk 8x would cut 1 in 5 BTC trades, 12x about 3 in 100) and its Binance
 leverage 25x (only sets the margin a position locks; in cross margin it does not move the liquidation point).
 
-2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
+2 years from $300 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
 reshuffled runs of 2022-26 trades / every real 2-year window of 2022-26):
 
 | v2.6 (with the profit lock) | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
 |---|---|---|---|
-| typical end | $5.0k / $5.5k | **$6.9k / $7.8k** | $8.1k / $9.3k |
-| 1 in 4 bad end | $1.9k / $2.7k | **$2.5k / $3.6k** | $2.4k / $3.8k |
-| reach $10k | 33% / 13% | **42% / 42%** | 45% / 45% |
-| worst drop once above $1k (typical / 1 in 10) | 39% / 57% | **39% / 60%** | 52% / 72% |
-| gave back half of a $5k+ peak | 2% | **1%** | 6% |
+| typical end | $7.5k / $8.2k | **$10.7k / $11.5k** | $12.2k / $14.0k |
+| 1 in 4 bad end | $2.9k / $4.0k | **$3.5k / $5.2k** | $3.6k / $5.8k |
+| reach $10k | 43% / 40% | **52% / 55%** | 54% / 60% |
+| worst drop once above $1k (typical / 1 in 10) | 42% / 59% | **41% / 61%** | 54% / 73% |
+| gave back half of a $5k+ peak | 2% | **1%** | 7% |
 
 The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
 all in the top-level `reports/` folder: `trades.html` (equity chart with every trade: click one to see it on its 4h price
@@ -247,29 +247,29 @@ journeys), `risk_comparison.html`, `plan_ladder_plus50.html`, `monthly_report.ht
 `winrate_rr.html`. All are rebuilt from the live settings by the `research/crypto/make_*.py` scripts and size trades
 like the bot.
 
-## 3-month trial from $200 (v2.5, Oct 2026)
+## 3-month trial from $300 (v2.6, Oct 2026)
 
-Settings: the risk ladder above (at $200: BTC 7.5%, ETH 2.5%, BNB / SOL / ADA 0.83%, cap 8.25%). Leave them alone
+Settings: the risk ladder above (at $300: BTC 7.5%, ETH 2.5%, BNB / SOL / ADA 0.83%, cap 8.25%). Leave them alone
 for the 3 months (changing settings mid-way makes the result impossible to judge).
 
-- **Start:** `git pull`, then steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades
-  are mostly too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
+- **Start:** `git pull`, then steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $300 SOL trades
+  are often too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
 - **Every month-end:** `python report.py --days 31` -> `trial_results/report_<date>.md` + two CSV files (Binance keeps
   only a few months of history, so keep each month's files).
 - **Every fill** is logged with the level aimed for, the slippage and the risk (`FILLED ... level ..., slippage ...%`).
 - **After 3 months:** send the `trial_results/` and `logs/` folders. They are compared with the backtest of the same
   days (same trades? same fills? fees and slippage as assumed?).
-- **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $200; every real
+- **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $300; every real
   3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
 
 | After 3 months (v2.6) | real windows | reshuffled |
 |---|---|---|
-| 1 in 10 bad | $163 | $138 |
-| 1 in 4 bad | $185 | $187 |
-| typical | $269 | $280 |
-| 1 in 4 good | $402 | $457 |
-| 1 in 10 good | $696 | $812 |
-| below $200 / doubled | 29% / 26% | 29% / 30% |
+| 1 in 10 bad | $245 | $207 |
+| 1 in 4 bad | $277 | $281 |
+| typical | $403 | $420 |
+| 1 in 4 good | $603 | $686 |
+| 1 in 10 good | $1,039 | $1,230 |
+| below $300 / doubled | 29% / 26% | 29% / 30% |
 | worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 30% / 41% / 49% | 31% / 40% / 49% |
 
   About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1

@@ -14,7 +14,7 @@ CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")
 BASE = CFG["BTCUSDT"]["risk_pct"] / 100
 W = {s: CFG[s]["risk_pct"] / 100 / BASE for s in COINS}
 SM = CFG["BTCUSDT"]["short_risk_mult"]
-START = 200.0
+START = 300.0
 
 
 POL = BS.bot_policy()

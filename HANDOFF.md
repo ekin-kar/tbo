@@ -245,3 +245,15 @@ noise. Opposite-direction case never occurs (alts only trade with BTC's trend wh
 now, 2020-23 / 2024-26): cap 0.8-1.0x 1.03-1.06 / 0.98-0.99, 1.2x 1.00 / 0.97, 1.3-1.5x 0.92-0.95 / 0.92-0.96, ETH exempt
 0.94 / 0.92, BTC risk free at +0.5/+1R 0.93-0.94 / 0.98-0.99, no cap on strong BTC 7d move 0.87-0.91 / 0.99-1.00, min
 fraction 0 / 0.5 / 0.99 1.01-1.03 / 0.98-1.00. None better in both; 1.1x stays (middle of the plateau).
+
+Live start changed to **$300** (Oct 2026, user's choice): START in make_trades_html / make_monthly_report / make_risk_html /
+make_cap_html / three_months, page templates and the tbo_statistics default; all pages rebuilt; cryptobot/README trial
+tables re-run from $300 (3 months: typical $403 / $420, below $300 29%, worst drop typ 30%; 2 yrs ladder typical $10.7k /
+$11.5k, P($10k) 52% / 55%). Older research tables that say "$200" were computed from $200 and are left as they were.
+Last research round before going live (Oct 2026, scratchpad scripts, not in git; nothing adopted): BVOL implied vol, order
+book depth, metrics ratios, aggTrades whale flow, time of day / same-coin streaks / losing-streak and after-win / near-
+equity-high pauses, close-based stops and breakeven, 4h/6h/8h/12h/n30/n40/phase-shifted ensembles, partial take-profit,
+trailing winners past 120 h: none beats the bot beyond the noise floor (shifting the 4h candles by 1-3 h alone moves
+net/DD by x0.78-1.13). Stress test: every 0.1R/trade of live shortfall roughly halves 5-yr growth -> after ~50/100/200
+live trades compare with the same-days backtest; edge alarm: running avg < -0.17R (50) / -0.04R (100) / +0.13R (200).
+BNB fee discount (taker 0.045%): 2024-26 $26.7k -> $29.9k from $200, same drop.

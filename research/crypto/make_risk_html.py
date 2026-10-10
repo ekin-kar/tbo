@@ -1,4 +1,4 @@
-"""reports/risk_comparison.html (+ plan_ladder_plus50.html preset): $200 over 24 months with different risk profiles
+"""reports/risk_comparison.html (+ plan_ladder_plus50.html preset): $300 over 24 months with different risk profiles
 (the bot's risk ladder and flat risks, all with the open-risk cap, BTC exempt) and monthly deposits, simulated from random
 4-week blocks of the bot's real v2.4 trades (BTC ETH BNB SOL ADA, shorts x0.5). Sizing: botsim.py (= the bot)."""
 import json
@@ -11,7 +11,7 @@ PROFILES = [("lad", BS.bot_policy(), 12), ("f25", BS.flat_policy(2.5, 1.25, 0.42
             ("f6", BS.flat_policy(6, 2.5, 0.83), 10), ("f75", BS.flat_policy(7.5, 2.5, 0.83), 12), ("f10", BS.flat_policy(10, 2.5, 0.83), 16)]
 DEPS = [0, 50, 100]
 SRCS = {"2022": ("2022-01-01", "2026-10-01"), "2024": ("2024-01-01", "2026-10-01")}
-MONTHS, START, N = 24, 200.0, 1000
+MONTHS, START, N = 24, 300.0, 1000
 LEVELS = [1000, 5000, 10000, 20000]
 MON = BS.MON
 

@@ -1,4 +1,4 @@
-"""reports/trades.html: every trade of the bot on one $200 account (sized like the bot: risk ladder + open-risk cap,
+"""reports/trades.html: every trade of the bot on one $300 account (sized like the bot: risk ladder + open-risk cap,
 botsim.py), with the equity chart and each trade's 4h price chart (entry, stop, breakeven, exit). Click a trade in the
 table or a dot on the equity chart to see it. Prices from trade_prices.py (same engine, matched trade for trade)."""
 import json
@@ -6,7 +6,7 @@ import numpy as np, pandas as pd
 import common as C, families as F
 import botsim as BS
 
-START_BAL = 200.0
+START_BAL = 300.0
 RUNS = {"2024": ("2024-01-01", "Jan 2024 – Sep 2026 (most recent)"), "2022": ("2022-01-01", "Jan 2022 – Sep 2026 (no 2020-21 boom)"),
         "2020": ("2020-03-01", "Mar 2020 – Sep 2026 (everything)")}
 END = "2026-10-01"
