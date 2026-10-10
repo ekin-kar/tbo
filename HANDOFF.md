@@ -224,3 +224,8 @@ trade is confirmed: 2020-23 BETTER (+0.82..+1.28R vs +0.49R); 2024-26 better at 
 (+0.31 vs +0.60). 64 rules (skip / x0.5 while confirmed or 2-7 d from confirmation, same / any direction): every one worse
 in 2020-23 on the fixed R account (x0.11-0.93); some better in 2024-26 (skip 7 d after +5R x1.42) but they cost 35%+ in
 2020-23 -> regime-dependent, not adopted.
+Range reading on v2.6 (Oct 2026, `range_test.py`; fixed R account net/DD vs bot 2020-23 / 2024-26): ATR buffer 0.1 / 0.25 /
+0.5 x0.87/0.78, x0.63/0.73, x0.59/0.61; skip ranges wider than 6 ATR x1.02/0.83, wider than 8 x1.00/0.98, tighter than 3
+x0.86/1.12, tighter than 4 x0.62/0.63; RSI(14) zones x0.66-0.99 / 0.79-0.95; entry after a 1h / 2h close beyond the
+level x0.54/0.41, x0.44/0.47; efficiency ratio >= 0.2 / 0.3 x0.32/0.49, x0.29/0.59. None better in both periods. (The
+engine's confirm-close path now also applies skip_fn / the OI filter.)

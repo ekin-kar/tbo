@@ -56,7 +56,7 @@ for lo_w, hi_w, lab in ((0, 6, "skip ranges wider than 6 ATR"), (0, 8, "skip ran
 for lo_r, hi_r in ((50, 100), (55, 100), (0, 75), (0, 80), (45, 75)):
     VARS[f"RSI(14) at the order {lo_r}-{hi_r} (side-adjusted)"] = dict(rsi=(lo_r, hi_r))
 VARS["enter after a 1h close beyond the level"] = dict(confirm_tf=60)
-VARS["enter after a 4h close beyond the level"] = dict(confirm_tf=240)
+VARS["enter after a 2h close beyond the level"] = dict(confirm_tf=120)
 for n_, er in ((20, 0.2), (20, 0.3)):
     VARS[f"efficiency ratio({n_}) >= {er}"] = dict(er_n=n_, er_min=er)
 
@@ -75,12 +75,16 @@ def job(name):
     return name, out
 
 
+def show(n, o, b):
+    q = lambda o: o[0] / o[1]
+    print(f"{n:52s} | {o[0][0]:5.0f} {o[0][1]:5.1f} {q(o[0]):5.2f} (x{q(o[0])/q(b[0]):.2f}) {o[0][2]:4d} | "
+          f"{o[1][0]:5.0f} {o[1][1]:5.1f} {q(o[1]):5.2f} (x{q(o[1])/q(b[1]):.2f}) {o[1][2]:4d} | {o[1][3]:3d} | "
+          f"${o[0][4]:>9,.0f} {o[0][5]:4.1f}% | ${o[1][4]:>7,.0f} {o[1][5]:4.1f}%", flush=True)
+
+
 if __name__ == "__main__":
-    with Pool(3) as p:
-        res = p.map(job, list(VARS))
-    b = res[0][1]; q = lambda o: o[0] / o[1]
-    print(f"{'variant':52s} | fixed R acct 2020-23: net, maxDD, net/DD (x bot), trades | 2024-26 same | >=5R 24-26 | bot $200 2020-23 | 2024-26")
-    for n, o in res:
-        print(f"{n:52s} | {o[0][0]:5.0f} {o[0][1]:5.1f} {q(o[0]):5.2f} (x{q(o[0])/q(b[0]):.2f}) {o[0][2]:4d} | "
-              f"{o[1][0]:5.0f} {o[1][1]:5.1f} {q(o[1]):5.2f} (x{q(o[1])/q(b[1]):.2f}) {o[1][2]:4d} | {o[1][3]:3d} | "
-              f"${o[0][4]:>9,.0f} {o[0][5]:4.1f}% | ${o[1][4]:>7,.0f} {o[1][5]:4.1f}%", flush=True)
+    print(f"{'variant':52s} | fixed R acct 2020-23: net, maxDD, net/DD (x bot), trades | 2024-26 same | >=5R 24-26 | bot $200 2020-23 | 2024-26", flush=True)
+    b = job("bot now")[1]; show("bot now", b, b)
+    with Pool(2, maxtasksperchild=1) as p:                 # results print as each variant finishes
+        for n, o in p.imap_unordered(job, [k for k in VARS if k != "bot now"]):
+            show(n, o, b)
