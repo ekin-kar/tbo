@@ -1,4 +1,4 @@
-"""cryptobot/monthly_report.html: TBO, BTC+ETH+BNB+SOL+ADA sized exactly like the bot (botsim.py: portfolio.json risk
+"""reports/monthly_report.html: TBO, BTC+ETH+BNB+SOL+ADA sized exactly like the bot (botsim.py: portfolio.json risk
 ladder + open-risk cap, BTC exempt, shorts at short_risk_mult), starting balance START.
 Two runs: from Mar 2020 and a fresh start in Jan 2024 (the period no choice was based on)."""
 import json, pickle
@@ -6,7 +6,8 @@ import numpy as np, pandas as pd
 import common as C
 import botsim as BS
 
-ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
+import botsim as _BS
+ALL = _BS.ALL
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 T4 = pd.concat([ALL[(s, 0.0003)] for s in COINS])
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}
@@ -86,6 +87,6 @@ data = {"2020": build("2020-03-01"), "2024": build("2024-01-01"),
         "cfg": dict(risks={s[:-4]: CFG[s]["risk_pct"] for s in COINS}, smult=SM, start=START, sizing=BS.label(POL),
                     cap=f"open-risk cap {POL['rows'][0][2]:g}% / {POL['rows'][-1][2]:g}% of the balance by ladder step (1.1x the BTC risk), BTC exempt")}
 html = open("monthly_report_template.html").read().replace("/*DATA*/null", json.dumps(data))
-(C.ROOT / "cryptobot" / "monthly_report.html").write_text(html)
+(C.ROOT / "reports" / "monthly_report.html").write_text(html)
 for k in ("2020", "2024"):
     print(k, data[k]["summary"])

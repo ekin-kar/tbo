@@ -2,8 +2,7 @@
 
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
-guide in `cryptobot/README.md` ("GO LIVE"). Pages: `stats/tbo_crypto_statistics.html`, `cryptobot/robustness.html`,
-`cryptobot/monthly_report.html`.
+guide in `cryptobot/README.md` ("GO LIVE"). Pages: all in `reports/` (rebuilt by research/crypto/make_*.py from the live settings; robustness page retired).
 
 The repo is crypto only (the old prop-firm gold/USDJPY work was removed Oct 2026). The user trades **Binance USD-M futures** with their own bots.
 Data: `data/BTCUSDT_1m_2020_2026_part*.parquet`, `data/ETHUSDT_...` (Binance 1m, 2020-01 .. 2026-09).
@@ -111,7 +110,7 @@ both periods; 5.5% (= 1.1 x BTC risk): 2020-23 x1.03, 2024-26 x1.17 (worst drop 
 2022-26 x1.05; binds on 13% of entries (8% shrunk to ~72%, 5% skipped). **Better: BTC exempt** (BTC trades never shrunk or
 skipped, but their open risk still counts against the cap for ETH/alts): 1.1x -> 2020-23 x1.03, 2024-26 x1.23 ($18.0k,
 drop 38.0%), 2022-26 x1.08; plateau 0.9-1.1x (x1.22-1.23), fades at 1.3x (x1.07) / 1.5x (x0.99). A cap among ETH+alts
-only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: cryptobot/cap_comparison.html. **In the bot as v2.5** (`portfolio.json`
+only (BTC risk not counted, 0.4-0.8x) does nothing (x0.97-1.02). Page: reports/cap_comparison.html. **In the bot as v2.5** (`portfolio.json`
 open_risk_cap_pct 5.5, cap_exempt BTCUSDT; bot.py size/capped/open_risk/resize_entry/trim_to_cap). Timing
 (`sizing_v4.py`): sizing only at the 4h close loses part of it (2024-26 $17.0k, drop 41%); the bot therefore re-sizes
 a waiting entry order every minute and trims at the fill -> equals the fill-time rule ($18.2k, 38%).
@@ -164,7 +163,40 @@ ADA); every page generator uses it (make_monthly_report, make_risk_html -> risk_
 make_cap_html, make_tbo_stats; the statistics page JS matches botsim to the cent, check in make_tbo_stats ref).
 Ladder from $200, 2 yrs (three_months.py): typical $5.8k / $5.6k (boot / real 2022-26 windows), P($10k) 39% / 29%,
 drop after $1k 40% / 63% (typ / 1-in-10). 3 months: typical $259-272, below $200 30%, drop typ 33%, 1-in-10 51%.
-Trade explorer `cryptobot/trades.html` (`make_trades_html.py` + `trades_template.html`): every trade from $200 (start 2024 /
+Trade explorer `reports/trades.html` (`make_trades_html.py` + `trades_template.html`): every trade from $200 (start 2024 /
 2022 / 2020) sized by botsim, equity chart with a dot per trade, 4h price chart per trade (entry, stop, breakeven, exit),
 filters, cap cut / skip marked. Prices from `trade_prices.py` (rebuilds the v2.4 trades with prices: 1551 / 1551 match).
 
+Gate / second-chance study (Oct 2026, `gate_test.py`, `tradepath.py` = validated 1m trade simulator, 300/300 exact):
+holding a new trade while another coin's same-direction trade is fresh. Premise check: trades entering with 1 other
+fresh same-dir trade avg +0.74R / +0.73R (2020-23 / 2024-26) vs solo +0.69 / +0.44 -> joint breakouts are the runs,
+not the chop; worst drops 2020 and 2024 were BTC losing streaks (BTC -$422 of -$432, -$64 of -$77). Results vs the bot
+(ladder + cap, $200): strict gate 2024-26 $2.5k vs $25.2k (blocked trades avg +0.68R); best variants: max 2 fresh
+same-dir (drop 42->38 / 44.6->39.6 but $14.7k, ret/DD x1.14 / x0.99 = same as lowering risk), max 2 fresh BTC exempt
+$21.9k x1.00 / x0.98, only-fresh-BTC-blocks $19.0k; chop-only ADX<20 x1.30 in 2020-23 but x0.60 in 2024-26. Second
+chance (near level 0.25-1R, retest at level / +0.5R, 12-48h) recovers part (best $16.8k) but re-entries avg 0.2-0.9R
+and retests often negative; none beats the bot in 2024-26. Nothing adopted; the open-risk cap already does the useful
+part (alts held while BTC is fresh).
+BTC losing-streak brake (Oct 2026, `btc_streak.py`): BTC x0.5 after 2 BTC stops until a BTC trade hits +1.5R: ladder
+from 2020 worst drop 42.0 -> 47.0% ($3.12M -> $1.19M), from 2024 44.6 -> 43.3% ($25.2k -> $16.2k); 3 stops / x0.33 /
+reset on a winner / all coins: drops -3 to +7 points, profit -25 to -90%. Not adopted (the recovery trade is half size).
+Exit ratchet (`ratchet.py`, `lock_grid.py`, engine exact on 1551 trades): trades reaching +3.5R but closing < +1R:
+67 (2020-23) / 51 (2024-26), avg exit -0.07R, gave back ~5.4R. Trailing stops after +3.5..5R (1-3R): bad (net R -30 to
+-70%, runners >= 5R 55 -> 10-42). One-step profit lock (+A R reached -> stop to +L R): A 3-3.5R worse; plateau A 4.5-6R,
+L 0.5-2R better in both periods on a fixed R account (net/DD x1.00-1.15), ladder worst drop 42 -> 33-40% (2020 run),
+44.6 -> 41.5-43% (2024 run), same profit, runners kept 48-55/55. Centre: +5R -> +1.5R (x1.11 / x1.02; drop 34.9% /
+42.3%; $3.41M / $26.7k). Not in the bot yet.
+v2.6 LIVE (Oct 2026): profit lock +5R -> stop +1.5R in strategy.Params (lock_R / lock_to, configs), bot.check_breakeven
+(lock_done state, PROFIT LOCK log/Telegram), replay.py, xengine/common/families (lock_R, lock_to). build_trades.py
+rebuilds the trade list (check: identical to v24 without the lock; v26: 1558 trades) -> cache/portfolio_trades_v26.pkl
++ trade_prices_v26.pkl; botsim.TAG = v26 (env BOT_TRADES=v24 for the old list); all pages regenerated. Parity: bot vs
+replay BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75 (fill-minute stop cases only); replay vs engine ETH/BTC
+2021-26 identical. Ladder from $200: 2020 $3.26M drop 37.1%, 2022 $181k 44.6%, 2024 $26.7k 42.3%. With v26 the cap's
+profit effect is mixed (2024: no cap $29.7k 45.9% vs cap $26.7k 42.3%; 2022: $150k vs $181k) but it lowers drops: kept.
+
+Universe expansion (Oct 2026, `universe.py`, v2.4 trades of 12 coins, bot sizing ladder + cap, $200): 12 coins with extra
+alts at 0.83%: 2020-23 ret/drop x1.35 but 2024-26 x1.01 (drop 47.3 vs 44.6%), fixed R account x0.90 / x0.92; alts
+0.42%: x1.24 / x1.01, fixed x0.90 / x1.00; same alt budget spread over 10 alts: x1.07 / x0.95; 5 + DOGE: x1.07 / x0.99;
+5 + DOGE/XRP/LINK/AVAX at 0.5%: x1.24 / x1.04, fixed x1.04 / x1.08 (best, modest). 2020-23 gains = the 2021 alt boom;
+2024-26 no clear gain (alts move with BTC). Not adopted at $200 (extra alt risk ~$1 -> many orders below Binance minimums);
+revisit the 9-coin set at a few $k.

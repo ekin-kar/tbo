@@ -34,6 +34,7 @@ def load_oi(sym):
 
 
 def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
+    """fee: per side, on every fill (float), or (entry, exit) per side."""
     c4 = F.resample(m, p.tf_min)
     if p.oi_lookback_h > 0 and oi is None:
         oi = load_oi(p.symbol)
@@ -42,6 +43,7 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
     n1 = len(m["t"])
     trades = []
     pos, entry_px, entry_i, sl, dist = 0, 0.0, -1, 0.0, 0.0
+    be_i = lock_i = -1
     max_bars = int(p.max_hold_h * 60)
     for k in range(LIVE_4H_CANDLES, len(c4["t"])):
         j0 = c4["act"][k]                                  # first 1m bar after candle k closed
@@ -57,7 +59,8 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
         def close(j, px, why):
             nonlocal pos
             trades.append(dict(entry_time=m["t"][entry_i], exit_time=m["t"][j], dir=pos, entry=entry_px,
-                               exit=px, sl_dist=dist, reason=why))
+                               exit=px, sl_dist=dist, reason=why, be_time=m["t"][be_i] if be_i >= 0 else m["t"][j],
+                               lock_time=m["t"][lock_i] if lock_i >= 0 else m["t"][j]))
             pos = 0
 
         # at the candle close: trail exit, then (if flat) a new order
@@ -86,6 +89,7 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
                 d, trig = order
                 if (d == 1 and h >= trig) or (d == -1 and l <= trig):
                     pos, entry_i, dist = d, j, dec.sl_dist
+                    be_i = lock_i = -1
                     entry_px = max(trig, o) if d == 1 else min(trig, o)
                     sl = entry_px - d * dist
                     order = None
@@ -97,20 +101,32 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
                     close(j, o, "SL")
                 elif l <= sl:
                     close(j, sl, "SL")
-                elif p.be_R > 0 and h - entry_px >= p.be_R * dist and sl < entry_px + p.be_off * dist:
-                    sl = entry_px + p.be_off * dist          # breakeven, from the next bar
+                else:
+                    if p.be_R > 0 and h - entry_px >= p.be_R * dist and sl < entry_px + p.be_off * dist:
+                        sl = entry_px + p.be_off * dist      # breakeven, from the next bar
+                        be_i = j if be_i < 0 else be_i
+                    if p.lock_R > 0 and h - entry_px >= p.lock_R * dist and sl < entry_px + p.lock_to * dist:
+                        sl = entry_px + p.lock_to * dist     # profit lock, from the next bar
+                        lock_i = j
             elif pos == -1:
                 if j > entry_i and o >= sl:
                     close(j, o, "SL")
                 elif h >= sl:
                     close(j, sl, "SL")
-                elif p.be_R > 0 and entry_px - l >= p.be_R * dist and sl > entry_px - p.be_off * dist:
-                    sl = entry_px - p.be_off * dist
+                else:
+                    if p.be_R > 0 and entry_px - l >= p.be_R * dist and sl > entry_px - p.be_off * dist:
+                        sl = entry_px - p.be_off * dist
+                        be_i = j if be_i < 0 else be_i
+                    if p.lock_R > 0 and entry_px - l >= p.lock_R * dist and sl > entry_px - p.lock_to * dist:
+                        sl = entry_px - p.lock_to * dist
+                        lock_i = j
     tr = pd.DataFrame(trades)
-    tr["entry_time"] = C.D.to_datetime(tr["entry_time"]); tr["exit_time"] = C.D.to_datetime(tr["exit_time"])
+    for col in ("entry_time", "exit_time", "be_time", "lock_time"):
+        tr[col] = C.D.to_datetime(tr[col])
     gross = (tr["exit"] - tr["entry"]) * tr["dir"]
     hours = (tr["exit_time"] - tr["entry_time"]).dt.total_seconds() / 3600
-    tr["R"] = (gross - fee * (tr["entry"] + tr["exit"]) - C.FUNDING_8H * hours / 8 * tr["entry"]) / tr["sl_dist"]
+    f_in, f_out = fee if isinstance(fee, tuple) else (fee, fee)
+    tr["R"] = (gross - f_in * tr["entry"] - f_out * tr["exit"] - C.FUNDING_8H * hours / 8 * tr["entry"]) / tr["sl_dist"]
     tr["hours"] = hours
     return tr
 

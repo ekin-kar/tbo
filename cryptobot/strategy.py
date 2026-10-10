@@ -17,6 +17,7 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
   Trail exit : at a 4h close, a long is closed if close < highest high of the last trail_m candles
                - trail_atr x ATR (mirror for shorts).
   Breakeven  : once price has gone be_R x the stop distance in favour, the stop moves to entry + be_off x dist.
+  Profit lock: once price has gone lock_R x the stop distance in favour, the stop moves to entry + lock_to x dist (v2.6).
   Time exit  : closed max_hold_h hours after the fill. No take profit.
 
 Indicators match research/engine/indicators.py (cTrader style): EMA seeded with the first value,
@@ -43,6 +44,8 @@ class Params:
     no_weekend: bool = True
     be_R: float = 1.5
     be_off: float = 0.0
+    lock_R: float = 0.0          # profit lock: at +lock_R the stop moves to +lock_to (0 = off)
+    lock_to: float = 0.0
     max_ext: float = 4.0         # in daily ATR14 from the daily EMA; 99 = off
     oi_lookback_h: int = 0       # open-interest filter: hours back (hourly rows); 0 = off
     oi_min_chg: float = -0.03    # skip new orders when OI changed by this much or less over the lookback

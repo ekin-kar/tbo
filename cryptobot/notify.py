@@ -7,7 +7,7 @@ import time
 
 import requests
 
-KEYS = ("FILLED", "EXIT", "BREAKEVEN", "position closed", "STOP LOSS for", "market entry", "TBO v", "CAP after the fill")
+KEYS = ("FILLED", "EXIT", "BREAKEVEN", "PROFIT LOCK", "position closed", "STOP LOSS for", "market entry", "TBO v", "CAP after the fill")
 
 
 def load_env(path):

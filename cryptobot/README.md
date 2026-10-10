@@ -1,4 +1,4 @@
-# TBO v2.5: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
+# TBO v2.6: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -13,6 +13,7 @@
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
+| Profit lock (v2.6) | Once price has gone **+5R** in favour, the stop moves to **+1.5R** (`lock_R` / `lock_to` in the configs). See "Profit lock" below |
 | Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
 | Risk ladder (v2.5) | `portfolio.json`: BTC 7.5% / ETH 2.5% / alts 0.83% under $1,000; 5% / 2.5% / 0.83% to $10,000; 2.5% / 1.25% / 0.42% above. See "Risk ladder" below |
@@ -142,7 +143,7 @@ Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 sta
 equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
 The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
 
-## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `cap_comparison.html`
+## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `reports/cap_comparison.html`
 
 Why: the deepest drops come when several coins break out together and all their stops get hit. Capping the risk
 that is open at once (only trades not yet at breakeven count: a breakeven stop loses nothing) trims exactly
@@ -178,6 +179,15 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   exchange on 1m history (v2.1): 327 vs 328 trades, 326 on the same minute, entry price within 1 tick, gross R
   234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
+- v2.6 profit lock, `test_bot_sim.py <coin> 2024-01-01 2025-07-01`: BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75
+  on the same minute; the few differences are the backtest's pessimistic stop inside the fill minute (none reached
+  breakeven or the lock). Live-logic replay vs research engine with the lock: ETH 274/274, BTC 278/278 identical.
+- **Full run before going live (v2.6, Oct 2026):** `test_bot_sim.py <coin> 2021-01-01 2026-09-30`: BTC 276/277, ETH
+  273/274, BNB 287/289, ADA 260/261, SOL 246 (+14 Jan-Feb 2021 trades before the replay's 1000-candle warm-up) on the
+  same entry minute; every difference listed by `parity_detail.py`: the backtest's stop inside the fill minute (and its
+  knock-on re-entry), 1-minute entry shifts from tick rounding, and SOL's minute-data gaps (the engine counts bars, the
+  bot clock time); none involves the profit lock or the cap. `check_replay_engine.py`: replay = engine on all five coins.
+  `test_cap_sim.py 2024-01-01 2026-09-01` at $500 / $3,000 / $20,000: 539 / 594 / 594 entries, 0 off the rule.
 - `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
@@ -185,6 +195,23 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   0 off the rule.
   With the ladder (`CAPSIM_EQ=500 / 3000 / 20000`, one year each at the 7.5% / 5% / 2.5% step): 220 / 225 / 126
   entries, every BTC entry full size, 0 off the rule.
+
+## Profit lock (v2.6, Oct 2026): `research/crypto/ratchet.py`, `lock_grid.py`, `build_trades.py`
+
+Of the trades that reached +3.5R, about 1 in 3 fell back and closed below +1R (67 in 2020-23, 51 in 2024-26, giving
+back ~5R each). Trailing stops cut the big runners (net R -30 to -70%). A one-step lock works: once a trade reaches
++A R, the stop moves once to +L R. Locking early (+3 / +3.5R) hurts; +4.5R to +6R with +0.5R to +2R is better in both
+periods (fixed-size R account return/drawdown x1.00-1.15). Chosen: the middle, **+5R -> +1.5R**.
+
+| From $200, ladder + cap, to Sep 2026 | v2.5 | v2.6 (lock) |
+|---|---|---|
+| from Mar 2020 | $3.12M, worst drop 42.0% | $3.26M, 37.1% |
+| from Jan 2022 | $143k, 48.5% | $181k, 44.6% |
+| from Jan 2024 | $25.2k, 44.6% | $26.7k, 42.3% |
+| runners >= +5R 2024-26 | 55 | 52 |
+
+Event-consistent: the research engine, the live-logic replay and the bot all apply the lock; `build_trades.py v26`
+rebuilds the trade list every page uses (1,558 trades; without the lock it reproduces v2.4 exactly).
 
 ## Risk ladder (v2.5, live from Oct 2026): `portfolio.json`
 
@@ -202,21 +229,23 @@ Shorts at half size. `risk_pct` in the configs is only used if `portfolio.json` 
 12x the balance (`max_leverage`; at 7.5% risk 8x would cut 1 in 5 BTC trades, 12x about 3 in 100) and its Binance
 leverage 25x (only sets the margin a position locks; in cross margin it does not move the liquidation point).
 
-2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`); 3,000 reshuffled runs of
-2022-26 trades / every real 2-year window of 2022-26):
+2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
+reshuffled runs of 2022-26 trades / every real 2-year window of 2022-26):
 
-| | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
+| v2.6 (with the profit lock) | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
 |---|---|---|---|
-| typical end | $4.3k / $4.0k | **$5.8k / $5.6k** | $6.3k / $5.8k |
-| 1 in 4 bad end | $1.6k / $2.2k | **$2.1k / $2.7k** | $1.8k / $2.6k |
-| reach $10k | 30% / 8% | **39% / 29%** | 40% / 28% |
-| worst drop once above $1k (typical / 1 in 10) | 40% / 59% | **40% / 63%** | 53% / 74% |
-| gave back half of a $5k+ peak | 2% | **1%** | 7% |
+| typical end | $5.0k / $5.5k | **$6.9k / $7.8k** | $8.1k / $9.3k |
+| 1 in 4 bad end | $1.9k / $2.7k | **$2.5k / $3.6k** | $2.4k / $3.8k |
+| reach $10k | 33% / 13% | **42% / 42%** | 45% / 45% |
+| worst drop once above $1k (typical / 1 in 10) | 39% / 57% | **39% / 60%** | 52% / 72% |
+| gave back half of a $5k+ peak | 2% | **1%** | 6% |
 
 The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
-`trades.html` (equity chart with every trade: click one to see it on its 4h price chart with entry, stop, breakeven and exit),
-`tbo_statistics.html` (equity chart, every statistic, random journeys), `risk_comparison.html`, `plan_ladder_plus50.html`,
-`monthly_report.html`, `cap_comparison.html` all size trades like the bot.
+all in the top-level `reports/` folder: `trades.html` (equity chart with every trade: click one to see it on its 4h price
+chart with entry, stop, breakeven, lock and exit), `tbo_statistics.html` (equity chart, every statistic, random
+journeys), `risk_comparison.html`, `plan_ladder_plus50.html`, `monthly_report.html`, `cap_comparison.html`,
+`winrate_rr.html`. All are rebuilt from the live settings by the `research/crypto/make_*.py` scripts and size trades
+like the bot.
 
 ## 3-month trial from $200 (v2.5, Oct 2026)
 
@@ -225,23 +254,23 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 
 - **Start:** `git pull`, then steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades
   are mostly too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
-- **Every month-end:** `python report.py --days 31` -> `reports/report_<date>.md` + two CSV files (Binance keeps
+- **Every month-end:** `python report.py --days 31` -> `trial_results/report_<date>.md` + two CSV files (Binance keeps
   only a few months of history, so keep each month's files).
 - **Every fill** is logged with the level aimed for, the slippage and the risk (`FILLED ... level ..., slippage ...%`).
-- **After 3 months:** send the `reports/` and `logs/` folders. They are compared with the backtest of the same
+- **After 3 months:** send the `trial_results/` and `logs/` folders. They are compared with the backtest of the same
   days (same trades? same fills? fees and slippage as assumed?).
 - **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $200; every real
   3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
 
-| After 3 months | real windows | reshuffled |
+| After 3 months (v2.6) | real windows | reshuffled |
 |---|---|---|
-| 1 in 10 bad | $155 | $131 |
-| 1 in 4 bad | $184 | $179 |
-| typical | $259 | $272 |
-| 1 in 4 good | $378 | $447 |
-| 1 in 10 good | $684 | $804 |
-| below $200 / doubled | 30% / 23% | 31% / 29% |
-| worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 33% / 42% / 51% | 33% / 42% / 51% |
+| 1 in 10 bad | $163 | $138 |
+| 1 in 4 bad | $185 | $187 |
+| typical | $269 | $280 |
+| 1 in 4 good | $402 | $457 |
+| 1 in 10 good | $696 | $812 |
+| below $200 / doubled | 29% / 26% | 29% / 30% |
+| worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 30% / 41% / 49% | 31% / 40% / 49% |
 
   About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
   time in 3 and says little. A drop beyond 60% from the top would be outside the backtest's usual range: stop and

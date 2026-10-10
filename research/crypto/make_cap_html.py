@@ -1,4 +1,4 @@
-"""cryptobot/cap_comparison.html: equity and drawdown of the bot with and without the open-risk cap (and the
+"""reports/cap_comparison.html: equity and drawdown of the bot with and without the open-risk cap (and the
 'just lower the risk' alternative), from $200, for three start dates and risk sets (the bot's ladder first). botsim.py."""
 import json
 from multiprocessing import Pool
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         data["series"][key] = dict(t0=bal.index[0].strftime("%Y-%m-%d"), bal=[float(f"{v:.4g}") for v in bal.values], dd=[round(float(v), 2) for v in dd.values],
                                    stats={k: (round(float(v), 3) if isinstance(v, (int, float, np.floating, np.integer)) else v) for k, v in st.items()})
     html = open(C.ROOT / "research" / "crypto" / "cap_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
-    (C.ROOT / "cryptobot" / "cap_comparison.html").write_text(html)
+    (C.ROOT / "reports" / "cap_comparison.html").write_text(html)
     s = data["series"]
     for k in ("2024_lad_now", "2024_lad_capbtc", "2024_now_capbtc", "2022_lad_capbtc", "2020_lad_capbtc"):
         st = s[k]["stats"]; print(k, round(st["final"]), round(st["pm"], 2), round(st["dd"], 1))
