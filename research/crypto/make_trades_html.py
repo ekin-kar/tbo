@@ -14,7 +14,7 @@ r5 = lambda v: float(f"{v:.6g}")
 
 
 def main():
-    P = pd.read_pickle(C.D.CACHE / "trade_prices_v24.pkl")
+    P = pd.read_pickle(C.D.CACHE / f"trade_prices_{BS.TAG}.pkl")
     T = BS.T.merge(P, on=["sym", "entry_time"], how="left")
     assert T.entry.notna().all() and len(T) == len(BS.T)
     mins = lambda s: (s.values.astype("datetime64[m]").astype(np.int64))

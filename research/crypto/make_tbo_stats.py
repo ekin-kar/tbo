@@ -7,7 +7,8 @@ import common as C
 import botsim as BS
 
 ROOT = C.ROOT
-ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
+import botsim as _BS
+ALL = _BS.ALL
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 cfg = {c: json.load(open(ROOT / "cryptobot" / f"config_{c[:-4].lower()}.json")) for c in COINS}
 ms = lambda s: (s.values.astype("datetime64[ms]").astype(np.int64))

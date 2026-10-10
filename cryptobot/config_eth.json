@@ -19,6 +19,8 @@
     "no_weekend": true,
     "be_R": 1.5,
     "be_off": 0.0,
+    "lock_R": 5.0,
+    "lock_to": 1.5,
     "max_ext": 4.0,
     "oi_lookback_h": 72,
     "oi_min_chg": -0.03

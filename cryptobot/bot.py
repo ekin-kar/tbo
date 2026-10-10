@@ -30,7 +30,7 @@ import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.5"
+VERSION = "2.6"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -76,7 +76,7 @@ class Bot:
         if self.state_path.exists():
             return json.loads(self.state_path.read_text())
         return dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0,
-                    best=0.0, be_done=False)
+                    best=0.0, be_done=False, lock_done=False)
 
     def save(self):
         tmp = self.state_path.with_suffix(".tmp")
@@ -228,7 +228,7 @@ class Bot:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
                           client_id=f"{PREFIX}_x_{int(time.time())}")
         self.cancel(self.st.get("sl_id"))
-        self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
+        self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
         self.save()
 
     def place_sl(self, amt, entry_px):
@@ -241,6 +241,8 @@ class Bot:
         trig = entry_px - side * dist
         if self.st.get("be_done"):                      # breakeven reached: stop at entry + be_off x dist
             trig = entry_px + side * self.p.be_off * dist
+        if self.st.get("lock_done"):                    # profit lock reached: stop at entry + lock_to x dist
+            trig = entry_px + side * self.p.lock_to * dist
         trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
         log.info(f"STOP LOSS for {amt} @ {entry_px:.2f}: {fmt(trig, self.f['tick'])} ({dist:.2f} away)")
         if self.dry:
@@ -325,7 +327,7 @@ class Bot:
         if self.paused():
             log.info("PAUSE file present: no new entry orders (open positions are still managed)")
         if amt == 0 and not self.paused():
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
+            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
                 if trig is None or blocked:
                     continue
@@ -421,7 +423,7 @@ class Bot:
         elif self.st.get("entry_ms"):
             log.info("position closed (stop loss hit or closed by hand)")
             self.cancel(self.st.get("sl_id"))
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False)
+            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
             self.save()
         elif self.st.get("entry_trig") and now - self.st.get("cap_seen_ms", 0) >= 60_000:
             self.st["cap_seen_ms"] = now
@@ -491,8 +493,11 @@ class Bot:
                       client_id=f"{PREFIX}_cap_{int(time.time())}")
 
     def check_breakeven(self, amt, entry_px):
-        """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour."""
-        if self.p.be_R <= 0 or self.st.get("be_done") or not self.st.get("sl_dist"):
+        """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour, and to
+        entry + lock_to x dist once it went lock_R x dist (profit lock, v2.6)."""
+        be_left = self.p.be_R > 0 and not self.st.get("be_done")
+        lock_left = self.p.lock_R > 0 and not self.st.get("lock_done")
+        if not (be_left or lock_left) or not self.st.get("sl_dist"):
             return
         side = 1 if amt > 0 else -1
         start = self.st.get("be_from") or (self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + 60_000)
@@ -505,9 +510,14 @@ class Bot:
         best = self.st.get("best") or entry_px
         best = max(best, ext) if side == 1 else min(best, ext)
         self.st["best"] = best
-        if side * (best - entry_px) >= self.p.be_R * self.st["sl_dist"]:
+        moved = False
+        if be_left and side * (best - entry_px) >= self.p.be_R * self.st["sl_dist"]:
             log.info(f"BREAKEVEN: price reached {best:.2f} (+{self.p.be_R}R): stop moves to entry")
-            self.st["be_done"] = True
+            self.st["be_done"] = True; moved = True
+        if lock_left and side * (best - entry_px) >= self.p.lock_R * self.st["sl_dist"]:
+            log.info(f"PROFIT LOCK: price reached {best:.2f} (+{self.p.lock_R}R): stop moves to +{self.p.lock_to}R")
+            self.st["lock_done"] = True; moved = True
+        if moved:
             old = self.st.get("sl_id")
             self.cancel(old)
             self.st["sl_id"] = None

@@ -6,7 +6,8 @@ import numpy as np, pandas as pd
 import common as C
 import botsim as BS
 
-ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
+import botsim as _BS
+ALL = _BS.ALL
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 T4 = pd.concat([ALL[(s, 0.0003)] for s in COINS])
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}

@@ -5,7 +5,8 @@ import json, pickle
 import pandas as pd
 import common as C
 
-ALL = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))
+import botsim as _BS
+ALL = _BS.ALL
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 pts = {}
 for per, a in (("all", "2020-01-01"), ("2024", "2024-01-01")):

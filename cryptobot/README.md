@@ -1,4 +1,4 @@
-# TBO v2.5: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
+# TBO v2.6: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -13,6 +13,7 @@
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
+| Profit lock (v2.6) | Once price has gone **+5R** in favour, the stop moves to **+1.5R** (`lock_R` / `lock_to` in the configs). See "Profit lock" below |
 | Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
 | Risk ladder (v2.5) | `portfolio.json`: BTC 7.5% / ETH 2.5% / alts 0.83% under $1,000; 5% / 2.5% / 0.83% to $10,000; 2.5% / 1.25% / 0.42% above. See "Risk ladder" below |
@@ -185,6 +186,23 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   0 off the rule.
   With the ladder (`CAPSIM_EQ=500 / 3000 / 20000`, one year each at the 7.5% / 5% / 2.5% step): 220 / 225 / 126
   entries, every BTC entry full size, 0 off the rule.
+
+## Profit lock (v2.6, Oct 2026): `research/crypto/ratchet.py`, `lock_grid.py`, `build_trades.py`
+
+Of the trades that reached +3.5R, about 1 in 3 fell back and closed below +1R (67 in 2020-23, 51 in 2024-26, giving
+back ~5R each). Trailing stops cut the big runners (net R -30 to -70%). A one-step lock works: once a trade reaches
++A R, the stop moves once to +L R. Locking early (+3 / +3.5R) hurts; +4.5R to +6R with +0.5R to +2R is better in both
+periods (fixed-size R account return/drawdown x1.00-1.15). Chosen: the middle, **+5R -> +1.5R**.
+
+| From $200, ladder + cap, to Sep 2026 | v2.5 | v2.6 (lock) |
+|---|---|---|
+| from Mar 2020 | $3.12M, worst drop 42.0% | $3.26M, 37.1% |
+| from Jan 2022 | $143k, 48.5% | $181k, 44.6% |
+| from Jan 2024 | $25.2k, 44.6% | $26.7k, 42.3% |
+| runners >= +5R 2024-26 | 55 | 52 |
+
+Event-consistent: the research engine, the live-logic replay and the bot all apply the lock; `build_trades.py v26`
+rebuilds the trade list every page uses (1,558 trades; without the lock it reproduces v2.4 exactly).
 
 ## Risk ladder (v2.5, live from Oct 2026): `portfolio.json`
 
