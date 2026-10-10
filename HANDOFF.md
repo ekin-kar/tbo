@@ -206,3 +206,7 @@ x0.88 (2020-23), x0.99 / x0.97 / x0.81 (2024-26); ladder from 2020 drop 37.1 -> 
 sized on 1 ATR: stops cost -0.99R instead of -1.09R but 73 more stop-outs (906 vs 833): x0.95 / x1.01, ladder 2020 drop
 50.6%; 0.8 ATR: x0.84 / x1.12 (inconsistent), 2020 drop 53%; stop 0.9 + BE +0.1R: x0.89 / x0.96, 2020 drop 56%. Not adopted.
 Short size with v2.6 (Oct 2026, `short_size.py`): fixed R account net/DD vs no shorts: x0.25 1.09/1.18, x0.5 1.12/1.22 (best both periods), x0.75 1.05/1.16, x1 0.99/1.12; bigger shorts = more money and deeper drops (like more risk). Kept 0.5.
+Smoother ladders (Oct 2026, `ladder2.py`, v2.6, $200): live 3-step vs 7 steps (7.5/6.5/5.5/5/4/3/2.5 at 0/500/1k/2.5k/
+5k/10k/20k) vs log-linear glides: all within noise. 7 steps: history drops 36.3/42.3/42.3% vs 37.1/44.6/42.3% (2020/22/24
+runs), 2-yr bootstrap typical $7.0k vs $6.9k, P($10k) 40% vs 42%, drop after $1k same. Glides cut the 2022-run drop
+(35-39%) but lower P($10k) (real windows 29-42% vs 43%). Kept the live 3-step ladder.
