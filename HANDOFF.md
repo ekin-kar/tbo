@@ -195,3 +195,9 @@ replay BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75 (fill-minute stop c
 2021-26 identical. Ladder from $200: 2020 $3.26M drop 37.1%, 2022 $181k 44.6%, 2024 $26.7k 42.3%. With v26 the cap's
 profit effect is mixed (2024: no cap $29.7k 45.9% vs cap $26.7k 42.3%; 2022: $150k vs $181k) but it lowers drops: kept.
 
+Universe expansion (Oct 2026, `universe.py`, v2.4 trades of 12 coins, bot sizing ladder + cap, $200): 12 coins with extra
+alts at 0.83%: 2020-23 ret/drop x1.35 but 2024-26 x1.01 (drop 47.3 vs 44.6%), fixed R account x0.90 / x0.92; alts
+0.42%: x1.24 / x1.01, fixed x0.90 / x1.00; same alt budget spread over 10 alts: x1.07 / x0.95; 5 + DOGE: x1.07 / x0.99;
+5 + DOGE/XRP/LINK/AVAX at 0.5%: x1.24 / x1.04, fixed x1.04 / x1.08 (best, modest). 2020-23 gains = the 2021 alt boom;
+2024-26 no clear gain (alts move with BTC). Not adopted at $200 (extra alt risk ~$1 -> many orders below Binance minimums);
+revisit the 9-coin set at a few $k.
