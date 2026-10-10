@@ -178,3 +178,12 @@ $21.9k x1.00 / x0.98, only-fresh-BTC-blocks $19.0k; chop-only ADX<20 x1.30 in 20
 chance (near level 0.25-1R, retest at level / +0.5R, 12-48h) recovers part (best $16.8k) but re-entries avg 0.2-0.9R
 and retests often negative; none beats the bot in 2024-26. Nothing adopted; the open-risk cap already does the useful
 part (alts held while BTC is fresh).
+BTC losing-streak brake (Oct 2026, `btc_streak.py`): BTC x0.5 after 2 BTC stops until a BTC trade hits +1.5R: ladder
+from 2020 worst drop 42.0 -> 47.0% ($3.12M -> $1.19M), from 2024 44.6 -> 43.3% ($25.2k -> $16.2k); 3 stops / x0.33 /
+reset on a winner / all coins: drops -3 to +7 points, profit -25 to -90%. Not adopted (the recovery trade is half size).
+Exit ratchet (`ratchet.py`, `lock_grid.py`, engine exact on 1551 trades): trades reaching +3.5R but closing < +1R:
+67 (2020-23) / 51 (2024-26), avg exit -0.07R, gave back ~5.4R. Trailing stops after +3.5..5R (1-3R): bad (net R -30 to
+-70%, runners >= 5R 55 -> 10-42). One-step profit lock (+A R reached -> stop to +L R): A 3-3.5R worse; plateau A 4.5-6R,
+L 0.5-2R better in both periods on a fixed R account (net/DD x1.00-1.15), ladder worst drop 42 -> 33-40% (2020 run),
+44.6 -> 41.5-43% (2024 run), same profit, runners kept 48-55/55. Centre: +5R -> +1.5R (x1.11 / x1.02; drop 34.9% /
+42.3%; $3.41M / $26.7k). Not in the bot yet.
