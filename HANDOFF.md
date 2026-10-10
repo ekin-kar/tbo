@@ -205,3 +205,4 @@ Breakeven offset / tighter stop (Oct 2026, `be_stop_test.py`, v2.6 rules, result
 x0.88 (2020-23), x0.99 / x0.97 / x0.81 (2024-26); ladder from 2020 drop 37.1 -> 42-45%, $3.26M -> $1.2-2.1M. Stop 0.9 ATR
 sized on 1 ATR: stops cost -0.99R instead of -1.09R but 73 more stop-outs (906 vs 833): x0.95 / x1.01, ladder 2020 drop
 50.6%; 0.8 ATR: x0.84 / x1.12 (inconsistent), 2020 drop 53%; stop 0.9 + BE +0.1R: x0.89 / x0.96, 2020 drop 56%. Not adopted.
+Short size with v2.6 (Oct 2026, `short_size.py`): fixed R account net/DD vs no shorts: x0.25 1.09/1.18, x0.5 1.12/1.22 (best both periods), x0.75 1.05/1.16, x1 0.99/1.12; bigger shorts = more money and deeper drops (like more risk). Kept 0.5.
