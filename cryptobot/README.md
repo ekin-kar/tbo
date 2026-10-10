@@ -303,7 +303,14 @@ entries, breakeven moves and the 5-day exit until it is back.
 3. **Install** (Python 3.10+): `git clone` this repo (branch `claude/sweet-meitner-lubkf9`), then
    `pip install -r cryptobot/requirements.txt`.
 4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
-   token + chat id for phone alerts (fills, stops, breakeven, exits, warnings).
+   token + chat id for phone messages (`TELEGRAM_UTC_OFFSET=3` shows times in UTC+3; default: the computer's time zone).
+   What arrives (run with `run_all.py`): one **start-up** message (balance, risk per coin, cap, exits, every coin's
+   status); one **4h check** message after every 4h close (one line per coin: the order placed with its stop and risk,
+   in a trade with its R and stop, or why there is no order: weekend, open-interest filter, no trend, cap full;
+   balance and open risk); and per trade: **opened** (entry, slippage, stop loss, the breakeven and profit-lock
+   prices, size, risk, opening and time-exit times, the open-risk cap), **stop to breakeven**, **profit locked**,
+   **cut by the cap**, **closed** (R, $ after fees and funding, exit reason, hold time, balance). Warnings and
+   errors are sent too, each one at most once per 30 minutes.
 5. **Risk:** the risk ladder and the open-risk cap in `portfolio.json` (see "Risk ladder"; shorts x0.5 in the
    configs). `risk_pct` in the configs is only the fallback when `portfolio.json` has no ladder.
 6. **Check:** `cd cryptobot && python check_setup.py` (places no orders). Every line must be OK (WARN = read it):

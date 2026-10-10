@@ -56,7 +56,7 @@ def utc(ms):
 
 class Bot:
     def __init__(self, cfg, path, testnet=False, dry=False):
-        self.cfg, self.dry = cfg, dry
+        self.cfg, self.dry, self.testnet = cfg, dry, testnet
         self.p = S.Params(**cfg["strategy"])
         self.sym = self.p.symbol
         self.risk = float(cfg["risk_pct"]) / 100
@@ -82,6 +82,98 @@ class Bot:
         tmp = self.state_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.st, indent=1))
         tmp.replace(self.state_path)
+
+    # ── Telegram (trade events; warnings go through notify.TelegramHandler) ──
+    @property
+    def coin(self):
+        return self.sym[:-4] if self.sym.endswith("USDT") else self.sym
+
+    def tg(self, text):
+        if notify.enabled():
+            mode = " <i>(dry run)</i>" if self.dry else " <i>(testnet)</i>" if getattr(self, "testnet", False) else ""
+            first, _, rest = text.partition("\n")
+            notify.send(first + mode + ("\n" + rest if rest else ""))
+
+    def P(self, x):
+        return notify.px(x, self.f["tick"])
+
+    def announce_open(self, amt, entry_px, stop):
+        """The trade is open and its stop loss is on Binance."""
+        self.st["announce"] = False
+        if not notify.enabled():
+            return
+        try:
+            side, q, d = (1 if amt > 0 else -1), abs(amt), self.st.get("sl_dist") or 0.0
+            eq = self.equity()
+            risk = q * abs(entry_px - stop)
+            want = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0)
+            lvl, e_ms = self.st.get("fill_lvl") or 0.0, self.st.get("entry_ms") or self.x.now_ms()
+            rows = [f"{'📈' if side > 0 else '📉'} <b>{self.coin} {'long' if side > 0 else 'short'} opened</b>",
+                    f"Entry <b>{self.P(entry_px)}</b>" + (f" · level {self.P(lvl)}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""),
+                    f"Stop loss <b>{self.P(stop)}</b> ({notify.pct(-abs(entry_px - stop) / entry_px * 100)})"]
+            rows.append("Take profit: none fixed, winners run up to the time exit")
+            if self.p.be_R > 0:
+                rows.append(f"At {self.P(entry_px + side * self.p.be_R * d)} (+{self.p.be_R:g}R) the stop moves to the entry")
+            if self.p.lock_R > 0:
+                rows.append(f"At {self.P(entry_px + side * self.p.lock_R * d)} (+{self.p.lock_R:g}R) the stop locks +{self.p.lock_to:g}R")
+            rows.append(f"Size {notify.esc(fmt(q, self.f['step']))} {self.coin} = {notify.usd(q * entry_px)} ({q * entry_px / eq:.1f}× the balance)")
+            rows.append(f"Risk <b>{notify.usd(risk)}</b> = {risk / eq * 100:.2f}% of {notify.usd(eq)}")
+            rows.append(f"Opened {notify.when(e_ms)} · time exit {notify.when(e_ms + self.p.max_hold_h * 3600_000)} ({notify.tz_label()})")
+            pf = self.portfolio()
+            if self.sym in pf.get("cap_exempt", []):
+                rows.append("Open-risk cap: BTC is exempt (always full size)")
+            elif self.cap_frac(eq) > 0:
+                used, _ = self.open_risk()
+                cap = self.cap_frac(eq) * eq
+                rows.append(f"Open-risk cap: {notify.usd(used + risk)} of {notify.usd(cap)} in use ({self.cap_frac(eq) * 100:.2f}% of the balance)"
+                            + (f" · trade shrunk to {risk / want * 100:.0f}% of its normal size" if risk < 0.95 * want and used + want > cap else ""))
+            self.tg("\n".join(rows))
+        except Exception as e:
+            log.info(f"telegram (open): {e}")
+
+    def report_close(self, why):
+        """Result of the trade that just closed (before the state is reset)."""
+        if not notify.enabled() or not self.st.get("entry_ms"):
+            return
+        try:
+            e_ms, side, now = self.st["entry_ms"], self.st.get("entry_side") or 0, self.x.now_ms()
+            entry, risk = self.st.get("fill_px") or 0.0, self.st.get("risk_usdt") or 0.0
+            pnl = fees = funding = 0.0; xq = xv = 0.0
+            try:
+                for t in self.x.user_trades(self.sym, limit=200, start_ms=e_ms - 60_000):
+                    if int(t["time"]) < e_ms - 60_000:
+                        continue
+                    pnl += float(t.get("realizedPnl", 0))
+                    c = float(t.get("commission", 0))
+                    fees += c if t.get("commissionAsset", "USDT") in ("USDT", "USDC") else c * self.x.last_price(t["commissionAsset"] + "USDT")
+                    if float(t.get("realizedPnl", 0)) != 0 or (t.get("side") == ("SELL" if side > 0 else "BUY")):
+                        xq += float(t["qty"]); xv += float(t["qty"]) * float(t["price"])
+                    if not side:
+                        side = 1 if t.get("side") == "BUY" else -1
+                    if not entry and float(t.get("realizedPnl", 0)) == 0:
+                        entry = float(t["price"])
+                for r in self.x.income(e_ms, now):
+                    if r.get("symbol") == self.sym and r.get("incomeType") == "FUNDING_FEE":
+                        funding += float(r["income"])
+            except Exception as e:
+                log.info(f"telegram (trade history): {e}")
+            est = not xq                                # no trade history: estimate from the price now
+            exit_px = xv / xq if xq else self.x.last_price(self.sym)
+            if est:
+                q = self.st.get("fill_qty") or 0.0
+                pnl = side * (exit_px - entry) * q
+                fees = 0.0005 * q * (entry + exit_px)
+            net = pnl - fees + funding
+            R = net / risk if risk > 0 else 0.0
+            icon = "✅" if R >= 0.2 else "❌" if R <= -0.2 else "⚪"
+            rows = [f"{icon} <b>{self.coin} {'long' if side > 0 else 'short'} closed · {notify.num(R, 2, sign=True)}R · {notify.usd(net, sign=True)}</b>",
+                    f"Exit {self.P(exit_px)} · {notify.esc(why)}",
+                    f"Entry {self.P(entry)} · held {notify.held(now - e_ms)}",
+                    f"Fees {notify.usd(fees)} · funding {notify.usd(funding, sign=True)}" + (" <i>(estimated: trade history not readable)</i>" if est else ""),
+                    f"Balance {notify.usd(self.equity())}"]
+            self.tg("\n".join(rows))
+        except Exception as e:
+            log.info(f"telegram (close): {e}")
 
     # ── helpers ──
     def equity(self):
@@ -221,12 +313,15 @@ class Bot:
         return 0.0, note + ": no room"
 
     # ── actions ──
-    def close_position(self, amt, why):
+    def close_position(self, amt, why, tg_why=None):
         side = "SELL" if amt > 0 else "BUY"
         log.info(f"EXIT {why}: {side} {abs(amt)} at market")
         if not self.dry:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
                           client_id=f"{PREFIX}_x_{int(time.time())}")
+            if notify.enabled():
+                time.sleep(1.5)                         # let the fill reach the trade history
+        self.report_close(tg_why or why)
         self.cancel(self.st.get("sl_id"))
         self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
         self.save()
@@ -246,12 +341,12 @@ class Bot:
         trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
         log.info(f"STOP LOSS for {amt} @ {entry_px:.2f}: {fmt(trig, self.f['tick'])} ({dist:.2f} away)")
         if self.dry:
-            return
+            return trig
         last = self.x.last_price(self.sym)
         if (side == 1 and last <= trig) or (side == -1 and last >= trig):
             log.warning(f"price {last} already beyond the stop {fmt(trig, self.f['tick'])}: closing at market")
-            self.close_position(amt, "SL (price already past the stop)")
-            return
+            self.close_position(amt, "SL (price already past the stop)", "stop loss (price was already past it)")
+            return None
         try:
             r = self.x.stop_market(self.sym, "SELL" if side == 1 else "BUY", fmt(trig, self.f["tick"]),
                                    close_position=True, client_id=f"{PREFIX}_sl_{int(time.time())}")
@@ -259,10 +354,11 @@ class Bot:
         except BinanceError as e:
             if e.code == -2021:                         # would trigger at once: price is already past the stop
                 log.warning("price already beyond the stop: closing at market")
-                self.close_position(amt, "SL (gap)")
-                return
+                self.close_position(amt, "SL (gap)", "stop loss (price gapped past it)")
+                return None
             raise
         self.save()
+        return trig
 
     def place_entry(self, side, trig, qty):
         """Stop-market entry at trig; at market if the price is already beyond it (the backtest fills at the open)."""
@@ -272,7 +368,7 @@ class Bot:
         if (side == 1 and last >= trig) or (side == -1 and last <= trig):
             log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
             self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
-            return
+            return True
         try:
             r = self.x.stop_market(self.sym, bs, fmt(trig, self.f["tick"]), qty=q, client_id=f"{PREFIX}_in_{int(time.time())}")
             self.st["entry_id"] = r["algoId"]
@@ -281,6 +377,8 @@ class Bot:
                 raise
             log.info("price already beyond the level: market entry (as the backtest fills at the open)")
             self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
+            return True
+        return False
 
     def on_candle_close(self, open_ms):
         k4, k1 = self.candles()
@@ -294,9 +392,11 @@ class Bot:
         log.info(f"4h close {utc(open_ms + 4 * 3600_000)}: close {c[-1]:.2f}  ATR {dec.atr:.2f}  trend "
                  f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"
                  f"{'  (weekend: no new orders)' if self.p.no_weekend and weekday >= 5 else ''}  position {amt}")
+        close_ms = open_ms + self.p.tf_min * 60_000
+        status = None                                   # the line for the 4h-check message
         # 1. trail exit
         if (amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short):
-            self.close_position(amt, "trail")
+            self.close_position(amt, "trail", "trail exit")
             amt = 0.0
         # 2. the previous entry order expires at this close
         if self.st.get("entry_id"):
@@ -324,6 +424,25 @@ class Bot:
             amt, _ = self.x.position(self.sym)
             if amt != 0:
                 log.info(f"the previous entry order filled just now ({amt}): no new order")
+        risk_open = 0.0
+        if amt != 0:
+            side_ = 1 if amt > 0 else -1
+            ep = self.st.get("fill_px") or entry_px
+            d_ = self.st.get("sl_dist") or 0.0
+            r_now = side_ * (c[-1] - ep) / d_ if d_ else 0.0
+            stage = "profit locked at +%gR" % self.p.lock_to if self.st.get("lock_done") else "stop at breakeven" if self.st.get("be_done") else "stop " + self.P(ep - side_ * d_)
+            risk_open = 0.0 if self.st.get("be_done") else abs(amt) * d_
+            status = f"● in a {'long' if side_ > 0 else 'short'} since {notify.when(self.st.get('entry_ms') or self.x.now_ms())} · {notify.num(r_now, 1, sign=True)}R now · {stage}"
+        elif self.paused():
+            status = "paused (PAUSE file): no new orders"
+        elif self.p.no_weekend and weekday >= 5:
+            status = "weekend: no new orders"
+        elif blocked:
+            status = f"no order · open interest {notify.pct(chg * 100, sign=True, dec=1)} in {self.p.oi_lookback_h} h (filter)"
+        elif dec.trend == 0:
+            status = "no order · no clear daily trend"
+        elif dec.long_trigger is None and dec.short_trigger is None:
+            status = "no order · price stretched far from the daily trend line"
         if self.paused():
             log.info("PAUSE file present: no new entry orders (open positions are still managed)")
         if amt == 0 and not self.paused():
@@ -347,18 +466,28 @@ class Bot:
                              f"placed if room opens before the price gets there, until the next 4h close")
                     self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_trig=trig, entry_qty=0.0,
                                    entry_from=open_ms + self.p.tf_min * 60_000)
+                    status = (f"{'▲ buy' if side == 1 else '▼ sell'} stop {self.P(trig)} held back: the open-risk cap is full "
+                              f"(placed if room opens before the next check)")
                     break
                 if qty <= 0:
+                    status = "no order · size below Binance's minimum"
                     continue
                 log.info(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
                          f"{fmt(trig, self.f['tick'])}  (SL dist {dec.sl_dist:.2f} = {dec.sl_dist / trig * 100:.2f}%, "
                          f"risk {qty * dec.sl_dist:.2f} USDT, valid until the next 4h close)")
                 self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_from=open_ms + self.p.tf_min * 60_000)
+                eq_ = self.equity()
+                want_ = eq_ * self.risk_now(eq_) * (self.short_mult if side < 0 else 1.0)
+                status = (f"{'▲ buy' if side == 1 else '▼ sell'} stop {self.P(trig)} · stop loss {self.P(trig - side * dec.sl_dist)} "
+                          f"({dec.sl_dist / trig * 100:.2f}%) · risk {notify.usd(qty * dec.sl_dist)}"
+                          + (f" (shrunk to {qty * dec.sl_dist / want_ * 100:.0f}% by the open-risk cap)" if "shrunk" in (note or "") else ""))
                 if self.dry:
                     break
-                self.place_entry(side, trig, qty)
+                if self.place_entry(side, trig, qty):
+                    status = f"{'▲ bought' if side == 1 else '▼ sold'} at market: price was already past {self.P(trig)}"
                 break                                   # one entry order at a time (sides="both": trend picks one)
         self.st["last_candle"] = open_ms
+        self.st["check"] = dict(t=close_ms, line=status or "no order", risk=round(risk_open, 2))
         self.save()
         return True
 
@@ -409,19 +538,31 @@ class Bot:
                 risk = abs(amt) * (self.st.get("sl_dist") or 0)
                 self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
                 self.st["cap_check"] = self.cap_frac() > 0
+                self.st.update(fill_px=entry_px, fill_lvl=lvl, fill_qty=abs(amt), risk_usdt=risk, entry_side=side, announce=True)
                 log.info(f"FILLED {amt} @ {entry_px:.2f}{slip}, risk {risk:.2f} USDT")
                 self.save()
             if not self.sl_alive():
-                self.place_sl(amt, entry_px)
+                stop = self.place_sl(amt, entry_px)
+                if stop and self.st.get("announce"):
+                    self.announce_open(amt, entry_px, stop)
+                    self.save()
             if self.st.get("cap_check") and self.st.get("entry_ms"):
                 self.trim_to_cap(amt)
                 amt, entry_px = self.x.position(self.sym)
             if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
                 self.check_breakeven(amt, entry_px)
             if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
-                self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)")
+                self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)", f"time exit after {self.p.max_hold_h / 24:g} days")
         elif self.st.get("entry_ms"):
             log.info("position closed (stop loss hit or closed by hand)")
+            why = "closed outside the bot (by hand?)"
+            try:
+                if self.st.get("sl_id") and self.x.algo_order(algo_id=self.st["sl_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                    why = ("profit-lock stop (+%gR)" % self.p.lock_to if self.st.get("lock_done") else
+                           "breakeven stop" if self.st.get("be_done") else "stop loss")
+            except Exception:
+                why = "stop loss or closed by hand"
+            self.report_close(why)
             self.cancel(self.st.get("sl_id"))
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
             self.save()
@@ -483,12 +624,16 @@ class Bot:
         px = self.x.last_price(self.sym)
         if allowed <= 0 or keep < self.f["min_qty"] or keep * px < self.f["min_notional"]:
             log.info(f"CAP after the fill: {note}")
-            self.close_position(amt, "open-risk cap (other coins filled first)")
+            self.close_position(amt, "open-risk cap (other coins filled first)", "closed by the open-risk cap: other coins filled first")
             return
         cut = floor_step(abs(amt) - keep, step)
         if cut <= 0:
             return
         log.info(f"CAP after the fill: {note}: position cut by {fmt(cut, self.f['step'])} to {fmt(keep, self.f['step'])}")
+        self.st["risk_usdt"] = keep * self.st["sl_dist"]
+        self.tg(f"✂️ <b>{self.coin} trade cut by the open-risk cap</b>\nOther coins filled first: "
+                f"{fmt(abs(amt), self.f['step'])} → {fmt(keep, self.f['step'])} {self.coin}, "
+                f"risk {notify.usd(want)} → {notify.usd(keep * self.st['sl_dist'])}")
         self.x.market(self.sym, "SELL" if amt > 0 else "BUY", fmt(cut, self.f["step"]), reduce_only=True,
                       client_id=f"{PREFIX}_cap_{int(time.time())}")
 
@@ -521,7 +666,15 @@ class Bot:
             old = self.st.get("sl_id")
             self.cancel(old)
             self.st["sl_id"] = None
-            self.place_sl(amt, entry_px)
+            stop = self.place_sl(amt, entry_px)
+            if stop:
+                risk = self.st.get("risk_usdt") or abs(amt) * self.st["sl_dist"]
+                if self.st.get("lock_done") and lock_left:
+                    self.tg(f"🔒 <b>{self.coin} profit locked</b>\nPrice reached {self.P(best)} (+{self.p.lock_R:g}R) · "
+                            f"stop moved to {self.P(stop)} = +{self.p.lock_to:g}R ({notify.usd(self.p.lock_to * risk, sign=True)} at worst)")
+                else:
+                    self.tg(f"🛡 <b>{self.coin} stop moved to breakeven</b>\nPrice reached {self.P(best)} (+{self.p.be_R:g}R) · "
+                            f"stop now at the entry {self.P(stop)}: this trade can no longer lose (apart from fees)")
         self.save()
 
     def run(self):
