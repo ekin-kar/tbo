@@ -210,3 +210,11 @@ Smoother ladders (Oct 2026, `ladder2.py`, v2.6, $200): live 3-step vs 7 steps (7
 5k/10k/20k) vs log-linear glides: all within noise. 7 steps: history drops 36.3/42.3/42.3% vs 37.1/44.6/42.3% (2020/22/24
 runs), 2-yr bootstrap typical $7.0k vs $6.9k, P($10k) 40% vs 42%, drop after $1k same. Glides cut the 2022-run drop
 (35-39%) but lower P($10k) (real windows 29-42% vs 43%). Kept the live 3-step ladder.
+Post-profit bleed filters (Oct 2026, `bleed_test.py`, v2.6): fixed R units from trades entered in the 7 d after a >= +5R
+winner closed: +0.69 (2020-23) / +1.16 (2024-26) vs +2.60 / +2.15 for any 7 d window, but losing as often (52-62% vs
+56-64%); 14 d after: +1.55 / +4.67 vs +5.31 / +4.42 -> weak, not consistent. 34 rules (pause / half size 3-14 d after a
++5R / +10R win, per coin, after +30-100% equity jumps, below the equity average of 10/20/50 trades, after -3/-5R in 7-14
+d, after a big win + 2-3 losses, after big BTC moves): none better in both periods on the fixed R account (best x1.00-1.05 /
+x0.95-1.00); equity-average filters cut drops (to 28-33%) but lose 25-35% of the edge (x0.64-0.75); skipping kills it.
+Ladder-only gains (e.g. x0.5 for 3 d after +5R: 2024-26 $34k) are compounding path luck (fixed account x1.00 / x0.98).
+Nothing adopted.
