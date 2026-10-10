@@ -236,3 +236,12 @@ candle closed when the confirm candle opened (checked: 40/40 4h-confirm entries 
 previous 20-candle level). Earlier close-confirm results (v2 research) were biased low, but the fixed ones are still far
 worse than the stop order.
 
+Cap study (Oct 2026, `cap_study.py`, v2.6; fixed account in units, cap in the same units): trades the cap skips avg
++0.30R (2020-23) / -0.04R (2024-26) vs +0.50 for full-size alt trades; trimmed ones +0.92 / +0.78 (kept, smaller).
+Cost of the cap in units: skipped +14.9 / -3.7, trimmed part +2.9 / +2.5. Per coin with / without cap 2020-23 | 2024-26:
+ETH 80/95 | 76/71, BNB 13/14 | 17/22, SOL 26/25 | 15/13, ADA 32/34 | 11/12. No cap: ret/drop x0.89 / x0.93 (drop 11.0 vs
+9.5%, 15.3 vs 14.3%). Blocked trades by BTC state (BTC trade progress, BTC 7d move) flip sign between periods (n 5-33):
+noise. Opposite-direction case never occurs (alts only trade with BTC's trend when BTC is fresh). Variants (ret/drop x
+now, 2020-23 / 2024-26): cap 0.8-1.0x 1.03-1.06 / 0.98-0.99, 1.2x 1.00 / 0.97, 1.3-1.5x 0.92-0.95 / 0.92-0.96, ETH exempt
+0.94 / 0.92, BTC risk free at +0.5/+1R 0.93-0.94 / 0.98-0.99, no cap on strong BTC 7d move 0.87-0.91 / 0.99-1.00, min
+fraction 0 / 0.5 / 0.99 1.01-1.03 / 0.98-1.00. None better in both; 1.1x stays (middle of the plateau).
