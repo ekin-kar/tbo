@@ -168,3 +168,13 @@ Trade explorer `cryptobot/trades.html` (`make_trades_html.py` + `trades_template
 2022 / 2020) sized by botsim, equity chart with a dot per trade, 4h price chart per trade (entry, stop, breakeven, exit),
 filters, cap cut / skip marked. Prices from `trade_prices.py` (rebuilds the v2.4 trades with prices: 1551 / 1551 match).
 
+Gate / second-chance study (Oct 2026, `gate_test.py`, `tradepath.py` = validated 1m trade simulator, 300/300 exact):
+holding a new trade while another coin's same-direction trade is fresh. Premise check: trades entering with 1 other
+fresh same-dir trade avg +0.74R / +0.73R (2020-23 / 2024-26) vs solo +0.69 / +0.44 -> joint breakouts are the runs,
+not the chop; worst drops 2020 and 2024 were BTC losing streaks (BTC -$422 of -$432, -$64 of -$77). Results vs the bot
+(ladder + cap, $200): strict gate 2024-26 $2.5k vs $25.2k (blocked trades avg +0.68R); best variants: max 2 fresh
+same-dir (drop 42->38 / 44.6->39.6 but $14.7k, ret/DD x1.14 / x0.99 = same as lowering risk), max 2 fresh BTC exempt
+$21.9k x1.00 / x0.98, only-fresh-BTC-blocks $19.0k; chop-only ADX<20 x1.30 in 2020-23 but x0.60 in 2024-26. Second
+chance (near level 0.25-1R, retest at level / +0.5R, 12-48h) recovers part (best $16.8k) but re-entries avg 0.2-0.9R
+and retests often negative; none beats the bot in 2024-26. Nothing adopted; the open-risk cap already does the useful
+part (alts held while BTC is fresh).
