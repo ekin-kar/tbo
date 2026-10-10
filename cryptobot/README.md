@@ -182,6 +182,12 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 - v2.6 profit lock, `test_bot_sim.py <coin> 2024-01-01 2025-07-01`: BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75
   on the same minute; the few differences are the backtest's pessimistic stop inside the fill minute (none reached
   breakeven or the lock). Live-logic replay vs research engine with the lock: ETH 274/274, BTC 278/278 identical.
+- **Full run before going live (v2.6, Oct 2026):** `test_bot_sim.py <coin> 2021-01-01 2026-09-30`: BTC 276/277, ETH
+  273/274, BNB 287/289, ADA 260/261, SOL 246 (+14 Jan-Feb 2021 trades before the replay's 1000-candle warm-up) on the
+  same entry minute; every difference listed by `parity_detail.py`: the backtest's stop inside the fill minute (and its
+  knock-on re-entry), 1-minute entry shifts from tick rounding, and SOL's minute-data gaps (the engine counts bars, the
+  bot clock time); none involves the profit lock or the cap. `check_replay_engine.py`: replay = engine on all five coins.
+  `test_cap_sim.py 2024-01-01 2026-09-01` at $500 / $3,000 / $20,000: 539 / 594 / 594 entries, 0 off the rule.
 - `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
