@@ -187,3 +187,11 @@ Exit ratchet (`ratchet.py`, `lock_grid.py`, engine exact on 1551 trades): trades
 L 0.5-2R better in both periods on a fixed R account (net/DD x1.00-1.15), ladder worst drop 42 -> 33-40% (2020 run),
 44.6 -> 41.5-43% (2024 run), same profit, runners kept 48-55/55. Centre: +5R -> +1.5R (x1.11 / x1.02; drop 34.9% /
 42.3%; $3.41M / $26.7k). Not in the bot yet.
+v2.6 LIVE (Oct 2026): profit lock +5R -> stop +1.5R in strategy.Params (lock_R / lock_to, configs), bot.check_breakeven
+(lock_done state, PROFIT LOCK log/Telegram), replay.py, xengine/common/families (lock_R, lock_to). build_trades.py
+rebuilds the trade list (check: identical to v24 without the lock; v26: 1558 trades) -> cache/portfolio_trades_v26.pkl
++ trade_prices_v26.pkl; botsim.TAG = v26 (env BOT_TRADES=v24 for the old list); all pages regenerated. Parity: bot vs
+replay BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75 (fill-minute stop cases only); replay vs engine ETH/BTC
+2021-26 identical. Ladder from $200: 2020 $3.26M drop 37.1%, 2022 $181k 44.6%, 2024 $26.7k 42.3%. With v26 the cap's
+profit effect is mixed (2024: no cap $29.7k 45.9% vs cap $26.7k 42.3%; 2022: $150k vs $181k) but it lowers drops: kept.
+

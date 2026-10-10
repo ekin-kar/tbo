@@ -179,6 +179,9 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   exchange on 1m history (v2.1): 327 vs 328 trades, 326 on the same minute, entry price within 1 tick, gross R
   234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
+- v2.6 profit lock, `test_bot_sim.py <coin> 2024-01-01 2025-07-01`: BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75
+  on the same minute; the few differences are the backtest's pessimistic stop inside the fill minute (none reached
+  breakeven or the lock). Live-logic replay vs research engine with the lock: ETH 274/274, BTC 278/278 identical.
 - `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
@@ -220,16 +223,16 @@ Shorts at half size. `risk_pct` in the configs is only used if `portfolio.json` 
 12x the balance (`max_leverage`; at 7.5% risk 8x would cut 1 in 5 BTC trades, 12x about 3 in 100) and its Binance
 leverage 25x (only sets the margin a position locks; in cross margin it does not move the liquidation point).
 
-2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`); 3,000 reshuffled runs of
-2022-26 trades / every real 2-year window of 2022-26):
+2 years from $200 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
+reshuffled runs of 2022-26 trades / every real 2-year window of 2022-26):
 
-| | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
+| v2.6 (with the profit lock) | flat 5% + cap | **ladder (the bot)** | flat 7.5% + cap |
 |---|---|---|---|
-| typical end | $4.3k / $4.0k | **$5.8k / $5.6k** | $6.3k / $5.8k |
-| 1 in 4 bad end | $1.6k / $2.2k | **$2.1k / $2.7k** | $1.8k / $2.6k |
-| reach $10k | 30% / 8% | **39% / 29%** | 40% / 28% |
-| worst drop once above $1k (typical / 1 in 10) | 40% / 59% | **40% / 63%** | 53% / 74% |
-| gave back half of a $5k+ peak | 2% | **1%** | 7% |
+| typical end | $5.0k / $5.5k | **$6.9k / $7.8k** | $8.1k / $9.3k |
+| 1 in 4 bad end | $1.9k / $2.7k | **$2.5k / $3.6k** | $2.4k / $3.8k |
+| reach $10k | 33% / 13% | **42% / 42%** | 45% / 45% |
+| worst drop once above $1k (typical / 1 in 10) | 39% / 57% | **39% / 60%** | 52% / 72% |
+| gave back half of a $5k+ peak | 2% | **1%** | 6% |
 
 The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
 `trades.html` (equity chart with every trade: click one to see it on its 4h price chart with entry, stop, breakeven and exit),
@@ -251,15 +254,15 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 - **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $200; every real
   3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
 
-| After 3 months | real windows | reshuffled |
+| After 3 months (v2.6) | real windows | reshuffled |
 |---|---|---|
-| 1 in 10 bad | $155 | $131 |
-| 1 in 4 bad | $184 | $179 |
-| typical | $259 | $272 |
-| 1 in 4 good | $378 | $447 |
-| 1 in 10 good | $684 | $804 |
-| below $200 / doubled | 30% / 23% | 31% / 29% |
-| worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 33% / 42% / 51% | 33% / 42% / 51% |
+| 1 in 10 bad | $163 | $138 |
+| 1 in 4 bad | $185 | $187 |
+| typical | $269 | $280 |
+| 1 in 4 good | $402 | $457 |
+| 1 in 10 good | $696 | $812 |
+| below $200 / doubled | 29% / 26% | 29% / 30% |
+| worst drop inside the 3 months (typical / 1 in 4 / 1 in 10) | 30% / 41% / 49% | 31% / 40% / 49% |
 
   About 58 trades in 3 months (41-74), most of them small losses or breakeven. A losing 3 months happens about 1
   time in 3 and says little. A drop beyond 60% from the top would be outside the backtest's usual range: stop and
