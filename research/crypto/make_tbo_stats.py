@@ -1,4 +1,4 @@
-"""Builds cryptobot/tbo_statistics.html (TBO v2.5, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
+"""Builds reports/tbo_statistics.html (TBO v2.6, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
 botsim.py) and Python reference results (botsim) for checking the page's math (check_tbo_stats.py).
 Trades: TBO v2.4 rules (v2.2 + open-interest filter from 2022, filter_test3.py 'USD 3d <= -3%'; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import json, pickle
@@ -47,8 +47,7 @@ if __name__ == "__main__":
                 risk=[cfg[s]["risk_pct"] for s in COINS], smult=cfg["BTCUSDT"]["short_risk_mult"],
                 strat=cfg["BTCUSDT"]["strategy"], maxlev=cfg["BTCUSDT"]["max_leverage"], exlev=cfg["BTCUSDT"].get("exchange_leverage", cfg["BTCUSDT"]["max_leverage"]))
     html = open(ROOT / "research" / "crypto" / "tbo_stats_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
-    (ROOT / "cryptobot" / "tbo_statistics.html").write_text(html)
-    (ROOT / "stats" / "tbo_crypto_statistics.html").write_text(html)
+    (ROOT / "reports" / "tbo_statistics.html").write_text(html)
     T0, T1 = int(pd.Timestamp("2020-03-01").value // 10**6), int(pd.Timestamp("2026-10-01").value // 10**6)
     T24 = int(pd.Timestamp("2024-01-01").value // 10**6)
     cases = {"all5": ([1, 1, 1, 1, 1], T0), "btc": ([1, 0, 0, 0, 0], T0), "btc_eth": ([1, 1, 0, 0, 0], T0), "alts_2024": ([0, 0, 1, 1, 1], T24),

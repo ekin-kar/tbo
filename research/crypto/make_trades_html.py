@@ -1,4 +1,4 @@
-"""cryptobot/trades.html: every trade of the bot on one $200 account (sized like the bot: risk ladder + open-risk cap,
+"""reports/trades.html: every trade of the bot on one $200 account (sized like the bot: risk ladder + open-risk cap,
 botsim.py), with the equity chart and each trade's 4h price chart (entry, stop, breakeven, exit). Click a trade in the
 table or a dot on the equity chart to see it. Prices from trade_prices.py (same engine, matched trade for trade)."""
 import json
@@ -48,7 +48,7 @@ def main():
     data = dict(coins=[s[:-4] for s in BS.COINS], trades=trades, runs=runs, order=list(RUNS), candles=candles, start=START_BAL,
                 ladder=[[f, r, cp] for f, r, cp in pol["rows"]], smult=pol["smult"], beR=1.5)
     html = open(C.ROOT / "research" / "crypto" / "trades_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
-    (C.ROOT / "cryptobot" / "trades.html").write_text(html)
+    (C.ROOT / "reports" / "trades.html").write_text(html)
     print("written trades.html", len(html) // 1024, "KB")
 
 

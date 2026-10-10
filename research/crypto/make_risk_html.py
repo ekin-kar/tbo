@@ -1,4 +1,4 @@
-"""cryptobot/risk_comparison.html (+ plan_ladder_plus50.html preset): $200 over 24 months with different risk profiles
+"""reports/risk_comparison.html (+ plan_ladder_plus50.html preset): $200 over 24 months with different risk profiles
 (the bot's risk ladder and flat risks, all with the open-risk cap, BTC exempt) and monthly deposits, simulated from random
 4-week blocks of the bot's real v2.4 trades (BTC ETH BNB SOL ADA, shorts x0.5). Sizing: botsim.py (= the bot)."""
 import json
@@ -65,5 +65,5 @@ if __name__ == "__main__":
         html = tpl.replace("/*DATA*/null", json.dumps(dd, separators=(",", ":")))
         if preset:
             html = html.replace("<title>TBO Risk Comparison</title>", "<title>TBO Plan: Ladder + $50/month</title>")
-        (C.ROOT / "cryptobot" / name).write_text(html)
+        (C.ROOT / "reports" / name).write_text(html)
         print("written", name, len(html) // 1024, "KB")

@@ -1,4 +1,4 @@
-"""cryptobot/winrate_rr.html: expectancy heatmap (win rate x reward-to-risk) with the bot's coins plotted on it.
+"""reports/winrate_rr.html: expectancy heatmap (win rate x reward-to-risk) with the bot's coins plotted on it.
 Win = trade closed above 0R; RR = average win / average loss (losses include the small breakeven exits after fees),
 so win% x avg win - loss% x avg loss = the real average R per trade."""
 import json, pickle
@@ -19,5 +19,5 @@ for per, a in (("all", "2020-01-01"), ("2024", "2024-01-01")):
                          be=float(((R > -0.2) & (R <= 0.2)).mean() * 100)))
     pts[per] = rows
 html = open(C.ROOT / "research" / "crypto" / "winrate_template.html").read().replace("/*DATA*/null", json.dumps(pts))
-(C.ROOT / "cryptobot" / "winrate_rr.html").write_text(html)
+(C.ROOT / "reports" / "winrate_rr.html").write_text(html)
 print(json.dumps(pts["all"][-1]), "written")

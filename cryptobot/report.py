@@ -1,14 +1,14 @@
 """
 Results report from Binance (read-only: places no orders). Run it after the trial and send the files in
-cryptobot/reports/ (plus the cryptobot/logs/ folder) for the comparison with the backtest.
+cryptobot/trial_results/ (plus the cryptobot/logs/ folder) for the comparison with the backtest.
 
     python report.py                  # the last 90 days
     python report.py --days 31        # the last 31 days (run it at the end of every month: Binance keeps only
                                       # a few months of history, and the monthly files then cover the whole trial)
     python report.py --testnet
 
-Writes reports/report_<date>.md (summary), reports/trades_<date>.csv (one row per trade: open -> flat) and
-reports/income_<date>.csv (every PnL / fee / funding / transfer line).
+Writes trial_results/report_<date>.md (summary), trial_results/trades_<date>.csv (one row per trade: open -> flat) and
+trial_results/income_<date>.csv (every PnL / fee / funding / transfer line).
 """
 import argparse
 import csv
@@ -137,7 +137,7 @@ def main():
         if r["incomeType"] not in ("TRANSFER", "INTERNAL_TRANSFER"):
             months[utc(int(r["time"]))[:7]] += float(r["income"])
 
-    out = HERE / "reports"; out.mkdir(exist_ok=True)
+    out = HERE / "trial_results"; out.mkdir(exist_ok=True)
     tag = datetime.now(timezone.utc).strftime("%Y%m%d")
     with open(out / f"trades_{tag}.csv", "w", newline="") as f:
         w = csv.writer(f)
@@ -167,7 +167,7 @@ def main():
     for s in syms:
         ts = [t for t in closed if t["symbol"] == s]
         L.append(f"| {s} | {len(ts)} | {sum(t['pnl'] - t['fees'] for t in ts):+.2f} | {sum(t['fees'] for t in ts):.2f} |")
-    L += ["", "Send this folder (`reports/`) and `logs/` for the comparison with the backtest of the same days."]
+    L += ["", "Send this folder (`trial_results/`) and `logs/` for the comparison with the backtest of the same days."]
     (out / f"report_{tag}.md").write_text("\n".join(L) + "\n")
     print("\n".join(L))
     print(f"\nwritten: {out / f'report_{tag}.md'}, trades_{tag}.csv, income_{tag}.csv")

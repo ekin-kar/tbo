@@ -533,7 +533,9 @@ class Bot:
             self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
         eq = self.equity()
         log.info(f"TBO v{VERSION} {self.sym} {'DRY RUN ' if self.dry else ''}on {self.x.base} | equity {eq:.2f} USDT | "
-                 f"risk {self.risk * 100:.2f}% (shorts x{self.short_mult}) | max leverage {self.max_lev} | {self.p.to_dict()}")
+                 f"risk now {self.risk_now(eq) * 100:.2f}% ({'ladder in portfolio.json' if self.ladder_row(eq) else 'risk_pct'}; shorts x{self.short_mult}) | "
+                 f"open-risk cap {self.cap_frac(eq) * 100:.2f}%{' (exempt)' if self.sym in self.portfolio().get('cap_exempt', []) else ''} | "
+                 f"profit lock +{self.p.lock_R}R -> +{self.p.lock_to}R | max leverage {self.max_lev} | {self.p.to_dict()}")
         tf_ms = self.p.tf_min * 60_000
         last_sync = time.time()
         while True:

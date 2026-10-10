@@ -143,7 +143,7 @@ Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 sta
 equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
 The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
 
-## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `cap_comparison.html`
+## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `reports/cap_comparison.html`
 
 Why: the deepest drops come when several coins break out together and all their stops get hit. Capping the risk
 that is open at once (only trades not yet at breakeven count: a breakeven stop loses nothing) trims exactly
@@ -235,9 +235,11 @@ reshuffled runs of 2022-26 trades / every real 2-year window of 2022-26):
 | gave back half of a $5k+ peak | 2% | **1%** | 6% |
 
 The ladder's extra drops happen while the account is under $1,000; above it, it behaves like flat 5%. Pages:
-`trades.html` (equity chart with every trade: click one to see it on its 4h price chart with entry, stop, breakeven and exit),
-`tbo_statistics.html` (equity chart, every statistic, random journeys), `risk_comparison.html`, `plan_ladder_plus50.html`,
-`monthly_report.html`, `cap_comparison.html` all size trades like the bot.
+all in the top-level `reports/` folder: `trades.html` (equity chart with every trade: click one to see it on its 4h price
+chart with entry, stop, breakeven, lock and exit), `tbo_statistics.html` (equity chart, every statistic, random
+journeys), `risk_comparison.html`, `plan_ladder_plus50.html`, `monthly_report.html`, `cap_comparison.html`,
+`winrate_rr.html`. All are rebuilt from the live settings by the `research/crypto/make_*.py` scripts and size trades
+like the bot.
 
 ## 3-month trial from $200 (v2.5, Oct 2026)
 
@@ -246,10 +248,10 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 
 - **Start:** `git pull`, then steps 1-8 below. `python check_setup.py` must say `RESULT: ready`. At $200 SOL trades
   are mostly too small for Binance's 1-SOL minimum and get skipped (check_setup shows it); that is expected.
-- **Every month-end:** `python report.py --days 31` -> `reports/report_<date>.md` + two CSV files (Binance keeps
+- **Every month-end:** `python report.py --days 31` -> `trial_results/report_<date>.md` + two CSV files (Binance keeps
   only a few months of history, so keep each month's files).
 - **Every fill** is logged with the level aimed for, the slippage and the risk (`FILLED ... level ..., slippage ...%`).
-- **After 3 months:** send the `reports/` and `logs/` folders. They are compared with the backtest of the same
+- **After 3 months:** send the `trial_results/` and `logs/` folders. They are compared with the backtest of the same
   days (same trades? same fills? fees and slippage as assumed?).
 - **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $200; every real
   3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
