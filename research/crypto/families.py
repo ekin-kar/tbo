@@ -203,8 +203,10 @@ def channel_breakout(m1, tf=240, n=20, sl_atr=2.0, tp_R=0.0, hold_h=48, ema_n=0,
         k4 = np.searchsorted(act, cf["act"], side="right") - 1       # governing 4h decision for each small candle
         valid = (k4 >= 0) & (cf["act"] < len(m1["t"]))
         k4c = np.clip(k4, 0, None)
-        gl = ok[k4c] & valid & (tside[k4c] >= 0) & (cf["c"] > (hi + buf)[k4c]) if sides in ("both", "long") else np.zeros(len(k4), bool)
-        gs = ok[k4c] & valid & (tside[k4c] <= 0) & (cf["c"] < (lo - buf)[k4c]) if sides in ("both", "short") else np.zeros(len(k4), bool)
+        skl = skip_fn(c, a, hi, lo, 1) if skip_fn else np.zeros(len(a), bool)     # (open-interest filter etc. here too)
+        sks = skip_fn(c, a, hi, lo, -1) if skip_fn else np.zeros(len(a), bool)
+        gl = ok[k4c] & ~skl[k4c] & valid & (tside[k4c] >= 0) & (cf["c"] > (hi + buf)[k4c]) if sides in ("both", "long") else np.zeros(len(k4), bool)
+        gs = ok[k4c] & ~sks[k4c] & valid & (tside[k4c] <= 0) & (cf["c"] < (lo - buf)[k4c]) if sides in ("both", "short") else np.zeros(len(k4), bool)
         o.place(cf["act"][gl], MKT, 1, sl_l[k4c][gl], tp_l[k4c][gl], slot=0)
         o.place(cf["act"][gs], MKT, -1, sl_s[k4c][gs], tp_s[k4c][gs], slot=1)
     else:
