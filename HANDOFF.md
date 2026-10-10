@@ -200,3 +200,8 @@ alts at 0.83%: 2020-23 ret/drop x1.35 but 2024-26 x1.01 (drop 47.3 vs 44.6%), fi
 5 + DOGE/XRP/LINK/AVAX at 0.5%: x1.24 / x1.04, fixed x1.04 / x1.08 (best, modest). 2020-23 gains = the 2021 alt boom;
 2024-26 no clear gain (alts move with BTC). Not adopted at $200 (extra alt risk ~$1 -> many orders below Binance minimums);
 revisit the 9-coin set at a few $k.
+Breakeven offset / tighter stop (Oct 2026, `be_stop_test.py`, v2.6 rules, results in R of 1 ATR): breakeven at +0.05 /
++0.1 / +0.2R: BE exits -0.10 -> 0 / +0.10R but more trades knocked out at the higher stop: fixed R net/DD x0.91 / x0.91 /
+x0.88 (2020-23), x0.99 / x0.97 / x0.81 (2024-26); ladder from 2020 drop 37.1 -> 42-45%, $3.26M -> $1.2-2.1M. Stop 0.9 ATR
+sized on 1 ATR: stops cost -0.99R instead of -1.09R but 73 more stop-outs (906 vs 833): x0.95 / x1.01, ladder 2020 drop
+50.6%; 0.8 ATR: x0.84 / x1.12 (inconsistent), 2020 drop 53%; stop 0.9 + BE +0.1R: x0.89 / x0.96, 2020 drop 56%. Not adopted.
