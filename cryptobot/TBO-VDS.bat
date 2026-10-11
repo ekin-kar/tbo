@@ -35,7 +35,7 @@ if "!c!"=="1" ssh -t !HOST! "journalctl -u tbo -f -o cat _SYSTEMD_INVOCATION_ID=
 if "!c!"=="2" ssh -t !HOST! "journalctl -u tbo -o cat --no-pager _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo) | tail -200"
 if "!c!"=="3" ssh -t !HOST! "systemctl status tbo --no-pager | head -12; echo; free -h; echo; uptime"
 if "!c!"=="4" ssh -t !HOST! "systemctl restart tbo && echo Bot restarted."
-if "!c!"=="5" ssh -t !HOST! "if [ -d /home/tbo/trade3/.git ]; then su - tbo -c 'cd trade3 && git pull' && systemctl restart tbo && echo Updated and restarted.; else echo This server is updated by the person who installed it, with tbo_install.bat. Nothing to do here.; fi"
+if "!c!"=="5" ssh -t !HOST! "su - tbo -c 'cd trade3 && git pull' && systemctl restart tbo && echo Updated and restarted."
 if "!c!"=="6" (
   set "y="
   set /p "y=  Stop the bot? No new orders; open trades keep their stop loss on Binance. Type y to confirm: "
