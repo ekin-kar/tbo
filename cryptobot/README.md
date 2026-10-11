@@ -289,6 +289,14 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 
 ## GO LIVE: step by step (v2.6)
 
+**Easiest: `tbo_servers.bat` (Windows, in this folder).** Add a server (name + IP of a fresh Ubuntu 22.04/24.04 VPS),
+then 1 = first-time setup: asks the root password once (then logs in with this PC's SSH key), asks the Binance key /
+secret and Telegram token / chat id of the person trading there, installs everything (`vds_setup.sh`), runs
+`check_setup.py` and starts the bot as a service that survives logouts and reboots. 2 = update: `git pull` on this
+PC, then the latest code is sent to the server and the bot restarted (a server set up with git pulls by itself);
+its `.env`, state files and logs are kept. Also: live output, status, restart, stop / start, check, terminal.
+The manual steps below do the same by hand.
+
 **Where to run it.** Recommended: a small Linux VPS (~$5/month, e.g. Hetzner in Germany/Finland), **not in the USA**
 (Binance.com blocks US IPs). It runs 24/7 without sleep, updates or power cuts. Your Windows PC also works if it
 never sleeps. If the bot is offline, open trades stay protected (the stop-loss sits on Binance); you only miss new

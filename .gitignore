@@ -6,3 +6,4 @@ cryptobot/logs/
 cryptobot/.env
 cryptobot/PAUSE
 cryptobot/trial_results/
+cryptobot/servers.txt
