@@ -126,6 +126,26 @@ def wait_reports(t_close, max_s):
         time.sleep(5)
 
 
+def weekend(t_ms):
+    """No new orders are placed at a 4h close on Saturday or Sunday (UTC), as in the backtest."""
+    return time.gmtime(t_ms / 1000).tm_wday >= 5
+
+
+def orders_resume(t_ms):
+    """The first 4h close after t_ms where new orders are placed again (Monday 00:00 UTC)."""
+    t = t_ms + TF_MS
+    while weekend(t):
+        t += TF_MS
+    return t
+
+
+def next_line(t_close):
+    if weekend(t_close + TF_MS):
+        return (f"Weekend: no new orders until {notify.when(orders_resume(t_close))}; open trades are still managed "
+                f"(stop loss, breakeven, profit lock, time exit)")
+    return f"Next check {notify.when(t_close + TF_MS, day=False)}"
+
+
 def startup_message():
     eq, now = account()
     last = now // TF_MS * TF_MS
@@ -142,7 +162,7 @@ def startup_message():
             "", f"<b>Status</b> at the last 4h check ({notify.when(last)}, {notify.tz_label()})"]
     lines, _ = coin_lines(last)
     rows += lines
-    rows += ["", f"Next check {notify.when(last + TF_MS, day=False)}"]
+    rows += ["", next_line(last)]
     publish("\n".join(rows))
 
 
@@ -161,7 +181,7 @@ def check_message(nxt):
     if eq:
         foot += f" · open risk {notify.usd(risk)} ({risk / eq * 100:.1f}%)" + (f" · cap {cap:g}%" if cap else "")
     return "\n".join([f"🕓 <b>4h check</b> · {notify.when(nxt)} ({notify.tz_label()}){MODE}"] + lines
-                     + ["", foot, f"Next check {notify.when(nxt + TF_MS, day=False)}"])
+                     + ["", foot, next_line(nxt)])
 
 
 def check_loop():
@@ -171,7 +191,16 @@ def check_loop():
         nxt = now // TF_MS * TF_MS + TF_MS
         time.sleep(max(1.0, (nxt - now) / 1000 + 20))
         wait_reports(nxt, 240)
-        publish(check_message(nxt))
+        lines, _ = coin_lines(nxt)
+        quiet = weekend(nxt) and not any("● in a" in l for l in lines)
+        if quiet and not weekend(nxt - TF_MS):                 # first check of the weekend: one short message
+            publish(f"🌙 <b>Weekend</b>{MODE}\nNo new orders until {notify.when(orders_resume(nxt))} ({notify.tz_label()}). "
+                    f"No open trades. Next message when trading resumes or if something happens.")
+        elif quiet:                                            # rest of the weekend, nothing open: console only
+            with lock:
+                print(f"{time.strftime('%H:%M:%S')}  4h check {notify.when(nxt)}: weekend, no open trades", flush=True)
+        else:
+            publish(check_message(nxt))
 
 
 def main():

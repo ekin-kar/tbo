@@ -289,12 +289,14 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 
 ## GO LIVE: step by step (v2.6)
 
-**Easiest: `tbo_servers.bat` (Windows, in this folder).** Add a server (name + IP of a fresh Ubuntu 22.04/24.04 VPS),
-then 1 = first-time setup: asks the root password once (then logs in with this PC's SSH key), asks the Binance key /
-secret and Telegram token / chat id of the person trading there, installs everything (`vds_setup.sh`), runs
-`check_setup.py` and starts the bot as a service that survives logouts and reboots. 2 = update: `git pull` on this
-PC, then the latest code is sent to the server and the bot restarted (a server set up with git pulls by itself);
-its `.env`, state files and logs are kept. Also: live output, status, restart, stop / start, check, terminal.
+**Easiest: `tbo_install.bat` (Windows, in this folder).** Two sections. *My server*: update my bot, check it, or set
+it up from scratch (its IP is asked once and kept in `my_server.txt`). *Other people's servers*: set up a new person's
+server (fresh Ubuntu 22.04/24.04; asks the root password once, then logs in with this PC's SSH key; asks that person's
+own Binance key / secret and Telegram token / chat id; installs everything with `vds_setup.sh`; reminds you to add the
+server's IP to his API key; runs `check_setup.py`; starts the bot as a service that survives logouts and reboots),
+update someone's bot, or manage it (live output, status, restart, stop / start, terminal). *Update ALL bots* does
+every server at once. Updates: `git pull` on this PC, then the code is sent to the server (friends' servers never
+touch GitHub); a server's `.env`, state files and logs are kept; a server with a git checkout pulls by itself.
 The manual steps below do the same by hand.
 
 **Where to run it.** Recommended: a small Linux VPS (~$5/month, e.g. Hetzner in Germany/Finland), **not in the USA**
