@@ -26,6 +26,7 @@ echo    5  Update from GitHub + restart
 echo    6  Stop the bot
 echo    7  Start the bot
 echo    8  Open a server terminal
+echo    9  Clean up the server  (old logs, caches; also sets up the weekly cleanup)
 echo    0  Exit
 echo.
 set "c="
@@ -42,6 +43,7 @@ if "!c!"=="6" (
 )
 if "!c!"=="7" ssh -t !HOST! "systemctl start tbo && echo Bot started."
 if "!c!"=="8" ssh -t !HOST!
+if "!c!"=="9" ssh -t !HOST! "sed -i 's/\r$//' /home/tbo/trade3/cryptobot/server_clean.sh; bash /home/tbo/trade3/cryptobot/server_clean.sh --install"
 if "!c!"=="0" exit /b
 echo.
 pause

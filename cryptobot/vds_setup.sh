@@ -46,6 +46,10 @@ sed -e 's/\r$//' -e 's#/usr/bin/python3#/home/tbo/trade3/cryptobot/venv/bin/pyth
 systemctl daemon-reload
 ufw allow OpenSSH >/dev/null 2>&1 && ufw --force enable >/dev/null 2>&1 || true
 
+sed -i 's/\r$//' "$D/server_clean.sh" 2>/dev/null || true
+bash "$D/server_clean.sh" --install >/dev/null 2>&1 || true
+echo "== weekly cleanup installed"
+
 if timedatectl show -p NTPSynchronized --value 2>/dev/null | grep -q yes; then
   echo "== clock synchronized"
 else

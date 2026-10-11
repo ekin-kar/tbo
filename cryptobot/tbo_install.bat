@@ -152,7 +152,7 @@ if exist "%ROOT%\.git" (
 )
 set "PKG=%TEMP%\cryptobot.tgz"
 del "%PKG%" >nul 2>&1
-tar -czf "%PKG%" --exclude=venv --exclude=.env --exclude="state_*" --exclude=logs --exclude=__pycache__ --exclude=trial_results --exclude=PAUSE --exclude=servers.txt --exclude=my_server.txt --exclude="*.tmp" -C "%ROOT%" cryptobot
+tar -czf "%PKG%" --exclude=venv --exclude=.env --exclude="state_*" --exclude=logs --exclude=__pycache__ --exclude=trial_results --exclude=PAUSE --exclude=servers.txt --exclude=my_server.txt --exclude="*.tmp" --exclude=dev -C "%ROOT%" cryptobot
 if errorlevel 1 (
   echo   Could not build the package.
   exit /b 1

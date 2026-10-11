@@ -8,8 +8,8 @@
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
 | Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
-| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/all12.py`, `combos22.py`). At $300 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
-| Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
+| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/studies/all12.py`, `combos22.py`). At $300 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
+| Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/studies/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
@@ -23,7 +23,7 @@ About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
 ## How v2 was found (Oct 2026)
 
-`research/crypto/wf_grid.py` ran 3,000 settings around v1 (timeframe, channel, stop, hold, EMA, long/both,
+`research/crypto/studies/wf_grid.py` ran 3,000 settings around v1 (timeframe, channel, stop, hold, EMA, long/both,
 trail, EMA slope, weekend skip, breakeven); `wf_eval.py` does an **anchored walk-forward**: for each year
 2022-2026 the best return/drawdown setting on the years BEFORE it is traded in that year (out of sample).
 - v1.0 (fixed) 2022-26: 15.5R/year, DD 11.7R -> 2.0%/month at 2% risk, DD 21%.
@@ -35,7 +35,7 @@ trail, EMA slope, weekend skip, breakeven); `wf_eval.py` does an **anchored walk
 - Rejected: "halve risk after a -3R/-5R drawdown" (worse than simply a lower risk: losing streaks come right
   before the big trend trades), top-K averaging (small gain, needs several positions), trailing exits on ETH.
 
-## Round 3 tuning (v2.1, Oct 2026): `research/crypto/wf2.py`, `ext_check.py`
+## Round 3 tuning (v2.1, Oct 2026): `research/crypto/core/wf2.py`, `ext_check.py`
 
 - Stage A, 2,592 core settings around v2 (channel 15-30, stop 0.75-1.25 ATR, breakeven 1-3R / +0.2R, hold
   72-168 h, EMA 30-75, slope 3-10 days): v2 is the best setting on all data AND the peak of every single
@@ -60,7 +60,7 @@ at 2% risk, with drawdowns up to 25-30%, and losing months (about 4 in 10).**
 
 ## ETHUSDT (Oct 2026): same settings as BTC, `config_eth.json`
 
-Tuned with the same anchored walk-forward (`research/crypto/wf2.py eth|ethf ETHUSDT`, `eth_narrow.py`):
+Tuned with the same anchored walk-forward (`research/crypto/core/wf2.py eth|ethf ETHUSDT`, `eth_narrow.py`):
 5,184 core settings, a narrow channel/stop search and 256 filter settings. **None beat the BTC v2.1
 settings out of sample** (2022-26 at 2% risk: BTC settings 3.2%/month DD 28%; ETH-tuned 2.7%, narrow
 3.2% but DD 37%, filters 2.6%), so ETH runs the BTC settings unchanged - never fitted to ETH data.
@@ -81,12 +81,12 @@ the same direction, so losses often come together. Closed-trade simulation: 1% r
 DD 24%; 1.5% each -> 7.5%/month, DD 34% (open-trade drawdowns are deeper than these closed-trade figures).
 Use about 1% each when running both.
 
-Parity on ETH: `replay.py ETHUSDT` 337 / 337 trades; `test_bot_sim.py ETHUSDT` 316 of 320 on the same minute,
+Parity on ETH: `dev/replay.py ETHUSDT` 337 / 337 trades; `dev/test_bot_sim.py ETHUSDT` 316 of 320 on the same minute,
 gross R 181.7 (bot) vs 178.8 (backtest): the differences are fills whose stop the backtest hits inside the
 fill minute (pessimistic), while the bot's stop goes on a few seconds later.
 Run: `python cryptobot/bot.py cryptobot/config_eth.json` (a second process next to the BTC one).
 
-## Trailing stops vs the 5-day close (Oct 2026, `research/crypto/trail_scan.py`)
+## Trailing stops vs the 5-day close (Oct 2026, `research/crypto/studies/trail_scan.py`)
 
 Tested on BTC and ETH: intrabar trailing stops 1-8R behind the best price (starting at +1.5/3/5R, max hold
 5/10/20 days), 4h-close chandelier trails (6/12/24 candles, 2-4 ATR) and longer holds alone (110 variants).
@@ -116,9 +116,9 @@ One $1,000 account (risk per trade, 3% open-risk cap, drawdown on 'all open trad
 - 2024-01..2026-09 only: BTC+ETH 1% 4.4%/month DD 20%; 4 coins 0.6% 4.0%/month DD 22%, longest flat 156 d vs 296 d.
 With 4 coins at 0.5-0.6% the 3% cap never binds, so the bot runs one process per coin with no shared state.
 Configs: `config_btc.json`, `config_eth.json`, `config_doge.json`, `config_ada.json` (set the same risk_pct in all four).
-Parity: `replay.py DOGEUSDT` 334/335 from 2021 (2020 differences = DOGE's warm-up after listing), ADA 348/348.
+Parity: `dev/replay.py DOGEUSDT` 334/335 from 2021 (2020 differences = DOGE's warm-up after listing), ADA 348/348.
 
-## Winners vs losers (Oct 2026): `research/crypto/trade_features.py`, `sizing_rules.py` -> v2.2
+## Winners vs losers (Oct 2026): `research/crypto/studies/trade_features.py`, `sizing_rules.py` -> v2.2
 
 1,474 trades of BTC/ETH/DOGE/ADA compared by the conditions when the order was placed (hour, weekday, volatility,
 channel width, level age, EMA distance/slope, volume, move into the breakout, previous trade, BTC agreement, side).
@@ -132,7 +132,7 @@ months positive 62%, worst month -11%; 2024-26 alone 4.5%/month, DD 20% (vs 0.6%
 Configs: all four at `risk_pct` 0.75, `short_risk_mult` 0.5. Note: BTCUSDT quantities step 0.001 BTC, so on a
 $1k account BTC positions round down (shorts ~20% smaller than intended); DOGE/ADA have fine steps.
 
-## Coin weights and risk for a $500 account (Oct 2026): `research/crypto/weights.py`, `risk_mc.py`
+## Coin weights and risk for a $500 account (Oct 2026): `research/crypto/studies/weights.py`, `risk_mc.py`
 
 BTC is the steadiest coin in both periods (return/DD 4.83 | 3.78), DOGE/ADA the bumpiest. Weights BTC 2x, ETH 1x,
 DOGE 0.5x, ADA 0.5x: 4-coin return/DD 4.31 | 4.44 vs equal weights 3.64 | 3.11 (2020-23 | 2024-26).
@@ -143,7 +143,7 @@ Monte Carlo (20,000 two-year paths from reshuffled real months 2022-26, $500 sta
 equity at risk and ~3-4x notional; the bot sets 5x leverage per symbol, so margin use stays below equity.
 The simulation reshuffles months independently and uses closed trades: real drawdowns can be deeper.
 
-## Open-risk cap (v2.5, Oct 2026): `research/crypto/sizing_v3.py`, `sizing_v4.py`, page `reports/cap_comparison.html`
+## Open-risk cap (v2.5, Oct 2026): `research/crypto/studies/sizing_v3.py`, `sizing_v4.py`, page `reports/cap_comparison.html`
 
 Why: the deepest drops come when several coins break out together and all their stops get hit. Capping the risk
 that is open at once (only trades not yet at breakeven count: a breakeven stop loses nothing) trims exactly
@@ -173,22 +173,22 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 
 ## Parity tests
 
-- `python cryptobot/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
+- `python cryptobot/dev/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
   windows the bot downloads) vs the research engine: v2.1 347 / 347 trades (2020-09..2026-09), same minute, same prices.
-- `python cryptobot/test_bot_sim.py BTCUSDT 2021-01-01 2026-09-30` - **`bot.py` itself** driven by a simulated
+- `python cryptobot/dev/test_bot_sim.py BTCUSDT 2021-01-01 2026-09-30` - **`bot.py` itself** driven by a simulated
   exchange on 1m history (v2.1): 327 vs 328 trades, 326 on the same minute, entry price within 1 tick, gross R
   234.8 vs 235.4. The few exit differences are fills where the backtest assumes the stop is hit inside the fill
   minute (pessimistic); the bot places its stop a few seconds after the fill.
-- v2.6 profit lock, `test_bot_sim.py <coin> 2024-01-01 2025-07-01`: BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75
+- v2.6 profit lock, `dev/test_bot_sim.py <coin> 2024-01-01 2025-07-01`: BTC 76/76, ETH 63/63, ADA 68/68, SOL 72/73, BNB 74/75
   on the same minute; the few differences are the backtest's pessimistic stop inside the fill minute (none reached
   breakeven or the lock). Live-logic replay vs research engine with the lock: ETH 274/274, BTC 278/278 identical.
-- **Full run before going live (v2.6, Oct 2026):** `test_bot_sim.py <coin> 2021-01-01 2026-09-30`: BTC 276/277, ETH
+- **Full run before going live (v2.6, Oct 2026):** `dev/test_bot_sim.py <coin> 2021-01-01 2026-09-30`: BTC 276/277, ETH
   273/274, BNB 287/289, ADA 260/261, SOL 246 (+14 Jan-Feb 2021 trades before the replay's 1000-candle warm-up) on the
-  same entry minute; every difference listed by `parity_detail.py`: the backtest's stop inside the fill minute (and its
+  same entry minute; every difference listed by `dev/parity_detail.py`: the backtest's stop inside the fill minute (and its
   knock-on re-entry), 1-minute entry shifts from tick rounding, and SOL's minute-data gaps (the engine counts bars, the
   bot clock time); none involves the profit lock or the cap. `check_replay_engine.py`: replay = engine on all five coins.
-  `test_cap_sim.py 2024-01-01 2026-09-01`: see below (re-run with the current ladder).
-- `python cryptobot/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
+  `dev/test_cap_sim.py 2024-01-01 2026-09-01`: see below (re-run with the current ladder).
+- `python cryptobot/dev/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
   With the current ladder (Oct 2026), 2024-01..2026-09 at `CAPSIM_EQ=500 / 3000 / 10000 / 20000` (the 6/4/.83, 5/3.3/.83
@@ -196,7 +196,7 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   after a same-minute fill, every BTC entry exempt (at $500, 8 of 130 a little under full size only from Binance's
   0.001 BTC quantity step), **0 off the rule** at every balance.
 
-## Profit lock (v2.6, Oct 2026): `research/crypto/ratchet.py`, `lock_grid.py`, `build_trades.py`
+## Profit lock (v2.6, Oct 2026): `research/crypto/studies/ratchet.py`, `lock_grid.py`, `build_trades.py`
 
 Of the trades that reached +3.5R, about 1 in 3 fell back and closed below +1R (67 in 2020-23, 51 in 2024-26, giving
 back ~5R each). Trailing stops cut the big runners (net R -30 to -70%). A one-step lock works: once a trade reaches
@@ -230,7 +230,7 @@ Shorts at half size. `risk_pct` in the configs is only used if `portfolio.json` 
 12x the balance (`max_leverage`; at 6% risk it limits about 3 in 1,000 BTC trades; ETH's 8x about 3 in 1,000 at 4%) and its Binance
 leverage 25x (only sets the margin a position locks; in cross margin it does not move the liquidation point).
 
-2 years from $300 (`research/crypto/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
+2 years from $300 (`research/crypto/core/three_months.py`, same sizing as the bot (`botsim.py`), v2.6 trades; 3,000
 reshuffled runs of 2022-26 trades / every real 2-year window of 2022-26):
 
 | v2.6 (with the profit lock) | flat 5% + cap | **ladder (the bot)** | old ladder 7.5/2.5/.83 | flat 7.5% + cap |
@@ -270,7 +270,7 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 - **Every fill** is logged with the level aimed for, the slippage and the risk (`FILLED ... level ..., slippage ...%`).
 - **After 3 months:** send the `trial_results/` and `logs/` folders. They are compared with the backtest of the same
   days (same trades? same fills? fees and slippage as assumed?).
-- **What 3 months looked like in the past** (`research/crypto/three_months.py`, the ladder from $300; every real
+- **What 3 months looked like in the past** (`research/crypto/core/three_months.py`, the ladder from $300; every real
   3-month window of 2022-26 and 5,000 reshuffled ones; real results will be somewhat worse):
 
 | After 3 months (v2.6) | real windows | reshuffled |
