@@ -196,7 +196,7 @@ class Bot:
         try:
             self.x.cancel_algo(algo_id=algo_id)
         except BinanceError as e:
-            log.info(f"cancel {algo_id}: {e.msg} (already gone)")
+            log.debug(f"cancel {algo_id}: {e.msg} (already gone)")
 
     def size(self, sl_dist, price, side=1, quiet=False):
         """(quantity, cap note, no_room). Raises if the cap applies and the account cannot be read."""
@@ -210,7 +210,7 @@ class Bot:
         qty = floor_step(qty, max(self.f["step"], self.f["mkt_step"]))
         if qty < self.f["min_qty"] or qty * price < self.f["min_notional"]:
             if not quiet:
-                log.warning(f"size {qty} below the exchange minimum (equity {eq:.2f}): no order")
+                log.debug(f"size {qty} below the exchange minimum (equity {eq:.2f}): no order")
             return 0.0, note, False
         return qty, note, False
 
@@ -315,7 +315,7 @@ class Bot:
     # ── actions ──
     def close_position(self, amt, why, tg_why=None):
         side = "SELL" if amt > 0 else "BUY"
-        log.info(f"EXIT {why}: {side} {abs(amt)} at market")
+        log.info(f"EXIT ({tg_why or why}): closing {abs(amt):g} {self.coin} at market")
         if not self.dry:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
                           client_id=f"{PREFIX}_x_{int(time.time())}")
@@ -339,7 +339,7 @@ class Bot:
         if self.st.get("lock_done"):                    # profit lock reached: stop at entry + lock_to x dist
             trig = entry_px + side * self.p.lock_to * dist
         trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
-        log.info(f"STOP LOSS for {amt} @ {entry_px:.2f}: {fmt(trig, self.f['tick'])} ({dist:.2f} away)")
+        log.info(f"STOP LOSS now at {self.P(trig)} (entry {self.P(entry_px)}, size {abs(amt):g} {self.coin})")
         if self.dry:
             return trig
         last = self.x.last_price(self.sym)
@@ -383,13 +383,13 @@ class Bot:
     def on_candle_close(self, open_ms):
         k4, k1 = self.candles()
         if not k4 or k4[-1][0] != open_ms:
-            log.warning("latest closed 4h candle not served yet; retrying")
+            log.debug("latest closed 4h candle not served yet; retrying")
             return False
         h, l, c = [k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4]
         weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
         dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday, [k[2] for k in k1], [k[3] for k in k1])
         amt, entry_px = self.x.position(self.sym)
-        log.info(f"4h close {utc(open_ms + 4 * 3600_000)}: close {c[-1]:.2f}  ATR {dec.atr:.2f}  trend "
+        log.debug(f"4h close {utc(open_ms + 4 * 3600_000)}: close {self.P(c[-1])}  ATR {self.P(dec.atr)}  trend "
                  f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"
                  f"{'  (weekend: no new orders)' if self.p.no_weekend and weekday >= 5 else ''}  position {amt}")
         close_ms = open_ms + self.p.tf_min * 60_000
@@ -417,7 +417,7 @@ class Bot:
                 log.warning(f"open interest unavailable ({e}): filter not applied this candle")
             blocked = S.oi_blocks(self.p, chg)
             if chg is not None:
-                log.info(f"open interest {chg * 100:+.1f}% over {self.p.oi_lookback_h} h"
+                log.debug(f"open interest {chg * 100:+.1f}% over {self.p.oi_lookback_h} h"
                          + (f" (<= {self.p.oi_min_chg * 100:.0f}%: no new entry order)" if blocked else ""))
         # 3. new entry order while flat (re-read: the old entry order may have filled in the meantime)
         if amt == 0 and not self.dry:
@@ -460,7 +460,7 @@ class Bot:
                     log.warning(f"open risk unavailable ({e}): no new entry order this candle")
                     break
                 if note:
-                    log.info(note)
+                    log.debug(note)
                 if no_room:                             # the cap is full: wait, re-checked every minute until the next close
                     log.info(f"no entry order for now ({'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])}): "
                              f"placed if room opens before the price gets there, until the next 4h close")
@@ -472,7 +472,7 @@ class Bot:
                 if qty <= 0:
                     status = "no order · size below Binance's minimum"
                     continue
-                log.info(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
+                log.debug(f"ENTRY ORDER {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop "
                          f"{fmt(trig, self.f['tick'])}  (SL dist {dec.sl_dist:.2f} = {dec.sl_dist / trig * 100:.2f}%, "
                          f"risk {qty * dec.sl_dist:.2f} USDT, valid until the next 4h close)")
                 self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_from=open_ms + self.p.tf_min * 60_000)
@@ -488,6 +488,7 @@ class Bot:
                 break                                   # one entry order at a time (sides="both": trend picks one)
         self.st["last_candle"] = open_ms
         self.st["check"] = dict(t=close_ms, line=status or "no order", risk=round(risk_open, 2))
+        log.debug(f"4h check: {status or 'no order'}")
         self.save()
         return True
 
@@ -534,12 +535,12 @@ class Bot:
                 self.st["entry_ms"] = fill_ms
                 self.st["be_from"] = fill_ms - fill_ms % 60_000 + 60_000   # first full 1m candle after the fill
                 lvl, side = self.st.get("entry_trig") or 0.0, (1 if amt > 0 else -1)
-                slip = f", level {lvl:g}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""
+                slip = f", level {self.P(lvl)}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""
                 risk = abs(amt) * (self.st.get("sl_dist") or 0)
                 self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
                 self.st["cap_check"] = self.cap_frac() > 0
                 self.st.update(fill_px=entry_px, fill_lvl=lvl, fill_qty=abs(amt), risk_usdt=risk, entry_side=side, announce=True)
-                log.info(f"FILLED {amt} @ {entry_px:.2f}{slip}, risk {risk:.2f} USDT")
+                log.info(f"FILLED {'long' if side > 0 else 'short'} {abs(amt):g} {self.coin} @ {self.P(entry_px)}{slip}, risk {risk:.2f} USDT")
                 self.save()
             if not self.sl_alive():
                 stop = self.place_sl(amt, entry_px)
@@ -554,7 +555,6 @@ class Bot:
             if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
                 self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)", f"time exit after {self.p.max_hold_h / 24:g} days")
         elif self.st.get("entry_ms"):
-            log.info("position closed (stop loss hit or closed by hand)")
             why = "closed outside the bot (by hand?)"
             try:
                 if self.st.get("sl_id") and self.x.algo_order(algo_id=self.st["sl_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
@@ -562,6 +562,7 @@ class Bot:
                            "breakeven stop" if self.st.get("be_done") else "stop loss")
             except Exception:
                 why = "stop loss or closed by hand"
+            log.info(f"position closed: {why}")
             self.report_close(why)
             self.cancel(self.st.get("sl_id"))
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
@@ -657,10 +658,10 @@ class Bot:
         self.st["best"] = best
         moved = False
         if be_left and side * (best - entry_px) >= self.p.be_R * self.st["sl_dist"]:
-            log.info(f"BREAKEVEN: price reached {best:.2f} (+{self.p.be_R}R): stop moves to entry")
+            log.info(f"BREAKEVEN: price reached {self.P(best)} (+{self.p.be_R:g}R): stop moves to the entry")
             self.st["be_done"] = True; moved = True
         if lock_left and side * (best - entry_px) >= self.p.lock_R * self.st["sl_dist"]:
-            log.info(f"PROFIT LOCK: price reached {best:.2f} (+{self.p.lock_R}R): stop moves to +{self.p.lock_to}R")
+            log.info(f"PROFIT LOCK: price reached {self.P(best)} (+{self.p.lock_R:g}R): stop moves to +{self.p.lock_to:g}R")
             self.st["lock_done"] = True; moved = True
         if moved:
             old = self.st.get("sl_id")
@@ -685,10 +686,12 @@ class Bot:
             # capped at max_leverage x equity by size(). Higher here = less margin locked when all coins are open.
             self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
         eq = self.equity()
-        log.info(f"TBO v{VERSION} {self.sym} {'DRY RUN ' if self.dry else ''}on {self.x.base} | equity {eq:.2f} USDT | "
-                 f"risk now {self.risk_now(eq) * 100:.2f}% ({'ladder in portfolio.json' if self.ladder_row(eq) else 'risk_pct'}; shorts x{self.short_mult}) | "
-                 f"open-risk cap {self.cap_frac(eq) * 100:.2f}%{' (exempt)' if self.sym in self.portfolio().get('cap_exempt', []) else ''} | "
-                 f"profit lock +{self.p.lock_R}R -> +{self.p.lock_to}R | max leverage {self.max_lev} | {self.p.to_dict()}")
+        exempt = self.sym in self.portfolio().get("cap_exempt", [])
+        log.info(f"TBO v{VERSION} online{' (DRY RUN)' if self.dry else ''} · balance {eq:.2f} USDT · risk {self.risk_now(eq) * 100:g}% "
+                 f"(shorts x{self.short_mult:g}) · cap {'exempt' if exempt else f'{self.cap_frac(eq) * 100:g}%'} · "
+                 f"size up to {self.max_lev:g}x the balance")
+        log.debug(f"{self.sym} on {self.x.base} | risk from {'the ladder in portfolio.json' if self.ladder_row(eq) else 'risk_pct'} | "
+                  f"profit lock +{self.p.lock_R}R -> +{self.p.lock_to}R | {self.p.to_dict()}")
         tf_ms = self.p.tf_min * 60_000
         last_sync = time.time()
         while True:
@@ -699,7 +702,7 @@ class Bot:
                 last_open = (now // tf_ms) * tf_ms - tf_ms           # open time of the last CLOSED 4h candle
                 if self.st["last_candle"] < last_open and now - (last_open + tf_ms) >= 3000:
                     if now - (last_open + tf_ms) > 15 * 60_000:
-                        log.warning("4h close was missed by > 15 min (bot was off): acting on it now")
+                        log.debug("catching up on the last 4h close (the bot was not running at that moment)")
                     self.on_candle_close(last_open)
                 if not self.dry:
                     self.check_position()
@@ -724,10 +727,14 @@ def main():
     notify.load_env(path.parent / ".env")
     logdir = path.parent / "logs"; logdir.mkdir(exist_ok=True)
     sym = cfg["strategy"]["symbol"]
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s UTC  %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
-                        handlers=[logging.StreamHandler(), logging.FileHandler(logdir / f"{sym}.log", encoding="utf-8")])
-    logging.Formatter.converter = time.gmtime
-    logging.getLogger("tbo").addHandler(notify.TelegramHandler(sym + (" TESTNET" if a.testnet else "") + (" DRY" if a.dry_run else "")))
+    lg = logging.getLogger("tbo"); lg.setLevel(logging.DEBUG); lg.propagate = False
+    con = logging.StreamHandler(sys.stdout); con.setLevel(logging.INFO)          # run_all.py adds the time and the coin
+    con.setFormatter(logging.Formatter("%(message)s"))
+    fh = logging.FileHandler(logdir / f"{sym}.log", encoding="utf-8"); fh.setLevel(logging.DEBUG)   # everything, UTC times
+    ff = logging.Formatter("%(asctime)s UTC  %(message)s", datefmt="%Y-%m-%d %H:%M:%S"); ff.converter = time.gmtime
+    fh.setFormatter(ff)
+    for h in (con, fh, notify.TelegramHandler(sym[:-4] + (" testnet" if a.testnet else "") + (" dry run" if a.dry_run else ""))):
+        lg.addHandler(h)
     while True:                                         # start-up: retry calmly while Binance is unreachable
         try:
             bot = Bot(cfg, path, testnet=a.testnet, dry=a.dry_run)

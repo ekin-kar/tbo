@@ -38,7 +38,14 @@ def pump(cfg, p):
     tag = cfg.replace("config_", "").replace(".json", "").upper()
     for line in p.stdout:
         with lock:
-            print(f"{tag:5s} | {line.rstrip()}", flush=True)
+            print(f"{time.strftime('%H:%M:%S')}  {tag:<4s} {line.rstrip()}", flush=True)
+
+
+def publish(msg):
+    """A status message: the console (plain text) and Telegram (formatted)."""
+    with lock:
+        print("\n" + notify._plain(msg).replace("\n", "\n   ") + "\n", flush=True)
+    notify.send(msg)
 
 
 def start(cfg):
@@ -136,7 +143,7 @@ def startup_message():
     lines, _ = coin_lines(last)
     rows += lines
     rows += ["", f"Next check {notify.when(last + TF_MS, day=False)}"]
-    notify.send("\n".join(rows))
+    publish("\n".join(rows))
 
 
 def bot_version():
@@ -164,16 +171,18 @@ def check_loop():
         nxt = now // TF_MS * TF_MS + TF_MS
         time.sleep(max(1.0, (nxt - now) / 1000 + 20))
         wait_reports(nxt, 240)
-        notify.send(check_message(nxt))
+        publish(check_message(nxt))
 
 
 def main():
-    print(f"TBO launcher: {', '.join(cfgs)} {' '.join(flags)}", flush=True)
-    for c in cfgs:
-        start(c); time.sleep(2)                      # stagger start-up requests
-    if notify.enabled():
-        threading.Thread(target=startup_message, daemon=True).start()
-        threading.Thread(target=check_loop, daemon=True).start()
+    mode = "dry run" if DRY else "testnet" if TESTNET else "live"
+    print(f"TBO launcher · {mode} · {' '.join(COIN[s] for s in SYMS)}"
+          f" · Telegram {'on' if notify.enabled() else 'off'}", flush=True)
+    by_sym = {cfg_of(c)["strategy"]["symbol"]: c for c in cfgs}
+    for s_ in SYMS:                                  # BTC first, then ETH, BNB, SOL, ADA
+        start(by_sym[s_]); time.sleep(2)             # stagger start-up requests
+    threading.Thread(target=startup_message, daemon=True).start()
+    threading.Thread(target=check_loop, daemon=True).start()
     try:
         while True:
             time.sleep(5)
@@ -181,7 +190,7 @@ def main():
                 if p.poll() is not None:
                     fails[c] = fails[c] + 1 if time.time() - t0 < 300 else 1
                     wait = 5 if fails[c] == 1 else 60
-                    print(f"{c}: bot stopped (exit code {p.returncode}); restarting in {wait} s", flush=True)
+                    print(f"{time.strftime('%H:%M:%S')}  {c}: bot stopped (exit code {p.returncode}); restarting in {wait} s", flush=True)
                     notify.send(f"♻️ <b>{COIN.get(cfg_of(c)['strategy']['symbol'], c)}</b> bot stopped (exit code {p.returncode}) · "
                                 f"restarting in {wait} s")
                     time.sleep(wait); start(c)
