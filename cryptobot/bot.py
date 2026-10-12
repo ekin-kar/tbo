@@ -94,6 +94,11 @@ class Bot:
             first, _, rest = text.partition("\n")
             notify.send(first + mode + ("\n" + rest if rest else ""))
 
+    def cid(self, kind):
+        """Order id, unique on the whole account: all coins' bots act in the same second at a 4h close, so the coin and
+        the millisecond are part of it (Binance rejects a repeated id with -4116)."""
+        return f"{PREFIX}_{kind}_{self.coin}_{int(time.time() * 1000)}"
+
     def P(self, x):
         return notify.px(x, self.f["tick"])
 
@@ -318,7 +323,7 @@ class Bot:
         log.info(f"EXIT ({tg_why or why}): closing {abs(amt):g} {self.coin} at market")
         if not self.dry:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
-                          client_id=f"{PREFIX}_x_{int(time.time())}")
+                          client_id=self.cid("x"))
             if notify.enabled():
                 time.sleep(1.5)                         # let the fill reach the trade history
         self.report_close(tg_why or why)
@@ -349,7 +354,7 @@ class Bot:
             return None
         try:
             r = self.x.stop_market(self.sym, "SELL" if side == 1 else "BUY", fmt(trig, self.f["tick"]),
-                                   close_position=True, client_id=f"{PREFIX}_sl_{int(time.time())}")
+                                   close_position=True, client_id=self.cid("sl"))
             self.st["sl_id"] = r["algoId"]
         except BinanceError as e:
             if e.code == -2021:                         # would trigger at once: price is already past the stop
@@ -367,16 +372,16 @@ class Bot:
         last = self.x.last_price(self.sym)
         if (side == 1 and last >= trig) or (side == -1 and last <= trig):
             log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
-            self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
+            self.x.market(self.sym, bs, q, client_id=self.cid("mk"))
             return True
         try:
-            r = self.x.stop_market(self.sym, bs, fmt(trig, self.f["tick"]), qty=q, client_id=f"{PREFIX}_in_{int(time.time())}")
+            r = self.x.stop_market(self.sym, bs, fmt(trig, self.f["tick"]), qty=q, client_id=self.cid("in"))
             self.st["entry_id"] = r["algoId"]
         except BinanceError as e:
             if e.code != -2021:
                 raise
             log.info("price already beyond the level: market entry (as the backtest fills at the open)")
-            self.x.market(self.sym, bs, q, client_id=f"{PREFIX}_mk_{int(time.time())}")
+            self.x.market(self.sym, bs, q, client_id=self.cid("mk"))
             return True
         return False
 
@@ -636,7 +641,7 @@ class Bot:
                 f"{fmt(abs(amt), self.f['step'])} → {fmt(keep, self.f['step'])} {self.coin}, "
                 f"risk {notify.usd(want)} → {notify.usd(keep * self.st['sl_dist'])}")
         self.x.market(self.sym, "SELL" if amt > 0 else "BUY", fmt(cut, self.f["step"]), reduce_only=True,
-                      client_id=f"{PREFIX}_cap_{int(time.time())}")
+                      client_id=self.cid("cap"))
 
     def check_breakeven(self, amt, entry_px):
         """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour, and to
