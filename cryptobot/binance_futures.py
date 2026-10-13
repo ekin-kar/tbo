@@ -22,7 +22,7 @@ class BinanceError(Exception):
 
 
 class Futures:
-    def __init__(self, key, secret, testnet=False, base_url=None, recv_window=5000):
+    def __init__(self, key, secret, testnet=False, base_url=None, recv_window=10000):
         self.key, self.secret = key, secret.encode() if secret else b""
         self.base = base_url or (TESTNET if testnet else LIVE)
         self.recv_window = recv_window
@@ -41,6 +41,17 @@ class Futures:
 
     def _req(self, method, path, params=None, signed=False):
         params = {k: v for k, v in (params or {}).items() if v is not None}
+        try:
+            return self._send(method, path, dict(params), signed)
+        except BinanceError as e:
+            if not (signed and e.code == -1021):
+                raise
+            # timestamp outside recvWindow (network stall or a clock jump): Binance rejected it without acting on it,
+            # so re-sync the clock and send it once more right away with a fresh timestamp
+            self.sync_time()
+            return self._send(method, path, dict(params), signed)
+
+    def _send(self, method, path, params, signed):
         if signed:
             params["timestamp"] = self.now_ms()
             params["recvWindow"] = self.recv_window
@@ -68,8 +79,6 @@ class Futures:
         except ValueError:
             raise BinanceError(r.status_code, None, r.text[:300])
         if r.status_code != 200:
-            if isinstance(data, dict) and data.get("code") == -1021:     # timestamp outside recvWindow
-                self.sync_time()
             raise BinanceError(r.status_code, data.get("code") if isinstance(data, dict) else None,
                                data.get("msg") if isinstance(data, dict) else str(data))
         return data
