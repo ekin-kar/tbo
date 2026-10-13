@@ -3,7 +3,7 @@
 Optional: TELEGRAM_UTC_OFFSET=3 shows times in UTC+3 (default: the computer's own time zone).
 
 The bots send their own trade events (opened, breakeven, profit lock, closed, cap cuts) and warnings; run_all.py sends
-one start-up message and one combined message after every 4h check. Messages use Telegram's HTML formatting."""
+one start-up message and answers /status (listen()). Messages use Telegram's HTML formatting."""
 import html
 import logging
 import os
@@ -61,6 +61,51 @@ def send(text, wait=False):
         _post(text)
     else:
         threading.Thread(target=_post, args=(text,), daemon=True).start()
+
+
+def listen(commands, log=print):
+    """Answer commands typed in the chat (only from TELEGRAM_CHAT_ID), e.g. {"status": ("description", fn)}; fn()
+    returns the reply text. Runs forever (long polling); adds the commands to the bot's / menu. One server per bot
+    token: a second program polling the same token gets HTTP 409 and the commands go to one of them only."""
+    if not enabled():
+        return
+    tok, chat = os.environ.get("TELEGRAM_TOKEN"), str(os.environ.get("TELEGRAM_CHAT_ID")).strip()
+    api = f"https://api.telegram.org/bot{tok}"
+    try:
+        requests.post(f"{api}/setMyCommands", timeout=10,
+                      json=dict(commands=[dict(command=c, description=d) for c, (d, _) in commands.items()]))
+    except Exception:
+        pass
+    offset, warned = None, 0.0
+    try:                                                   # skip commands typed while the bot was not running
+        old = requests.get(f"{api}/getUpdates", timeout=15, params=dict(offset=-1, timeout=0)).json().get("result", [])
+        offset = old[-1]["update_id"] + 1 if old else None
+    except Exception:
+        pass
+    while True:
+        try:
+            r = requests.get(f"{api}/getUpdates", timeout=60,
+                             params=dict(timeout=50, offset=offset, allowed_updates='["message"]'))
+            if r.status_code != 200:
+                if time.time() - warned > 3600:
+                    log(f"Telegram commands unavailable (HTTP {r.status_code}"
+                        f"{': is another program using the same bot token?' if r.status_code == 409 else ''})")
+                    warned = time.time()
+                time.sleep(30)
+                continue
+            for u in r.json().get("result", []):
+                offset = u["update_id"] + 1
+                m = u.get("message") or {}
+                if str((m.get("chat") or {}).get("id")) != chat:
+                    continue
+                word = (m.get("text") or "").strip().split(" ")[0].split("@")[0].lstrip("/").lower()
+                if word in commands:
+                    try:
+                        _post(commands[word][1]())
+                    except Exception as e:
+                        _post(f"❗ /{esc(word)} failed: {esc(e)}")
+        except Exception:
+            time.sleep(10)
 
 
 # ── formatting ──
