@@ -10,7 +10,7 @@ Telegram (if set in .env): one message when the bots start; /status in the chat 
 current situation of every coin, live from Binance. The bots themselves send their trade events (opened, breakeven,
 profit lock, closed, cap cuts) and warnings. No message after the 4h checks.
 """
-import json, subprocess, sys, time, threading
+import json, re, subprocess, sys, time, threading
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -143,25 +143,38 @@ def tick(sym):
     return _X[sym]
 
 
+def short_reason(line):
+    """The 4h check's 'no order' reason, short enough for a phone line."""
+    oi = re.search(r"open interest ([−+-]?[\d.]+)%", line)
+    if oi:
+        return f"OI {notify.num(float(oi.group(1).replace('−', '-')), 0, sign=True)}% (filter)"
+    for key, short in (("no clear daily trend", "no trend"), ("stretched", "price stretched"), ("weekend", "weekend"),
+                       ("PAUSE", "paused"), ("minimum", "size below minimum"), ("cap is full", "cap full")):
+        if key in line:
+            return short
+    return notify.esc(line.replace("no order · ", "")) or "no order"
+
+
+IND = "   "                                           # indent of a coin's detail lines
+
+
 def status_message(title="📊 <b>Status</b>"):
-    """Every coin as it is now: open trade (live price, R, P&L, stop), waiting order (distance to it), or why there is
-    no order; then balance, open risk and the cap. Positions and orders are read from Binance, the rest from the bots'
-    state files."""
+    """Every coin as it is now, in lines short enough for a phone (about 30 characters): open trades and waiting orders
+    first (live from Binance), then the coins without an order and why (from the last 4h check); then balance, open
+    risk and the cap."""
     if DRY:
         return f"{title}{MODE}\nDry run: no account to read."
     x = exchange()
-    acc = x.account()
-    eq, now = float(acc["totalMarginBalance"]), x.now_ms()
-    pos = x.positions()
-    orders = x.open_algo_orders()
+    eq, now = float(x.account()["totalMarginBalance"]), x.now_ms()
+    pos, orders = x.positions(), x.open_algo_orders()
     last_close = now // TF_MS * TF_MS
     P = lambda s, v: notify.px(v, tick(s))
-    rows, risk, upnl = [], 0.0, 0.0
+    blocks, idle, risk, upnl = [], [], 0.0, 0.0
     for s in SYMS:
-        st, c = state(s), f"<b>{COIN[s]}</b>"
+        st, c = state(s), COIN[s]
         mine = [o for o in orders if o.get("symbol") == s]
-        price = x.last_price(s)
         if s in pos:
+            price = x.last_price(s)
             amt, entry = pos[s]
             side = 1 if amt > 0 else -1
             pnl = amt * (price - entry)                 # (Binance's average entry; fees not included)
@@ -170,78 +183,60 @@ def status_message(title="📊 <b>Status</b>"):
             stops = [float(o.get("triggerPrice") or 0) for o in mine
                      if str(o.get("closePosition")).lower() == "true" or str(o.get("reduceOnly")).lower() == "true"]
             stop = (max(stops) if side > 0 else min(stops)) if stops else None
-            r_now = side * (price - entry) / d if d else 0.0
             upnl += pnl
             if stop:
                 risk += max(0.0, side * (entry - stop)) * abs(amt)
-            stage = (f"profit locked at +{st.get('lock_to', 1.5):g}R" if st.get("lock_done") else
-                     "stop at breakeven" if st.get("be_done") else "stop")
+            stage = (f" (+{st.get('lock_to', 1.5):g}R)" if st.get("lock_done") else " (BE)" if st.get("be_done") else "")
             held = notify.held(now - st["entry_ms"]) if st.get("entry_ms") else "?"
-            rows.append(f"{c} ● <b>{'long' if side > 0 else 'short'}</b> {notify.num(r_now, 2, sign=True)}R "
-                        f"({notify.usd(pnl, sign=True)}) · entry {P(s, entry)} · now {P(s, price)}\n"
-                        f"      {stage} {P(s, stop) if stop else '<b>not found on Binance!</b>'} · held {held}")
+            blocks.append([f"<b>{c} ● {'long' if side > 0 else 'short'}</b> {notify.num(side * (price - entry) / d if d else 0, 2, sign=True)}R"
+                           f" · {notify.usd(pnl, sign=True)}",
+                           f"{IND}{P(s, entry)} → {P(s, price)}",
+                           f"{IND}SL {P(s, stop)}{stage} · {held}" if stop else f"{IND}⚠️ <b>SL not found on Binance</b> · {held}"])
             continue
         entries = [o for o in mine if "_in_" in str(o.get("clientAlgoId", ""))]
-        if entries:
-            o = entries[0]
-            side = 1 if o.get("side") == "BUY" else -1
-            trig = float(o.get("triggerPrice") or 0)
+        held_back = not entries and st.get("entry_trig") and not st.get("entry_qty")
+        if entries or held_back:
+            price = x.last_price(s)
+            o = entries[0] if entries else {}
+            side = (1 if o.get("side") == "BUY" else -1) if o else (st.get("entry_side") or 1)
+            trig = float(o.get("triggerPrice") or 0) if o else float(st["entry_trig"])
             d = float(st.get("sl_dist") or 0)
-            qty = float(o.get("quantity") or st.get("entry_qty") or 0)
-            away = side * (trig / price - 1) * 100
-            rows.append(f"{c} {'▲ buy' if side > 0 else '▼ sell'} stop {P(s, trig)} · price {P(s, price)} "
-                        f"({notify.pct(away, dec=2)} away)\n"
-                        f"      stop loss {P(s, trig - side * d)} · risk {notify.usd(qty * d)}")
+            qty = float(o.get("quantity") or st.get("entry_qty") or 0) if o else 0.0
+            blk = [f"<b>{c} {'▲ buy' if side > 0 else '▼ sell'} stop</b> {P(s, trig)}",
+                   f"{IND}price {P(s, price)} · {notify.num(side * (trig / price - 1) * 100, 2)}% away"]
+            blk.append(f"{IND}SL {P(s, trig - side * d)} · risk {notify.usd(qty * d)}" if o else f"{IND}held back: cap full")
+            blocks.append(blk)
             continue
         ck = st.get("check") or {}
         line = ck.get("line", "")
-        if st.get("entry_trig") and not st.get("entry_qty"):
-            side = st.get("entry_side") or 1
-            rows.append(f"{c} {'▲ buy' if side > 0 else '▼ sell'} stop {P(s, st['entry_trig'])} held back: open-risk cap full "
-                        f"· price {P(s, price)}")
-        elif ck.get("t") != last_close:
-            rows.append(f"{c} <i>no report from the last 4h close yet</i> · price {P(s, price)}")
+        if ck.get("t") != last_close:
+            idle.append(f"{c} · waiting for its 4h check")
         elif line.startswith(("▲", "▼", "●")):
-            rows.append(f"{c} no order: this candle's order was used · next decision at {notify.when(last_close + TF_MS, day=False)}")
+            idle.append(f"{c} · order used, next {notify.when(last_close + TF_MS, day=False)}")
         else:
-            rows.append(f"{c} {notify.esc(line)}")
+            idle.append(f"{c} · {short_reason(line)}")
     _, cap = risk_text(eq)
-    out = [f"{title} · {notify.when(now)} ({notify.tz_label()}){MODE}", ""] + rows + [""]
-    out.append(f"Balance <b>{notify.usd(eq)}</b>" + (f" · open P&amp;L {notify.usd(upnl, sign=True)}" if pos else ""))
-    out.append(f"Open risk {notify.usd(risk)} ({risk / eq * 100:.1f}%)" + (f" · cap {cap:g}%" if cap else "") if eq else "")
+    out = [f"{title} · {notify.when(now)}{MODE}"]
+    for blk in blocks:
+        out += [""] + blk
+    if idle:
+        out += ["", "<b>No order</b>"] + idle
+    out += ["", f"Balance <b>{notify.usd(eq)}</b>" + (f" ({notify.usd(upnl, sign=True)} open)" if pos else "")]
+    if eq:
+        out.append(f"Risk {risk / eq * 100:.1f}%" + (f" of {cap:g}% cap" if cap else "") + f" · {notify.usd(risk)}")
     if (HERE / "PAUSE").exists():
-        out.append("⏸ PAUSE file: no new orders (open trades are still managed)")
+        out.append("⏸ Paused (PAUSE file)")
     elif weekend(now):
-        out.append(f"🌙 Weekend: no new orders until {notify.when(orders_resume(now))}; open trades are still managed")
+        out.append(f"🌙 No new orders till {notify.when(orders_resume(now))}")
     return "\n".join(out)
 
 
 def startup_message():
-    eq, now = account()
-    wait_reports(now // TF_MS * TF_MS, 120)        # the bots act on the last 4h close right after starting
-    rtext, cap = risk_text(eq)
-    st0 = json.loads((HERE / cfgs[0]).read_text())["strategy"]
+    eq, _ = account()
     rows = [f"🟢 <b>TBO v{bot_version()} online</b>{MODE}",
-            f"Coins {' · '.join(COIN[s] for s in SYMS)}",
-            f"Risk per trade {rtext} (shorts half)",
-            f"Open-risk cap {cap:g}% of the balance (BTC exempt)" if cap else "Open-risk cap off",
-            f"Exits: stop 1 ATR · breakeven at +{st0.get('be_R', 1.5):g}R · +{st0.get('lock_R', 5):g}R locks "
-            f"+{st0.get('lock_to', 1.5):g}R · time exit after {st0.get('max_hold_h', 120) / 24:g} days",
-            "Send /status any time for the current situation."]
-    try:
-        rows += ["", status_message("<b>Now</b>")]
-    except Exception as e:
-        rows += ["", f"Balance {notify.usd(eq)}" if eq is not None else "Balance: not readable right now",
-                 f"(status not readable right now: {notify.esc(e)})"]
+            f"Balance <b>{notify.usd(eq)}</b>" if eq is not None else "Balance not readable right now",
+            "/status for details"]
     publish("\n".join(rows))
-
-
-def wait_reports(t_close, max_s):
-    t0 = time.time()
-    while time.time() - t0 < max_s:
-        if all((state(s).get("check") or {}).get("t") == t_close for s in SYMS):
-            return
-        time.sleep(5)
 
 
 def bot_version():

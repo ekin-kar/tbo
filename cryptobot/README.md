@@ -314,8 +314,8 @@ entries, breakeven moves and the 5-day exit until it is back.
    `pip install -r cryptobot/requirements.txt`.
 4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
    token + chat id for phone messages (`TELEGRAM_UTC_OFFSET=3` shows times in UTC+3; default: the computer's time zone).
-   What arrives (run with `run_all.py`): one **start-up** message (balance, risk per coin, cap, exits, every coin's
-   status); **/status** whenever you send it in the chat (or tap it in the bot's / menu): every coin as it is now (in a
+   What arrives (run with `run_all.py`): one short **start-up** message (version and balance);
+   **/status** whenever you send it in the chat (or tap it in the bot's / menu), in lines short enough for a phone: every coin as it is now (in a
    trade: R and $ now, entry, price, stop and its stage, time held; an order waiting: its level, how far the price is
    from it, stop loss and risk; or why there is no order: weekend, open-interest filter, no trend, cap full, the
    candle's order already used), then balance, open P&L, open risk and the cap (no message after the 4h checks;
