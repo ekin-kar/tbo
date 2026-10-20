@@ -59,15 +59,24 @@ except Exception:
 total_risk = 0.0; total_notional = 0.0
 pf_path = Path(__file__).resolve().parent / "portfolio.json"
 pf = json.loads(pf_path.read_text()) if pf_path.exists() else {}
+# the bot sizes on this account + the panic sleeve's sub-account when its key is set (bot.equity, one pool)
+eq, sub_bal = bal, None
+if os.environ.get("PANIC_API_KEY") and os.environ.get("PANIC_API_SECRET") and pf.get("pool_panic_balance", True):
+    try:
+        sub_bal = float(Futures(os.environ["PANIC_API_KEY"], os.environ["PANIC_API_SECRET"], testnet=testnet).account()["totalMarginBalance"])
+        eq = bal + sub_bal
+        print(f" sizing balance: main ${bal:,.2f} + panic sub-account ${sub_bal:,.2f} = ${eq:,.2f} (the bot sizes on both)")
+    except Exception as e:
+        res(False, f"panic sub-account balance unreadable ({e}): sizes below use the main balance only", warn=True)
 row = None
 for r in sorted(pf.get("risk_ladder") or [], key=lambda r: float(r["from_usdt"])):
-    if bal >= float(r["from_usdt"]):
+    if eq >= float(r["from_usdt"]):
         row = r
 if pf.get("risk_ladder"):
     print(" risk ladder (portfolio.json), risk % by balance: " + " | ".join(
         f"from ${float(r['from_usdt']):,.0f}: BTC {r.get('BTCUSDT')} ETH {r.get('ETHUSDT')} alts {r.get('ADAUSDT')} cap {r.get('cap_pct')}"
         for r in sorted(pf["risk_ladder"], key=lambda r: float(r["from_usdt"]))))
-    print(f" -> at your balance ${bal:,.2f} the row from ${float(row['from_usdt']):,.0f} applies" if row else " -> no row applies: config risk_pct")
+    print(f" -> at your balance ${eq:,.2f} the row from ${float(row['from_usdt']):,.0f} applies" if row else " -> no row applies: config risk_pct")
 for c in cfgs:
     p = S.Params(**c["strategy"]); sym = p.symbol; sm = c.get("short_risk_mult", 1.0)
     c = dict(c, risk_pct=float(row[sym]) if row and sym in row else c["risk_pct"])
@@ -80,16 +89,16 @@ for c in cfgs:
         a = S.atr([k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4], p.atr_n)[-1]; px = k4[-1][4]
         dist = p.sl_atr * a
         for side, m in (("long", 1.0), ("short", sm)):
-            qty = bal * risk * m / dist
-            qty = min(qty, bal * c.get("max_leverage", 5) / px)
+            qty = eq * risk * m / dist
+            qty = min(qty, eq * c.get("max_leverage", 5) / px)
             qr = int(qty / max(f["step"], f["mkt_step"]) + 1e-9) * max(f["step"], f["mkt_step"])
             okq = qr >= f["min_qty"] and qr * px >= f["min_notional"]
             if side == "long":
                 total_notional += qr * px / c.get("exchange_leverage", c.get("max_leverage", 5))
             res(okq, f"{side}: stop {dist / px * 100:.2f}% away -> {qr:g} {sym[:-4]} (${qr * px:,.0f} notional, risk ${qr * dist:.2f}; "
                      f"min {f['min_qty']:g} / ${f['min_notional']:g})" + ("" if okq else " -> too small: this trade would be skipped"), warn=not okq)
-            if okq and qr * dist < 0.75 * bal * risk * m:
-                res(False, f"{side}: rounding cuts the risk to ${qr * dist:.2f} of ${bal * risk * m:.2f} (step {f['step']:g})", warn=True)
+            if okq and qr * dist < 0.75 * eq * risk * m:
+                res(False, f"{side}: rounding cuts the risk to ${qr * dist:.2f} of ${eq * risk * m:.2f} (step {f['step']:g})", warn=True)
         try:
             sc = x.symbol_config(sym); mt = str(sc.get("marginType", "?")).upper()
             res(mt in ("CROSSED", "CROSS"), f"margin type {mt}" + ("" if mt in ("CROSSED", "CROSS") else " (recommended: cross)"), warn=True)
@@ -108,14 +117,14 @@ for c in cfgs:
                 res(False, f"open interest data unavailable ({e}): the bot then trades without the filter", warn=True)
     except BinanceError as e:
         res(False, f"{sym}: {e}")
-print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${bal * total_risk:.2f})")
+print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${eq * total_risk:.2f})")
 cap = float(row["cap_pct"]) if row and "cap_pct" in row else float(pf.get("open_risk_cap_pct", 0) or 0)
 if cap > 0:
     ex = [c["strategy"]["symbol"] for c in cfgs if c["strategy"]["symbol"] in pf.get("cap_exempt", [])]
     rk = lambda c: float(row[c["strategy"]["symbol"]]) if row and c["strategy"]["symbol"] in row else c["risk_pct"]
     capped = [rk(c) for c in cfgs if c["strategy"]["symbol"] not in ex] or [0]
     btc = next((rk(c) for c in cfgs if c["strategy"]["symbol"] == "BTCUSDT"), None)
-    print(f" open-risk cap (portfolio.json): {cap:g}% of the balance (${bal * cap / 100:.2f})"
+    print(f" open-risk cap (portfolio.json): {cap:g}% of the balance (${eq * cap / 100:.2f})"
           + (f" = {cap / btc:.2f} x the BTC risk (tested best: about 1.1x)" if btc else "") + f"; never shrunk: {', '.join(ex) or 'none'}")
     res(cap >= max(capped), f"cap {cap:g}% vs the biggest capped coin risk {max(capped):g}%" + ("" if cap >= max(capped) else
         " -> that coin could never trade full size: raise the cap (about 1.1 x the BTC risk)"), warn=cap < max(capped))
@@ -126,7 +135,7 @@ if cap > 0:
 else:
     print(" open-risk cap: off (no portfolio.json or open_risk_cap_pct 0)")
 if bal > 0:
-    res(total_notional < 0.8 * bal, f"margin locked if all coins are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
+    res(total_notional < 0.8 * bal, f"margin locked if all coins are long at today's stops: ${total_notional:.2f} of ${bal:.2f} (main account)"
         + ("" if total_notional < 0.8 * bal else " (raise exchange_leverage in the configs)"), warn=True)
 pk, ps = os.environ.get("PANIC_API_KEY", ""), os.environ.get("PANIC_API_SECRET", "")
 if pk and ps:
