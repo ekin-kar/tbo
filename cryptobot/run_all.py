@@ -262,7 +262,7 @@ def status_message(title="📊 <b>Status</b>"):
 
 
 def panic_lines(x, now):
-    """The panic sleeve's open trades (state_panic.json), in the same short phone lines."""
+    """The panic sleeve's open trades (state_panic.json), in the same short phone lines; nothing when none is open."""
     if not panic_on():
         return []
     try:
@@ -278,8 +278,6 @@ def panic_lines(x, now):
                 f"{IND}{P(tr['entry'])} → {P(price)}",
                 f"{IND}TP {P(tr['tp']) if tr.get('tp') else '-'} · SL {P(tr['entry'] if tr.get('be_done') else tr['stop'])}",
                 f"{IND}closes in {notify.held(left)}"]
-    if not out:
-        out = ["", f"⚡ Panic sleeve: watching {len(cfg.get('coins', []))} coins"]
     return out
 
 
