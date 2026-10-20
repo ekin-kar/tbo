@@ -1,4 +1,4 @@
-# TBO v2.6: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) (Binance USD-M futures)
+# TBO v2.7: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -20,6 +20,34 @@
 | Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (6.6% of equity under $1,000, 5.5% to $10,000, 2.75% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
+
+## Panic sleeve (v2.7, Oct 2026): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
+
+A second, separate strategy that buys **forced-liquidation crashes** and sells the rebound. When a coin falls hard while
+**open interest collapses**, leveraged longs are being liquidated: market sells at any price, so the price overshoots
+and tends to snap back. (If open interest RISES during the drop, new shorts are opening: real selling, no rebound.)
+
+| | |
+|---|---|
+| Account | A Binance **sub-account** with its own API key (`PANIC_API_KEY` / `PANIC_API_SECRET` in `.env`): its positions never touch the bot's (in 27% of panic trades the bot is short the same coin) |
+| Signal | Checked after every hourly close on BTC, ETH, BNB, SOL, ADA: over the last **4 hours** the price fell **>= 1.5x its normal 4-hour move** (std of the last 168 hourly returns x 2), **open interest fell >= 12%**, and the futures **premium is at a discount** (z-score <= -1 over 30 days) |
+| Entry | Market buy at once (the next hour's open in the backtest). Long only (short squeezes: rare and losing) |
+| Exits | Take-profit **+3 x ATR(1h)**, stop **-4 x ATR(1h), never more than 20% below the entry** (both on Binance; without the limit the FTX crash would have put the stop 68% away), the stop moves to the **entry once the price was +2 ATR** above it, otherwise **closed after 12 hours** |
+| Size | **3 units per panic event**: 1 unit = 1/6 of the ladder's BTC risk, a 5% move = 1 unit's risk. At the $0-1k row (BTC 6%) a 5% move against the position costs 3% of the balance (position = 60% of the balance), split equally if several coins trigger in the same hour. Sized on **main + sub-account** (one pool, as in the research); follows the ladder automatically |
+| Balance | The bot also sizes on main + sub when the key is set (portfolio.json `"pool_panic_balance": false` = main only). Keep **20-30%** of the money on the sub-account (`check_setup.py` shows it) |
+| Frequency | About 1.2 events a month on the 5 coins (86 trades 2022-26), held 10 hours on average (most run the full 12 h) |
+
+Backtest (`research/crypto/core/panic_sleeve.py`, the live signal code; bot's real sizing from $300, open interest data
+from Dec 2021): bot alone from 2022 $367.5k, worst drop 46.4% -> bot + sleeve **$652k, 29.2%**; from 2024 $39.1k, 41.8%
+-> **$50.7k, 36.1%**. Sleeve trades: 74% win, average win +5.9%, average loss -3.3%, profit factor 5.2. The exact settings
+are a good point of a broad plateau: over 81 neighbouring settings (window 3-6 h, OI 10-15%, premium -0.5 to -1.5,
+2-4 units) 70% give more money AND a smaller drop in both runs; the typical neighbour adds +5-20% and a few points less
+drop. On 41 coins never used to find it the effect holds (2022-23 x1.03-1.13, 2024-26 x1.17-1.21 on the bot's
+return / drop) when sized per event. Weak spot: long bear-market cascades (2022: LUNA, FTX). Details: `reports/panic.html`.
+
+Set up: Binance -> Sub-accounts -> create one -> enable Futures -> transfer 20-30% of the balance -> API Management of the
+sub-account: create a key (Enable Futures, NO withdrawals, restrict to the server's IP) -> `tbo_install.bat` option 8 (my
+server) or 6 -> 9 (someone's server) saves it and restarts; `check_setup.py` checks it. Logs: `logs/PANIC.log`.
 
 ## How v2 was found (Oct 2026)
 

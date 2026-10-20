@@ -6,6 +6,7 @@ Runs one bot process per config (default: every config_*.json here) and restarts
     python run_all.py config_btc.json config_eth.json   # only these
 Stop with Ctrl+C (stops all bots; open positions keep their stop-loss on Binance).
 To stop NEW entries but keep managing open trades: create an empty file named PAUSE in this folder.
+The panic sleeve (panic.py, on a Binance sub-account) runs too when PANIC_API_KEY / PANIC_API_SECRET are in .env.
 Telegram (if set in .env): one message when the bots start; /status in the chat (or the bot's / menu) answers with the
 current situation of every coin, live from Binance. The bots themselves send their trade events (opened, breakeven,
 profit lock, closed, cap cuts) and warnings. No message after the 4h checks.
@@ -19,7 +20,7 @@ import notify                                    # noqa: E402
 
 flags = [a for a in sys.argv[1:] if a.startswith("--")]
 cfgs = [a for a in sys.argv[1:] if not a.startswith("--")] or sorted(str(p.name) for p in HERE.glob("config_*.json"))
-procs, fails, lock = {}, {c: 0 for c in cfgs}, threading.Lock()
+procs, fails, lock = {}, {c: 0 for c in cfgs + ["panic"]}, threading.Lock()
 notify.load_env(HERE / ".env")
 TESTNET, DRY = "--testnet" in flags, "--dry-run" in flags
 MODE = " <i>(dry run)</i>" if DRY else " <i>(testnet)</i>" if TESTNET else ""
@@ -36,7 +37,7 @@ COIN = {s: s[:-4] for s in SYMS}
 
 
 def pump(cfg, p):
-    tag = cfg.replace("config_", "").replace(".json", "").upper()
+    tag = "PNC" if cfg == PANIC else cfg.replace("config_", "").replace(".json", "").upper()
     for line in p.stdout:
         with lock:
             print(f"{time.strftime('%H:%M:%S')}  {tag:<4s} {line.rstrip()}", flush=True)
@@ -54,8 +55,17 @@ def publish_console(msg):
         print(f"{time.strftime('%H:%M:%S')}  {msg}", flush=True)
 
 
+PANIC = "panic"                                  # the panic sleeve's process name (panic.py, sub-account)
+
+
+def panic_on():
+    import os
+    return bool(os.environ.get("PANIC_API_KEY") and os.environ.get("PANIC_API_SECRET")) and (HERE / "panic.json").exists()
+
+
 def start(cfg):
-    p = subprocess.Popen([sys.executable, "-u", str(HERE / "bot.py"), str(HERE / cfg)] + flags, cwd=HERE,
+    cmd = [str(HERE / "panic.py")] if cfg == PANIC else [str(HERE / "bot.py"), str(HERE / cfg)]
+    p = subprocess.Popen([sys.executable, "-u"] + cmd + flags, cwd=HERE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     threading.Thread(target=pump, args=(cfg, p), daemon=True).start()
     procs[cfg] = (p, time.time())
@@ -70,9 +80,23 @@ def account():
         if DRY:
             return float(cfg_of(cfgs[0]).get("dry_run_equity", 1000)), int(time.time() * 1000)
         x = Futures(os.environ.get("BINANCE_API_KEY", ""), os.environ.get("BINANCE_API_SECRET", ""), testnet=TESTNET)
-        return float(x.account()["totalMarginBalance"]), x.now_ms()
+        return float(x.account()["totalMarginBalance"]) + (panic_balance() or 0.0), x.now_ms()
     except Exception:
         return None, int(time.time() * 1000)
+
+
+def panic_balance():
+    """The sub-account's balance (None when the panic sleeve is off or unreadable)."""
+    if not panic_on() or DRY:
+        return None
+    try:
+        import os
+        from binance_futures import Futures
+        if "px" not in _X:
+            _X["px"] = Futures(os.environ["PANIC_API_KEY"], os.environ["PANIC_API_SECRET"], testnet=TESTNET)
+        return float(_X["px"].account()["totalMarginBalance"])
+    except Exception:
+        return None
 
 
 def portfolio():
@@ -215,13 +239,19 @@ def status_message(title="📊 <b>Status</b>"):
             idle.append(f"{c} · order used, next {notify.when(last_close + TF_MS, day=False)}")
         else:
             idle.append(f"{c} · {short_reason(line)}")
+    sub = panic_balance()
+    if sub is not None:
+        eq += sub                                       # the bot sizes on main + sub-account (one pool)
     _, cap = risk_text(eq)
     out = [f"{title} · {notify.when(now)}{MODE}"]
     for blk in blocks:
         out += [""] + blk
+    out += panic_lines(x, now)
     if idle:
         out += ["", "<b>No order</b>"] + idle
     out += ["", f"Balance <b>{notify.usd(eq)}</b>" + (f" ({notify.usd(upnl, sign=True)} open)" if pos else "")]
+    if sub is not None:
+        out.append(f"{IND}main {notify.usd(eq - sub)} · panic {notify.usd(sub)}")
     if eq:
         out.append(f"Risk {risk / eq * 100:.1f}%" + (f" of {cap:g}% cap" if cap else "") + f" · {notify.usd(risk)}")
     if (HERE / "PAUSE").exists():
@@ -231,11 +261,35 @@ def status_message(title="📊 <b>Status</b>"):
     return "\n".join(out)
 
 
+def panic_lines(x, now):
+    """The panic sleeve's open trades (state_panic.json), in the same short phone lines."""
+    if not panic_on():
+        return []
+    try:
+        st = json.loads((HERE / f"state_panic{'_testnet' if TESTNET else ''}.json").read_text())
+    except (OSError, ValueError):
+        st = {"trades": {}}
+    cfg = json.loads((HERE / "panic.json").read_text()); hold = int(cfg.get("signal", {}).get("hold_h", 12))
+    out = []
+    for s_, tr in st.get("trades", {}).items():
+        price = x.last_price(s_); P = lambda v: notify.px(v, tick(s_))
+        r = price / tr["entry"] - 1; left = max(0, tr["entry_ms"] + hold * 3_600_000 - now)
+        out += ["", f"<b>{s_[:-4]} ⚡ panic</b> {notify.pct(r * 100, sign=True)} · {notify.usd((price - tr['entry']) * tr['qty'], sign=True)}",
+                f"{IND}{P(tr['entry'])} → {P(price)}",
+                f"{IND}TP {P(tr['tp']) if tr.get('tp') else '-'} · SL {P(tr['entry'] if tr.get('be_done') else tr['stop'])}",
+                f"{IND}closes in {notify.held(left)}"]
+    if not out:
+        out = ["", f"⚡ Panic sleeve: watching {len(cfg.get('coins', []))} coins"]
+    return out
+
+
 def startup_message():
     eq, _ = account()
     rows = [f"🟢 <b>TBO v{bot_version()} online</b>{MODE}",
             f"Balance <b>{notify.usd(eq)}</b>" if eq is not None else "Balance not readable right now",
+            "⚡ Panic sleeve on (sub-account)" if panic_on() else "",
             "/status for details"]
+    rows = [r for r in rows if r]
     publish("\n".join(rows))
 
 
@@ -253,6 +307,8 @@ def main():
     by_sym = {cfg_of(c)["strategy"]["symbol"]: c for c in cfgs}
     for s_ in SYMS:                                  # BTC first, then ETH, BNB, SOL, ADA
         start(by_sym[s_]); time.sleep(2)             # stagger start-up requests
+    if panic_on():
+        start(PANIC)                                 # the panic sleeve on the sub-account
     threading.Thread(target=startup_message, daemon=True).start()
     threading.Thread(target=notify.listen, daemon=True,
                      args=({"status": ("Current status of every coin", status_message)}, publish_console)).start()
@@ -264,8 +320,8 @@ def main():
                     fails[c] = fails[c] + 1 if time.time() - t0 < 300 else 1
                     wait = 5 if fails[c] == 1 else 60
                     print(f"{time.strftime('%H:%M:%S')}  {c}: bot stopped (exit code {p.returncode}); restarting in {wait} s", flush=True)
-                    notify.send(f"♻️ <b>{COIN.get(cfg_of(c)['strategy']['symbol'], c)}</b> bot stopped (exit code {p.returncode}) · "
-                                f"restarting in {wait} s")
+                    name = "Panic sleeve" if c == PANIC else COIN.get(cfg_of(c)['strategy']['symbol'], c)
+                    notify.send(f"♻️ <b>{name}</b> {'' if c == PANIC else 'bot '}stopped (exit code {p.returncode}) · restarting in {wait} s")
                     time.sleep(wait); start(c)
     except KeyboardInterrupt:
         print("stopping all bots (stop-losses stay on Binance)", flush=True)

@@ -25,6 +25,7 @@ if defined MYIP (echo   MY SERVER  ^(!MYIP!^)) else (echo   MY SERVER  ^(not set
 echo    1  Update my bot  ^(latest code^) + restart
 echo    2  Check my setup  ^(check_setup.py^)
 echo    3  Set up my server from scratch  ^(new or reinstalled server^)
+echo    8  Add / change my panic sleeve key  ^(Binance sub-account^)
 echo.
 echo   OTHER PEOPLE'S SERVERS
 echo    4  Set up a new person's server
@@ -43,6 +44,7 @@ if "!c!"=="4" ( call :addserver && call :setup )
 if "!c!"=="5" ( call :pickserver && call :update )
 if "!c!"=="6" ( call :pickserver && goto manage )
 if "!c!"=="7" call :updateall
+if "!c!"=="8" ( call :myip && call :panickey )
 if "!c!"=="0" exit /b
 echo.
 pause
@@ -105,6 +107,7 @@ echo    5  Start the bot
 echo    6  Check the setup  (check_setup.py)
 echo    7  Update the bot  (latest code) + restart
 echo    8  Server terminal
+echo    9  Add / change the panic sleeve key  ^(Binance sub-account^)
 echo    B  Back
 echo.
 set "c="
@@ -117,6 +120,7 @@ if "!c!"=="5" ssh -t %SSHO% root@!IP! "systemctl enable --now tbo && echo Bot st
 if "!c!"=="6" call :check
 if "!c!"=="7" call :update
 if "!c!"=="8" ssh -t %SSHO% root@!IP!
+if "!c!"=="9" call :panickey
 if /i "!c!"=="B" goto main
 echo.
 pause
@@ -175,6 +179,9 @@ set "AK=" & set /p "AK=  Binance API key: "
 set "AS=" & set /p "AS=  Binance API secret: "
 set "TT=" & set /p "TT=  Telegram bot token (Enter to skip): "
 set "TC=" & set /p "TC=  Telegram chat id (Enter to skip): "
+echo   Optional: the panic sleeve's Binance SUB-ACCOUNT key ^(Enter to skip; can be added later^)
+set "PK=" & set /p "PK=  Sub-account API key: "
+set "PS=" & set /p "PS=  Sub-account API secret: "
 if "!AK!"=="" ( echo   No API key given: setup cancelled. & exit /b )
 set "ENVF=%TEMP%\tbo.env"
 > "%ENVF%" (
@@ -183,6 +190,8 @@ set "ENVF=%TEMP%\tbo.env"
   echo TELEGRAM_TOKEN=!TT!
   echo TELEGRAM_CHAT_ID=!TC!
   echo TELEGRAM_UTC_OFFSET=3
+  if not "!PK!"=="" echo PANIC_API_KEY=!PK!
+  if not "!PK!"=="" echo PANIC_API_SECRET=!PS!
 )
 call :pkg || ( del "%ENVF%" >nul 2>&1 & exit /b )
 echo   Uploading...
@@ -230,6 +239,23 @@ exit /b
 
 :check
 ssh -t %SSHO% root@!IP! "cd /home/tbo/trade3/cryptobot && sudo -u tbo venv/bin/python check_setup.py"
+exit /b
+
+rem ── the panic sleeve's sub-account key into the server's .env (replaces an old one), then restart ──
+:panickey
+call :ensurekey || exit /b
+echo.
+echo   In Binance: create a sub-account, enable Futures on it, move 20-30%% of the balance there, and create an
+echo   API key FOR THE SUB-ACCOUNT ^(Enable Futures, NO withdrawals, restricted to !IP!^).
+set "PK=" & set /p "PK=  Sub-account API key (Enter = remove the panic sleeve): "
+set "PS="
+if not "!PK!"=="" set /p "PS=  Sub-account API secret: "
+if "!PK!"=="" (
+  ssh -t %SSHO% root@!IP! "cd /home/tbo/trade3/cryptobot && sed -i '/^PANIC_API_/d' .env && systemctl restart tbo && echo Panic sleeve removed, bot restarted."
+) else (
+  ssh -t %SSHO% root@!IP! "cd /home/tbo/trade3/cryptobot && sed -i '/^PANIC_API_/d' .env && echo PANIC_API_KEY=!PK! >> .env && echo PANIC_API_SECRET=!PS! >> .env && chown tbo:tbo .env && chmod 600 .env && systemctl restart tbo && echo Panic sleeve key saved, bot restarted."
+  call :check
+)
 exit /b
 
 :stop

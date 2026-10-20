@@ -30,7 +30,7 @@ import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.6"
+VERSION = "2.7"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -182,9 +182,26 @@ class Bot:
 
     # ── helpers ──
     def equity(self):
+        """The balance the risk is sized on: this account + the panic sleeve's sub-account when its key is in .env
+        (one pool, as in the research; portfolio.json "pool_panic_balance": false sizes on this account alone)."""
         if self.dry:
             return float(self.cfg.get("dry_run_equity", 1000))
-        return float(self.x.account()["totalMarginBalance"])
+        return float(self.x.account()["totalMarginBalance"]) + self.panic_balance()
+
+    def panic_balance(self):
+        if not (os.environ.get("PANIC_API_KEY") and os.environ.get("PANIC_API_SECRET")) or not self.portfolio().get("pool_panic_balance", True):
+            return 0.0
+        now = time.time()
+        if now - getattr(self, "_pb_t", 0) < 60:
+            return self._pb
+        try:
+            if not hasattr(self, "_px"):
+                self._px = Futures(os.environ["PANIC_API_KEY"], os.environ["PANIC_API_SECRET"], testnet=self.testnet)
+            self._pb = float(self._px.account()["totalMarginBalance"]); self._pb_t = now
+        except Exception as e:
+            log.warning(f"panic sub-account balance unreadable ({e}): sizing on the last known value")
+            self._pb = getattr(self, "_pb", 0.0); self._pb_t = now
+        return self._pb
 
     def candles(self):
         now = self.x.now_ms()

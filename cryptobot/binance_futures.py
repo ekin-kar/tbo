@@ -105,6 +105,11 @@ class Futures:
     def last_price(self, symbol):
         return float(self._req("GET", "/fapi/v1/ticker/price", dict(symbol=symbol))["price"])
 
+    def premium_klines(self, symbol, interval="1h", limit=1000):
+        """Premium index candles (perpetual vs the spot index): [(open_ms, o, h, l, c, close_ms), ...] oldest first."""
+        raw = self._req("GET", "/fapi/v1/premiumIndexKlines", dict(symbol=symbol, interval=interval, limit=limit))
+        return [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), int(k[6])) for k in raw]
+
     def open_interest_hist(self, symbol, period="1h", limit=100):
         """[(timestamp_ms, open interest USD value), ...] oldest first (public endpoint, last 30 days)."""
         raw = self._req("GET", "/futures/data/openInterestHist", dict(symbol=symbol, period=period, limit=min(int(limit), 500)))
@@ -176,6 +181,12 @@ class Futures:
             algoType="CONDITIONAL", symbol=symbol, side=side, type="STOP_MARKET", triggerPrice=trigger,
             quantity=None if close_position else qty, closePosition="true" if close_position else None,
             workingType="CONTRACT_PRICE", clientAlgoId=client_id), signed=True)
+
+    def take_profit_market(self, symbol, side, trigger, client_id=None):
+        """Conditional TAKE_PROFIT_MARKET closing the whole position (Algo Order API, LAST price)."""
+        return self._req("POST", "/fapi/v1/algoOrder", dict(
+            algoType="CONDITIONAL", symbol=symbol, side=side, type="TAKE_PROFIT_MARKET", triggerPrice=trigger,
+            closePosition="true", workingType="CONTRACT_PRICE", clientAlgoId=client_id), signed=True)
 
     def open_algo_orders(self, symbol=None):
         """Open conditional orders of one symbol, or of every symbol when symbol is None."""

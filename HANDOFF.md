@@ -2,7 +2,7 @@
 
 **Layout (Oct 2026 cleanup):** research scripts are in `research/crypto/core/` (library), `research/crypto/pages/` (page generators + templates) and `research/crypto/studies/` (experiments); the bot's developer checks in `cryptobot/dev/`. Script names below are unchanged; see the top-level `README.md` for what is where.
 
-**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. Older sections below describe how it got here (their ladder numbers are the old ones).
+**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
 
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
@@ -275,3 +275,32 @@ Trade list from the FIRST trade: build_trades / trade_prices now keep trades fro
 2020 data); adds one ETH trade on 2020-02-24 (-1.06R) -> 1,559 trades (other 1,558 identical). Pages' "2020" runs start
 there (trades.html opens on it by default: from $300 -> $4.89M, worst drop 35.5%; 2022 run $368k / 46.4%; 2024 run
 $39.1k / 41.8%). All pages rebuilt and checked in headless Chromium (no JS errors, numbers match botsim).
+
+Research round after going live (Oct 2026; exploratory scripts in the scratchpad, not kept; the final sleeve is reproduced
+by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobot/dev/test_panic_sim.py`):
+- Rejected (v2.6 engine, both periods + random skips + 4h phase shifts): exit on daily trend flip (never triggers: the 1-ATR
+  / breakeven stop always closes first), late trailing stops (+8/10R, 3-5R behind: x0.75-0.97), dead-trade exits (cut 20-60
+  future big winners), ATR length 10/20/28, minimum stop %, alts only when stronger than BTC (14/30d x1.18/1.08 but no
+  better than random skips in 2024-26; ETH-only version zig-zags with the lookback), alts only with BTC's daily trend
+  (opposite-trend alt trades were the BEST in 2020-23), weekly coin rotation from 52 coins (fixed BTC+ETH-led set beats ~97%
+  of random sets; rotating the alt slots by 30d efficiency x1.10/1.02 but 60/90d worse = noise), partial take-profit (win
+  rate 21% -> 46% but money -30 to -70%), adding at +2.5-5R (bootstrap 2022-26 looked good, 8 phase x era runs at matched drop
+  x0.86-1.22 -> not robust).
+- Chop study: 36 daily features + a model: AUC within luck bounds (0.57-0.62 vs null 0.58-0.64), model out of sample 0.51-
+  0.57. Breakout outcomes on 52 coins are independent of the coin's previous FINISHED breakouts (42.8/42.9/41.6/42.2%; the
+  apparent clustering was look-ahead). Drawdown depth = random reorderings of the same trades. Losses cluster in the same
+  moment (other coin's trade within 24 h won -> 39% win, lost -> 13%), not in a detectable state: nothing to filter.
+- **Panic sleeve (adopted, v2.7):** 3 h move vs OI change: OI rising -> continuation (fade -0.3/-0.75%), OI <= -6% ->
+  rebound, monotonic in the OI fall. Premium discount (z <= -1..-5) the same effect. As a sleeve next to the bot (sized per
+  event, own budget outside the cap) it beats random long trades at the same times in 99-100% of 200 draws. Grids 15,120 +
+  9,072 combinations on 10 dev coins + 41 new coins (OI + premium downloaded from data.binance.vision): 66% of the focused
+  grid beat the bot in all 4 tests; OI fall is the dominant setting (monotonic), window 3-6 h, price-move size barely
+  matters, hold 6-18 h, no tight stop. Picking on the 10 coins does NOT carry to the 41 (top picks x0.82), picking on the 41
+  carries to the 10 (100% > 1): trust the plateau. Frozen rule on the 41 coins (per-event sizing): x1.03-1.13 / x1.17-1.21.
+  Exits: 12 h best (18-24 h raise 2024-26 drop to 44-46%), TP 2.5-3.5 ATR plateau, breakeven after +2 ATR neutral (safer),
+  trailing 1 ATR / stop-to-entry after 4-6 h worse; stop cap -20% (FTX: 4 ATR = -68%) costs nothing. Neighbours (81: window
+  3/4/6, OI 10/12/15%, premium -0.5/-1/-1.5, 2-4 units): 70% more money AND less drop in both runs, typical +5-20% / a few
+  points; the chosen point is one of the better ones (expect the typical neighbour). Short squeezes: rare, losing. Waiting
+  for a green hour: worse. In 27% of sleeve trades the bot is short the same coin -> separate sub-account (one-way mode).
+  Final (bot real sizing from $300): 2022 $367.5k/46.4% -> $652k/29.2%; 2024 $39.1k/41.8% -> $50.7k/36.1%; 86 trades, 74% win,
+  +5.9% / -3.3%, PF 5.2. Live parity (`test_panic_sim.py`): signals 0 missed / 0 extra over 3,115 hours, trades 85/86 same.

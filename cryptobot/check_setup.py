@@ -128,4 +128,41 @@ else:
 if bal > 0:
     res(total_notional < 0.8 * bal, f"margin locked if all coins are long at today's stops: ${total_notional:.2f} of ${bal:.2f}"
         + ("" if total_notional < 0.8 * bal else " (raise exchange_leverage in the configs)"), warn=True)
+pk, ps = os.environ.get("PANIC_API_KEY", ""), os.environ.get("PANIC_API_SECRET", "")
+if pk and ps:
+    print("\nPANIC SLEEVE (sub-account, panic.py)")
+    try:
+        import panic as PN
+        pcfg = PN.load_cfg()
+        y = Futures(pk, ps, testnet=testnet)
+        sub = float(y.account()["totalMarginBalance"]); res(True, f"sub-account reachable, balance {sub:.2f} USDT")
+        if not testnet:
+            r = y.api_restrictions()
+            res(not r.get("enableWithdrawals", True), "withdrawals DISABLED on the sub-account key" if not r.get("enableWithdrawals") else "withdrawals ENABLED on the sub-account key: disable them!")
+            res(bool(r.get("enableFutures")), "futures trading enabled on the sub-account key")
+            res(bool(r.get("ipRestrict")), "sub-account key restricted to your IP" if r.get("ipRestrict") else "sub-account key NOT IP-restricted (recommended)", warn=True)
+        res(not y.hedge_mode(), "sub-account position mode One-way" if not y.hedge_mode() else "sub-account is in Hedge mode: switch it to One-way")
+        total = bal + sub
+        res(sub >= 0.15 * total, f"sub-account holds {sub / total * 100:.0f}% of main + sub (${total:.2f}); 20-30% recommended"
+            + ("" if sub >= 0.15 * total else " -> move more to the sub-account (panic trades are sized on main + sub)"), warn=True)
+        btc = PN.ladder_btc_pct(total); units = float(pcfg.get("units", 3))
+        risk = total * btc / 100 * units / 6
+        print(f" {units:g} units per panic event = {units / 6 * btc:.2f}% of ${total:.2f} = ${risk:.2f} lost on a 5% move; position ${risk / 0.05:.2f}"
+              f" (split over the coins that trigger in the same hour)")
+        for sym in pcfg["coins"]:
+            f = y.exchange_info(sym)
+            for n in (1, 2):
+                res(risk / 0.05 / n >= f["min_notional"], f"{sym} panic position with {n} coin(s) in the event: ${risk / 0.05 / n:.2f} vs Binance minimum ${f['min_notional']:g}",
+                    warn=True)
+        try:
+            y.open_algo_orders(); x.premium_klines("BTCUSDT", "1h", 5); x.open_interest_hist("BTCUSDT", period="5m", limit=5)
+            res(True, "algo orders, premium index and 5-minute open interest reachable")
+        except BinanceError as e:
+            res(False, f"panic data / orders: {e}")
+    except BinanceError as e:
+        res(False, f"sub-account: {e} (key invalid, futures not enabled for the key, or IP not whitelisted)")
+    except Exception as e:
+        res(False, f"panic sleeve check failed: {e}")
+else:
+    print("\nPANIC SLEEVE: off (no PANIC_API_KEY / PANIC_API_SECRET in .env)")
 print("RESULT:", "ready" if ok_all else "fix the FAIL lines first")

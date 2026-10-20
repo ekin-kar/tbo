@@ -1,0 +1,20 @@
+{
+  "coins": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"],
+  "units": 3,
+  "signal": {
+    "window_h": 4,
+    "move_k": 1.5,
+    "oi_drop": 0.12,
+    "premium_z": -1.0,
+    "hold_h": 12,
+    "tp_atr": 3.0,
+    "stop_atr": 4.0,
+    "stop_max": 0.20,
+    "be_atr": 2.0
+  },
+  "max_leverage": 5,
+  "exchange_leverage": 10,
+  "poll_s": 15,
+  "dry_run_equity": 75,
+  "dry_run_equity_main": 225
+}

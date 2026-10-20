@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panic Sleeve</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#ffffff;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;
+--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#7a5cc7;--comb:#18212b;--neg:#b3432f;--pos:#1d6b5b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9a7fe0;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9a7fe0;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 22px;max-width:78ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:20px;margin:40px 0 4px;font-weight:600}h3{font-size:16px;margin:0 0 6px}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:80ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--eth);outline-offset:2px}
+.coinbtn{display:inline-flex;align-items:center;gap:7px}.coinbtn i{width:10px;height:10px;border-radius:3px;display:inline-block}
+label.risk{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.risk input{font:inherit;width:84px;padding:7px 9px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 16px 10px;position:relative}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 6px}.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:18px;height:3px;border-radius:2px;display:inline-block}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.chart-cap{font-size:13px;color:var(--muted);margin:6px 2px 4px}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
+tr.yr td{font-weight:600;background:var(--soft)}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.big div{background:var(--surface);padding:12px 14px}.big b{display:block;font-size:22px;font-weight:600}.big span{font-size:13px;color:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}
+.tip .r{display:flex;justify-content:space-between;gap:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.spec{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:8px 0 0;font-size:14px}dt{color:var(--muted)}dd{margin:0}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.notes li{margin-bottom:6px}
+details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
+.lbtn{display:inline-flex;align-items:center;gap:7px}.lbtn i{width:18px;height:3px;border-radius:2px;display:inline-block}
+tr.rec td{font-weight:600}
+
+.rule-t td:first-child{color:var(--muted);width:150px;white-space:normal;vertical-align:top}.rule-t td{text-align:left;white-space:normal}
+tr.chosen td{font-weight:600;background:var(--soft)}
+.sweeps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:14px}.sweeps>*{min-width:0}
+.tag{font-size:12px;color:var(--muted)}
+</style></head><body><div class="wrap">
+<h1>The panic sleeve</h1>
+<p class="lede">A second strategy next to the trend bot: it <b>buys forced-liquidation crashes and sells the rebound</b>. When a coin falls hard while <b>open interest collapses</b>, leveraged longs are being liquidated: Binance sells their positions at any price, the price overshoots, and it tends to snap back once the forced selling is over. (When open interest <i>rises</i> during a drop, new shorts are opening on purpose: real selling, no rebound.) It runs on a <b>Binance sub-account</b> so its positions never touch the bot's. The numbers below use the bot's real sizing (risk ladder, open-risk cap, compounding) on one balance from $300, with fees, slippage and funding.</p>
+<div class="spec" style="margin-bottom:18px"><h3>The rules (cryptobot/panic.json)</h3><table class="rule-t" id="rules"></table></div>
+<div class="controls"><div><div class="ctl-title">Start</div><div class="seg" id="start"></div></div></div>
+<div class="big" id="tiles"></div>
+<div class="panel">
+ <div class="controls" style="margin-bottom:8px"><div class="seg" id="scale"></div><div class="legend" id="legend" style="margin:0"></div></div>
+ <svg id="eq" height="360" role="img" aria-label="Balance: bot alone and bot plus panic sleeve"></svg><div class="tip" id="tip"></div>
+ <div class="chart-cap" id="cap"></div>
+ <svg id="dd" height="170" role="img" aria-label="Drop from the highest balance"></svg>
+ <div class="chart-cap">Drop from the highest balance so far, counting every open trade not yet at breakeven as if it hit its stop (worst case).</div>
+</div>
+<h2>Year by year</h2><p class="hint">Each year started fresh from $300.</p>
+<div class="scroll panel"><table id="years"></table></div>
+<h2>The sleeve's trades</h2><p class="hint" id="shint"></p>
+<div class="big" id="stiles"></div>
+<details><summary>Every panic trade (2022 to Sep 2026)</summary><div class="scroll panel months"><table id="trades"></table></div></details>
+<h2>Every setting, one at a time</h2>
+<p class="hint">Each table changes one setting and keeps the others at the chosen values (highlighted). "Bot + sleeve" = the whole account from $300 (the bot alone: <span id="basehint"></span>). Look for broad flat areas, not single best cells: the chosen point is near the middle of each plateau, and a lucky exact value would not survive live trading.</p>
+<div class="sweeps" id="sweeps"></div>
+<h2>How robust is it?</h2>
+<ul class="notes">
+<li><b>Open interest is the signal.</b> On 41 other coins (never used to find the idea), the bigger the open-interest fall, the better the rebound: average per trade +0.2% at −6%, +0.9% at −10%, +1.6% at −12%, +2.7% at −15%, +4.5% at −20%, win rate 51% → 71%. Price falls with rising open interest (new positions, not liquidations) keep falling.</li>
+<li><b>Neighbouring settings:</b> of 81 combinations around the chosen one (window 3-6 h, open interest −10/−12/−15%, premium −0.5/−1/−1.5, 2-4 units), 70% give more money <i>and</i> a smaller worst drop than the bot alone in both runs; with 3 units the typical neighbour adds +17% (from 2022) / +6% (from 2024) and 2-3 points less drop. The exact chosen point is one of the better ones: expect the typical neighbour, not the best.</li>
+<li><b>Coins it never saw:</b> with the settings frozen first, the 41 other coins (sized per event) improved the bot's return ÷ drop by ×1.03-1.13 (2022-23) and ×1.17-1.21 (2024-26). Settings tuned on the 5 coins alone did <i>not</i> carry over; settings found on the 41 coins did: the plateau, not the 5-coin optimum, is what can be trusted.</li>
+<li><b>Random buying does not do this:</b> the same number of long trades at random times (or within a week of the real signals) made the bot <i>worse</i> in 100% of 200 tries; the timing of the forced selling is what matters.</li>
+<li><b>Short squeezes (the mirror):</b> rare on these coins (5 in 4¾ years) and losing: long only. Waiting for the bounce to start before buying: worse (the rebound starts at once).</li>
+<li><b>Weak spot:</b> long bear-market cascades (2022: LUNA, FTX), where liquidations keep coming for days. Open-interest data starts in Dec 2021, so 2022 is the only bear market in the test. The bot and the sleeve were tested on one balance; the sub-account split is handled by sizing both on main + sub.</li>
+</ul>
+</div>
+<script>
+const D=/*DATA*/null;
+let S={s:'2022',scale:'log'};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const money=v=>'$'+Math.round(v).toLocaleString('en-US');
+const pc=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}">${t}</button>`).join('');e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
+const P=D.params;
+document.getElementById('rules').innerHTML=[
+ ['Coins',D.coins.join(', ')+', checked after every hourly close'],
+ ['Signal',`over the last ${P.window_h} hours the price fell at least ${P.move_k}× its normal ${P.window_h}-hour move, open interest fell at least ${(P.oi_drop*100).toFixed(0)}%, and the futures price is at a discount to spot (premium z-score ≤ ${P.premium_z})`],
+ ['Entry','buy at once (the next hour\'s open), long only'],
+ ['Exits',`take-profit +${P.tp_atr} × hourly ATR; stop −${P.stop_atr} × ATR (never more than ${(P.stop_max*100).toFixed(0)}% below), moved to the entry once the price was +${P.be_atr} ATR above it; otherwise sold ${P.hold_h} hours after the entry`],
+ ['Size',`${D.units} units per panic event: 1 unit = 1/6 of the ladder's BTC risk, a 5% move = 1 unit's risk (under $1k: a 5% move against the position costs ${(D.units/6*6).toFixed(0)}% of the balance), split over the coins that trigger in the same hour; sized on main + sub-account`],
+ ['Account','a Binance sub-account with its own API key (in 27% of panic trades the bot is short the same coin: one-way mode would mix them)']].map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+function draw(){
+ const SK=Object.keys(D.runs);
+ seg('start',SK.map(k=>'From '+k),i=>SK[i]===S.s,i=>S.s=SK[i]);
+ seg('scale',['Log scale','Linear'],i=>(i===0)===(S.scale==='log'),i=>S.scale=i?'lin':'log');
+ const R=D.runs[S.s],ser=[{k:'bot',l:'Bot alone (now)',col:css('--s1'),d:R.bot},{k:'both',l:'Bot + panic sleeve',col:css('--s3'),d:R.both}];
+ document.getElementById('tiles').innerHTML=[
+  [`${money(R.bot.final)} → ${money(R.both.final)}`,`final balance from $300 (${pc((R.both.final/R.bot.final-1)*100,0)})`],
+  [`−${R.bot.dd.toFixed(1)}% → −${R.both.dd.toFixed(1)}%`,'worst drop: bot alone → bot + sleeve'],
+  [`${D.sleeve.events} events · ${D.sleeve.n} trades`,`panic trades 2022 to Sep 2026 (about ${(D.sleeve.events/57).toFixed(1)} a month)`]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+ const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=360,L=64,Rm=140,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ const t0=new Date(R.t0+'T00:00:00Z').getTime(),n=R.bot.bal.length,DAY=864e5,t1=t0+(n-1)*DAY,lg=S.scale==='log';
+ const vals=ser.flatMap(s=>s.d.bal),mn=Math.min(...vals),mx=Math.max(...vals);
+ const lo_=lg?Math.log10(mn*0.9):0,hi_=lg?Math.log10(mx*1.1):mx*1.05;
+ const x=t=>L+(t-t0)/(t1-t0)*(W-L-Rm),y=v=>T+(1-((lg?Math.log10(v):v)-lo_)/(hi_-lo_))*(H-T-B);
+ let ticks=[];if(lg){for(let e=1;e<=9;e++)for(const k of[1,2,5]){const v=k*10**e;if(v>=mn*0.9&&v<=mx*1.1)ticks.push(v);}}else{const st=Math.pow(10,Math.floor(Math.log10(hi_/4)));const s2=hi_/st>20?st*5:hi_/st>8?st*2:st;for(let v=0;v<=hi_;v+=s2)ticks.push(v);}
+ for(const v of ticks){el('line',{x1:L,x2:W-Rm,y1:y(v),y2:y(v),stroke:css('--rule')},sv);el('text',{x:L-8,y:y(v)+4,'text-anchor':'end'},sv).textContent=money(v);}
+ const y0=new Date(t0).getUTCFullYear();for(let yy=y0+1;Date.UTC(yy,0,1)<t1;yy++){const tx=x(Date.UTC(yy,0,1));el('line',{x1:tx,x2:tx,y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:tx,y:H-6,'text-anchor':'middle'},sv).textContent=yy;}
+ for(const s of ser){let p='';s.d.bal.forEach((v,i)=>p+=(i?'L':'M')+x(t0+i*DAY).toFixed(1)+','+y(v).toFixed(1));el('path',{d:p,fill:'none',stroke:s.col,'stroke-width':2,'stroke-linejoin':'round'},sv);}
+ const ends=ser.map(s=>({s,yv:y(s.d.bal[n-1])})).sort((a,b)=>a.yv-b.yv);let last=-99;
+ for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:W-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='both'?700:500}`},sv).textContent=`${e.s.k==='bot'?'Bot':'Bot + sleeve'} ${money(e.s.d.bal[n-1])}`;}
+ document.getElementById('legend').innerHTML=ser.map(s=>`<span><i style="background:${s.col}"></i>${s.l}</span>`).join('');
+ document.getElementById('cap').textContent=`From $300, ${S.s} to Sep 2026. Daily closed balance; hover for values.`;
+ const dv=document.getElementById('dd');dv.innerHTML='';const DH=170;dv.setAttribute('viewBox',`0 0 ${W} ${DH}`);
+ const dmin=Math.min(-10,...ser.flatMap(s=>s.d.ddser)),ylo=Math.floor(dmin/10)*10,yd=v=>6+(v/ylo)*(DH-6-22);
+ for(let v=0;v>=ylo;v-=10){el('line',{x1:L,x2:W-Rm,y1:yd(v),y2:yd(v),stroke:css('--rule')},dv);el('text',{x:L-8,y:yd(v)+4,'text-anchor':'end'},dv).textContent=v+'%';}
+ for(const s of ser){let p='';s.d.ddser.forEach((v,i)=>p+=(i?'L':'M')+x(t0+i*DAY).toFixed(1)+','+yd(v).toFixed(1));el('path',{d:p,fill:'none',stroke:s.col,'stroke-width':1.5},dv);}
+ const hl=el('line',{y1:T,y2:H-B,stroke:css('--muted'),'stroke-dasharray':'3 3',visibility:'hidden'},sv),tip=document.getElementById('tip');
+ sv.onmousemove=ev=>{const rc=sv.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width);if(px<L||px>W-Rm){tip.style.display='none';hl.setAttribute('visibility','hidden');return;}
+  const i=Math.max(0,Math.min(n-1,Math.round((px-L)/(W-L-Rm)*(n-1))));hl.setAttribute('x1',px);hl.setAttribute('x2',px);hl.setAttribute('visibility','visible');
+  tip.innerHTML=`<div style="color:var(--muted);margin-bottom:3px">${new Date(t0+i*DAY).toISOString().slice(0,10)}</div>`+ser.map(s=>`<div class="r"><span><span class="dot" style="background:${s.col}"></span>${s.l}</span><b>${money(s.d.bal[i])}</b>&nbsp;<span style="color:var(--muted)">${s.d.ddser[i].toFixed(0)}%</span></div>`).join('');
+  tip.style.display='block';const pr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-pr.left+14;if(lx>pr.width-300)lx=ev.clientX-pr.left-300;tip.style.left=lx+'px';tip.style.top=(ev.clientY-pr.top+10)+'px';};
+ sv.onmouseleave=()=>{tip.style.display='none';hl.setAttribute('visibility','hidden');};
+}
+const cl=v=>v>0?'pos':v<0?'neg':'';
+document.getElementById('years').innerHTML='<thead><tr><th>Year</th><th>Bot alone</th><th>Bot + sleeve</th><th>Worst drop, bot</th><th>Worst drop, bot + sleeve</th><th>Panic trades</th><th>Their average</th></tr></thead><tbody>'+
+ D.years.map(r=>`<tr><td>${r.y}${r.y===2026?' (to Sep)':''}</td><td class="${cl(r.bot)}">${pc(r.bot,0)}</td><td class="${cl(r.both)}"><b>${pc(r.both,0)}</b></td><td>−${r.bot_dd.toFixed(1)}%</td><td>−${r.both_dd.toFixed(1)}%</td><td>${r.n}</td><td class="${cl(r.avg)}">${r.avg==null?'–':pc(r.avg,2)}</td></tr>`).join('')+'</tbody>';
+const Sl=D.sleeve;
+document.getElementById('shint').textContent=`Returns per trade after fees, before sizing. Average hold ${D.held_h.toFixed(1)} h; exits: ${Object.entries(D.exits).map(([k,v])=>v+' '+k).join(', ')}.`;
+document.getElementById('stiles').innerHTML=[[`${Sl.win.toFixed(0)}%`,'trades in profit'],[`${pc(Sl.avg_win,2)} / ${pc(Sl.avg_loss,2)}`,'average win / average loss'],[Sl.pf?Sl.pf.toFixed(2):'–','profit factor (won ÷ lost)'],[pc(Sl.worst,1),'worst trade']].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+document.getElementById('trades').innerHTML='<thead><tr><th>Entry (UTC)</th><th>Coin</th><th>Price, 4 h</th><th>Open interest, 4 h</th><th>Premium z</th><th>Entry</th><th>Exit</th><th>Result</th><th>Exit</th><th>Held</th></tr></thead><tbody>'+
+ D.trades.map(t=>`<tr><td>${t.t}</td><td>${t.coin}${t.n>1?` <span class="tag">(1 of ${t.n})</span>`:''}</td><td>${pc(t.move,1)}</td><td>${pc(t.oi,1)}</td><td>${t.pz.toFixed(2)}</td><td>${t.entry}</td><td>${t.exit}</td><td class="${cl(t.ret)}"><b>${pc(t.ret,2)}</b></td><td>${t.why}</td><td>${t.held} h</td></tr>`).join('')+'</tbody>';
+document.getElementById('basehint').textContent=`from 2022 ${money(D.base.usd2022)}, worst drop −${D.base.dd2022.toFixed(1)}%; from 2024 ${money(D.base.usd2024)}, −${D.base.dd2024.toFixed(1)}%`;
+document.getElementById('sweeps').innerHTML=D.sweeps.map(sw=>`<div class="panel"><h3>${sw.title}</h3><div class="scroll"><table><thead><tr><th>Setting</th><th>Trades</th><th>Win</th><th>Avg</th><th>From 2022</th><th>Drop</th><th>From 2024</th><th>Drop</th></tr></thead><tbody>`+
+ sw.rows.map(r=>`<tr class="${r.chosen?'chosen':''}"><td>${r.label}${r.chosen?' ◀':''}</td><td>${r.n}</td><td>${r.win.toFixed(0)}%</td><td class="${cl(r.avg)}">${pc(r.avg,2)}</td><td>${money(r.usd2022)}</td><td>−${r.dd2022.toFixed(1)}%</td><td>${money(r.usd2024)}</td><td>−${r.dd2024.toFixed(1)}%</td></tr>`).join('')+'</tbody></table></div></div>').join('');
+draw();addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+</script></body></html>
