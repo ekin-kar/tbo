@@ -158,6 +158,9 @@ if pk and ps:
         risk = total * btc / 100 * units / 6
         print(f" {units:g} units per panic event = {units / 6 * btc:.2f}% of ${total:.2f} = ${risk:.2f} lost on a 5% move; position ${risk / 0.05:.2f}"
               f" (split over the coins that trigger in the same hour)")
+        ml = float(pcfg.get("max_leverage", 4))
+        res(risk / 0.05 <= sub * ml, f"panic position ${risk / 0.05:.2f} = {risk / 0.05 / max(sub, 1e-9):.1f}x the sub-account (limit {ml:g}x; Binance allows sub-accounts 5x)"
+            + ("" if risk / 0.05 <= sub * ml else " -> it will be cut to the limit: move more to the sub-account"), warn=True)
         for sym in pcfg["coins"]:
             f = y.exchange_info(sym)
             for n in (1, 2):

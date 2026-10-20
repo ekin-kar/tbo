@@ -157,9 +157,9 @@ class Sleeve:
         risk = total * ladder_btc_pct(total) / 100 * units / 6 / n          # $ lost on a 5% move
         price = self.main.last_price(sym)
         notional = risk / 0.05
-        cap = sub * float(self.cfg.get("max_leverage", 5))
+        cap = sub * float(self.cfg.get("max_leverage", 4))
         if notional > cap:
-            log.warning(f"{sym}: size {notional:.2f} capped at {cap:.2f} ({self.cfg.get('max_leverage', 5)}x the sub-account balance)")
+            log.warning(f"{sym}: size {notional:.2f} capped at {cap:.2f} ({self.cfg.get('max_leverage', 4)}x the sub-account balance; move more to the sub-account)")
             notional = cap
         if notional < f["min_notional"]:
             if f["min_notional"] <= 1.5 * notional:
@@ -344,7 +344,7 @@ class Sleeve:
                 raise SystemExit("Sub-account is in Hedge mode; switch it to One-way.")
             for s in self.coins:
                 try:
-                    self.sub.set_leverage(s, int(self.cfg.get("exchange_leverage", 10)))
+                    self.sub.set_leverage(s, min(5, int(self.cfg.get("exchange_leverage", 5))))     # Binance: sub-accounts max 5x
                 except BinanceError as e:
                     log.warning(f"{s}: leverage not set ({e})")
         total, sub = self.total_equity()

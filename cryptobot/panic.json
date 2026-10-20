@@ -12,8 +12,8 @@
     "stop_max": 0.20,
     "be_atr": 2.0
   },
-  "max_leverage": 5,
-  "exchange_leverage": 10,
+  "max_leverage": 4,
+  "exchange_leverage": 5,
   "poll_s": 15,
   "dry_run_equity": 75,
   "dry_run_equity_main": 225
