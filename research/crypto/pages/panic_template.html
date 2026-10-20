@@ -52,6 +52,8 @@ tr.rec td{font-weight:600}
 tr.chosen td{font-weight:600;background:var(--soft)}
 .sweeps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:14px}.sweeps>*{min-width:0}
 .tag{font-size:12px;color:var(--muted)}
+.tv{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;position:relative}@media(max-width:800px){.tv{grid-template-columns:1fr}}
+#trades tbody tr{cursor:pointer}#trades tr.sel td{background:var(--soft);font-weight:600}
 </style></head><body><div class="wrap">
 <h1>The panic sleeve</h1>
 <p class="lede">A second strategy next to the trend bot: it <b>buys forced-liquidation crashes and sells the rebound</b>. When a coin falls hard while <b>open interest collapses</b>, leveraged longs are being liquidated: Binance sells their positions at any price, the price overshoots, and it tends to snap back once the forced selling is over. (When open interest <i>rises</i> during a drop, new shorts are opening on purpose: real selling, no rebound.) It runs on a <b>Binance sub-account</b> so its positions never touch the bot's. The numbers below use the bot's real sizing (risk ladder, open-risk cap, compounding) on one balance from $300, with fees, slippage and funding.</p>
@@ -69,7 +71,14 @@ tr.chosen td{font-weight:600;background:var(--soft)}
 <div class="scroll panel"><table id="years"></table></div>
 <h2>The sleeve's trades</h2><p class="hint" id="shint"></p>
 <div class="big" id="stiles"></div>
-<details><summary>Every panic trade (2022 to Sep 2026)</summary><div class="scroll panel months"><table id="trades"></table></div></details>
+<h2>Trade by trade</h2>
+<p class="hint">Step through every panic trade, or click a row in the list below it. Arrow keys ← → work too.</p>
+<div class="panel">
+ <div class="controls" style="margin-bottom:8px"><div class="seg"><button id="prev" aria-label="Previous trade">← Previous</button><button id="next" aria-label="Next trade">Next →</button></div><span class="hint" style="margin:0" id="navhint"></span></div>
+ <div class="tv"><div><svg id="tv" height="470" role="img" aria-label="The selected panic trade: hourly price, open interest and premium"></svg><div class="tip" id="ptip"></div>
+ <div class="chart-cap" id="tvcap"></div></div><dl id="tvd"></dl></div>
+</div>
+<details open><summary>Every panic trade (2022 to Sep 2026)</summary><div class="scroll panel months"><table id="trades"></table></div></details>
 <h2>Every setting, one at a time</h2>
 <p class="hint">Each table changes one setting and keeps the others at the chosen values (highlighted). "Bot + sleeve" = the whole account from $300 (the bot alone: <span id="basehint"></span>). Look for broad flat areas, not single best cells: the chosen point is near the middle of each plateau, and a lucky exact value would not survive live trading.</p>
 <div class="sweeps" id="sweeps"></div>
@@ -139,9 +148,72 @@ const Sl=D.sleeve;
 document.getElementById('shint').textContent=`Returns per trade after fees, before sizing. Average hold ${D.held_h.toFixed(1)} h; exits: ${Object.entries(D.exits).map(([k,v])=>v+' '+k).join(', ')}.`;
 document.getElementById('stiles').innerHTML=[[`${Sl.win.toFixed(0)}%`,'trades in profit'],[`${pc(Sl.avg_win,2)} / ${pc(Sl.avg_loss,2)}`,'average win / average loss'],[Sl.pf?Sl.pf.toFixed(2):'–','profit factor (won ÷ lost)'],[pc(Sl.worst,1),'worst trade']].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
 document.getElementById('trades').innerHTML='<thead><tr><th>Entry (UTC)</th><th>Coin</th><th>Price, 4 h</th><th>Open interest, 4 h</th><th>Premium z</th><th>Entry</th><th>Exit</th><th>Result</th><th>Exit</th><th>Held</th></tr></thead><tbody>'+
- D.trades.map(t=>`<tr><td>${t.t}</td><td>${t.coin}${t.n>1?` <span class="tag">(1 of ${t.n})</span>`:''}</td><td>${pc(t.move,1)}</td><td>${pc(t.oi,1)}</td><td>${t.pz.toFixed(2)}</td><td>${t.entry}</td><td>${t.exit}</td><td class="${cl(t.ret)}"><b>${pc(t.ret,2)}</b></td><td>${t.why}</td><td>${t.held} h</td></tr>`).join('')+'</tbody>';
+ D.trades.map((t,i)=>`<tr data-i="${i}"><td>${t.t}</td><td>${t.coin}${t.n>1?` <span class="tag">(1 of ${t.n})</span>`:''}</td><td>${pc(t.move,1)}</td><td>${pc(t.oi,1)}</td><td>${t.pz.toFixed(2)}</td><td>${t.entry}</td><td>${t.exit}</td><td class="${cl(t.ret)}"><b>${pc(t.ret,2)}</b></td><td>${t.why}</td><td>${t.held} h</td></tr>`).join('')+'</tbody>';
 document.getElementById('basehint').textContent=`from 2022 ${money(D.base.usd2022)}, worst drop −${D.base.dd2022.toFixed(1)}%; from 2024 ${money(D.base.usd2024)}, −${D.base.dd2024.toFixed(1)}%`;
 document.getElementById('sweeps').innerHTML=D.sweeps.map(sw=>`<div class="panel"><h3>${sw.title}</h3><div class="scroll"><table><thead><tr><th>Setting</th><th>Trades</th><th>Win</th><th>Avg</th><th>From 2022</th><th>Drop</th><th>From 2024</th><th>Drop</th></tr></thead><tbody>`+
  sw.rows.map(r=>`<tr class="${r.chosen?'chosen':''}"><td>${r.label}${r.chosen?' ◀':''}</td><td>${r.n}</td><td>${r.win.toFixed(0)}%</td><td class="${cl(r.avg)}">${pc(r.avg,2)}</td><td>${money(r.usd2022)}</td><td>−${r.dd2022.toFixed(1)}%</td><td>${money(r.usd2024)}</td><td>−${r.dd2024.toFixed(1)}%</td></tr>`).join('')+'</tbody></table></div></div>').join('');
+
+let SEL=0;
+const pf=v=>{const a=Math.abs(v),d=a>=1000?1:a>=100?2:a>=1?3:5;return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});};
+const dts=ms=>new Date(ms).toISOString().slice(0,16).replace('T',' ');
+function tview(){
+ const t=D.trades[SEL],V=D.viz[SEL],lv=V.lv,HR=36e5,n=V.c.length,sv=document.getElementById('tv');sv.innerHTML='';
+ document.querySelectorAll('#trades tbody tr').forEach(r=>r.classList.toggle('sel',+r.dataset.i===SEL));
+ document.getElementById('navhint').textContent=`Trade ${SEL+1} of ${D.trades.length}`;
+ const beTxt=V.be==null?'not reached':`at ${pf(lv.be_at)} (+${P.be_atr} ATR) → stop to the entry from ${dts(V.t0+V.be*HR)}`;
+ document.getElementById('tvd').innerHTML=`<dt>Coin</dt><dd><b>${t.coin}</b>${t.n>1?` (one of ${t.n} coins in this event)`:''}</dd>
+ <dt>Signal</dt><dd>price ${pc(t.move,1)} in ${P.window_h} h (${Math.abs(t.rz).toFixed(1)}× its normal move)<br>open interest ${pc(t.oi,1)}<br>premium z ${t.pz}</dd>
+ <dt>Entry</dt><dd>${pf(lv.entry)}<br><span style="color:var(--muted)">${t.t} UTC</span></dd>
+ <dt>Take-profit</dt><dd>${pf(lv.tp)} (${pc((lv.tp/lv.entry-1)*100,1)})</dd>
+ <dt>Stop</dt><dd>${pf(lv.stop)} (${pc((lv.stop/lv.entry-1)*100,1)})</dd>
+ <dt>Breakeven</dt><dd>${beTxt}</dd>
+ <dt>Exit</dt><dd>${pf(lv.exit)} · ${t.why} · ${t.held} h</dd>
+ <dt>Result</dt><dd class="${cl(t.ret)}"><b>${pc(t.ret,2)}</b> after fees</dd>`;
+ const W=sv.clientWidth,H=470,L=70,R=72,T=8,PH=260,G=22,OH=78,ZH=70,xb=i=>L+(i+0.5)/n*(W-L-R),cw=Math.max(1,(W-L-R)/n*0.7);
+ sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+ // panel 1: candles
+ let mn=Math.min(lv.stop,...V.l),mx=Math.max(lv.tp,...V.h);const pd=(mx-mn)*0.05;mn-=pd;mx+=pd;
+ const y=v=>T+(1-(v-mn)/(mx-mn))*PH;
+ const st=(mx-mn)/5,mag=Math.pow(10,Math.floor(Math.log10(st))),stp=[1,2,2.5,5,10].map(q=>q*mag).find(q=>q>=st)||st;
+ for(let v=Math.ceil(mn/stp)*stp;v<=mx;v+=stp){el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--rule')},sv);el('text',{x:L-8,y:y(v)+4,'text-anchor':'end'},sv).textContent=pf(v);}
+ const top2=T+PH+G,oy0=top2,zy0=top2+OH+G,bottom=zy0+ZH;
+ for(let i=0;i<n;i++){const d=new Date(V.t0+i*HR);if(d.getUTCHours()===0){el('line',{x1:xb(i)-(W-L-R)/n/2,x2:xb(i)-(W-L-R)/n/2,y1:T,y2:bottom,stroke:css('--rule'),'stroke-opacity':0.7},sv);el('text',{x:xb(i),y:H-4,'text-anchor':'middle'},sv).textContent=d.toISOString().slice(5,10);}}
+ el('rect',{x:xb(V.sig-P.window_h)+cw/2,y:T,width:Math.max(2,xb(V.sig)-xb(V.sig-P.window_h)),height:bottom-T,fill:css('--s2'),'fill-opacity':0.09},sv);
+ el('rect',{x:xb(V.e)-(W-L-R)/n/2,y:T,width:Math.max(2,xb(V.x)-xb(V.e)),height:PH,fill:css('--s1'),'fill-opacity':0.08},sv);
+ for(let i=0;i<n;i++){const up=V.c[i]>=V.o[i],col=css(up?'--pos':'--neg'),cx=xb(i);
+  el('line',{x1:cx,x2:cx,y1:y(V.h[i]),y2:y(V.l[i]),stroke:col},sv);
+  el('rect',{x:cx-cw/2,y:y(Math.max(V.o[i],V.c[i])),width:cw,height:Math.max(1,Math.abs(y(V.o[i])-y(V.c[i]))),fill:col,'fill-opacity':up?0.55:0.85},sv);}
+ const xs=xb(V.e)-(W-L-R)/n/2,xe=xb(V.x),xbe=V.be==null?xe:xb(V.be)-(W-L-R)/n/2;
+ const hl=(x1,x2,v,col,dash,w=2)=>el('line',{x1,x2,y1:y(v),y2:y(v),stroke:col,'stroke-width':w,'stroke-dasharray':dash},sv);
+ hl(xs,xe,lv.tp,css('--pos'),'6 4');hl(xs,xbe,lv.stop,css('--neg'),'6 4');
+ if(V.be!=null){hl(xbe,xe,lv.entry,css('--neg'),'6 4');el('circle',{cx:xbe,cy:y(lv.be_at),r:4,fill:'none',stroke:css('--muted'),'stroke-width':1.5},sv);}
+ hl(xs,xe,lv.entry,css('--ink'),'3 3',1.5);
+ el('polygon',{points:`${xs},${y(lv.entry)-2} ${xs-7},${y(lv.entry)+10} ${xs+7},${y(lv.entry)+10}`,fill:css('--s1'),stroke:css('--surface')},sv);
+ el('circle',{cx:xe,cy:y(lv.exit),r:5.5,fill:css(t.ret>0?'--pos':'--neg'),stroke:css('--surface'),'stroke-width':1.5},sv);
+ const labs=[[lv.tp,'take-profit',css('--pos')],[lv.entry,'entry',css('--ink')],[lv.stop,'stop',css('--neg')],[lv.exit,'exit',css(t.ret>0?'--pos':'--neg')]].sort((a,b)=>y(a[0])-y(b[0]));let last=-99;
+ for(const [v,txt,col] of labs){const yy=Math.max(y(v),last+14);last=yy;el('text',{x:W-R+6,y:yy+4,style:`fill:${col};font-weight:600`},sv).textContent=txt;}
+ // panel 2: open interest vs the value 4 h before the signal
+ const ov=V.oi.filter(v=>v!=null),omn=Math.min(-P.oi_drop*100-2,...ov),omx=Math.max(2,...ov),oy=v=>oy0+(1-(v-omn)/(omx-omn))*OH;
+ el('text',{x:L,y:oy0-6,style:'fill:var(--ink);font-weight:600'},sv).textContent='Open interest (% vs 4 h before the signal)';
+ for(const v of [0,-P.oi_drop*100]){el('line',{x1:L,x2:W-R,y1:oy(v),y2:oy(v),stroke:css(v?'--neg':'--rule'),'stroke-dasharray':v?'4 4':''},sv);el('text',{x:L-8,y:oy(v)+4,'text-anchor':'end'},sv).textContent=(v?'−'+(P.oi_drop*100).toFixed(0):'0')+'%';}
+ let p='';V.oi.forEach((v,i)=>{if(v!=null)p+=(p?'L':'M')+xb(i).toFixed(1)+','+oy(v).toFixed(1);});el('path',{d:p,fill:'none',stroke:css('--s6'),'stroke-width':2},sv);
+ // panel 3: premium z
+ const zv=V.pz.filter(v=>v!=null),zmn=Math.min(-3,...zv),zmx=Math.max(1,...zv),zy=v=>zy0+(1-(v-zmn)/(zmx-zmn))*ZH;
+ el('text',{x:L,y:zy0-6,style:'fill:var(--ink);font-weight:600'},sv).textContent='Futures premium (z-score)';
+ for(const v of [0,P.premium_z]){el('line',{x1:L,x2:W-R,y1:zy(v),y2:zy(v),stroke:css(v?'--neg':'--rule'),'stroke-dasharray':v?'4 4':''},sv);const gap=zy(P.premium_z)-zy(0),ly=v?zy(v)+(gap<13?13-gap/2:0):zy(v)-(gap<13?13-gap/2:0);el('text',{x:L-8,y:ly+4,'text-anchor':'end'},sv).textContent=v.toFixed(0);}
+ p='';V.pz.forEach((v,i)=>{if(v!=null)p+=(p?'L':'M')+xb(i).toFixed(1)+','+zy(v).toFixed(1);});el('path',{d:p,fill:'none',stroke:css('--s4'),'stroke-width':2},sv);
+ document.getElementById('tvcap').textContent=`${t.coin}USDT, hourly candles (UTC). Orange band = the ${P.window_h} hours that triggered the signal; blue band = the trade; ▲ entry, ● exit; green dashed = take-profit, red dashed = stop${V.be!=null?' (moved to the entry, ○)':''}. Red dashed lines below = the thresholds.`;
+ const tip=document.getElementById('ptip');
+ sv.onmousemove=ev=>{const rc=sv.getBoundingClientRect(),px=(ev.clientX-rc.left)*(W/rc.width),i=Math.floor((px-L)/(W-L-R)*n);
+  if(px<L||px>W-R||i<0||i>=n){tip.style.display='none';return;}
+  tip.innerHTML=`<div style="color:var(--muted)">${dts(V.t0+i*HR)} UTC, 1h</div><div class="r"><span>open</span><b>${pf(V.o[i])}</b></div><div class="r"><span>high</span><b>${pf(V.h[i])}</b></div><div class="r"><span>low</span><b>${pf(V.l[i])}</b></div><div class="r"><span>close</span><b>${pf(V.c[i])}</b></div>`+
+   (V.oi[i]!=null?`<div class="r"><span>open interest</span><b>${pc(V.oi[i],1)}</b></div>`:'')+(V.pz[i]!=null?`<div class="r"><span>premium z</span><b>${V.pz[i].toFixed(2)}</b></div>`:'');
+  tip.style.display='block';const pr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-pr.left+14;if(lx>pr.width-180)lx=ev.clientX-pr.left-180;tip.style.left=lx+'px';tip.style.top=(ev.clientY-pr.top+10)+'px';};
+ sv.onmouseleave=()=>{tip.style.display='none';};}
+function tstep(d){SEL=Math.min(D.trades.length-1,Math.max(0,SEL+d));tview();}
+document.getElementById('prev').onclick=()=>tstep(-1);document.getElementById('next').onclick=()=>tstep(1);
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){tstep(-1);e.preventDefault();}else if(e.key==='ArrowRight'){tstep(1);e.preventDefault();}});
+document.querySelector('#trades tbody').onclick=e=>{const r=e.target.closest('tr');if(r){SEL=+r.dataset.i;tview();document.getElementById('tv').scrollIntoView({behavior:'smooth',block:'center'});}};
+tview();addEventListener('resize',tview);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',tview);
 draw();addEventListener('resize',draw);matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
 </script></body></html>

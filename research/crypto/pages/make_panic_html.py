@@ -70,6 +70,35 @@ if __name__ == "__main__":
         data["trades"].append(dict(t=r.t.strftime("%Y-%m-%d %H:%M"), coin=r.sym[:-4], move=round(float(r.move) * 100, 1), rz=round(float(r.rz), 2),
                                    oi=round(float(r.doi) * 100, 1), pz=round(float(r.pz), 2), entry=float(f"{r.entry:.6g}"), exit=float(f"{r.exit:.6g}"),
                                    ret=round(float(r.ret) * 100, 2), why=r.why, n=int(r.n), held=round((r.t_exit - r.t).total_seconds() / 3600, 1)))
+    # per-trade chart data: hourly candles 36 h before the entry to 24 h after the exit, open interest (% vs the value
+    # 4 h before the signal) and the premium z-score, plus the levels the live sleeve uses
+    import panic_signal as PS
+    P = PSL.P0; FE = {}
+    data["viz"] = []
+    for _, r in ev.iterrows():
+        df = PSL.hourly(r.sym)
+        if r.sym not in FE:
+            FE[r.sym] = PS.features(df.h.values, df.l.values, df.c.values, df.oi.values, df.prem.values, P["window_h"])
+        f = FE[r.sym]; ix = df.index
+        ie = int(ix.get_loc(r.t)); ix_x = int(ix.get_loc(r.t_exit)); sig = ie - 1
+        i0, i1 = max(0, ie - 36), min(len(ix), ix_x + 25)
+        base_oi = df.oi.values[sig - int(P["window_h"])]
+        e, a = r.entry, r.atr
+        stop = max(e - P["stop_atr"] * a, e * (1 - P["stop_max"])); tp = e + P["tp_atr"] * a; be_at = e + P["be_atr"] * a
+        be_i = None; best = e
+        for jj in range(ie, ix_x + 1):                   # the hour after the one whose high reached +2 ATR
+            best = max(best, df.h.values[jj])
+            if best >= be_at:
+                be_i = jj + 1; break
+        if be_i is not None and be_i > ix_x:
+            be_i = None
+        rd = lambda v: float(f"{v:.6g}")
+        data["viz"].append(dict(t0=int(ix[i0].value // 10**6), e=ie - i0, x=ix_x - i0, sig=sig - i0, be=None if be_i is None else be_i - i0,
+                                o=[rd(v) for v in df.o.values[i0:i1]], h=[rd(v) for v in df.h.values[i0:i1]], l=[rd(v) for v in df.l.values[i0:i1]],
+                                c=[rd(v) for v in df.c.values[i0:i1]],
+                                oi=[None if np.isnan(v) else round(float(v / base_oi * 100 - 100), 2) for v in df.oi.values[i0:i1]],
+                                pz=[None if np.isnan(v) else round(float(v), 2) for v in f["pz"][i0:i1]],
+                                lv=dict(entry=rd(e), exit=rd(r.exit), stop=rd(stop), tp=rd(tp), be_at=rd(be_at), atr=rd(a))))
     base = {k: PSL.run(a, END)["final"] for k, a in STARTS.items()}
     base_dd = {k: PSL.run(a, END)["dd"] for k, a in STARTS.items()}
     data["base"] = dict(usd2022=base["2022"], usd2024=base["2024"], dd2022=base_dd["2022"], dd2024=base_dd["2024"])
