@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Breakout Support Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#ffffff;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;
+--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#7a5cc7;--comb:#18212b;--neg:#b3432f;--pos:#1d6b5b}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9a7fe0;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#9a7fe0;--comb:#e7eaec;--neg:#e07a64;--pos:#4fb39a}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 22px;max-width:78ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:20px;margin:40px 0 4px;font-weight:600}h3{font-size:16px;margin:0 0 6px}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:80ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button:focus-visible,input:focus-visible{outline:2px solid var(--eth);outline-offset:2px}
+.coinbtn{display:inline-flex;align-items:center;gap:7px}.coinbtn i{width:10px;height:10px;border-radius:3px;display:inline-block}
+label.risk{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.risk input{font:inherit;width:84px;padding:7px 9px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 16px 10px;position:relative}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 6px}.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:18px;height:3px;border-radius:2px;display:inline-block}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.chart-cap{font-size:13px;color:var(--muted);margin:6px 2px 4px}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
+tr.yr td{font-weight:600;background:var(--soft)}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden;margin-bottom:18px}
+.big div{background:var(--surface);padding:12px 14px}.big b{display:block;font-size:22px;font-weight:600}.big span{font-size:13px;color:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}
+.tip .r{display:flex;justify-content:space-between;gap:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.spec{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:8px 0 0;font-size:14px}dt{color:var(--muted)}dd{margin:0}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.notes li{margin-bottom:6px}
+details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
+.lbtn{display:inline-flex;align-items:center;gap:7px}.lbtn i{width:18px;height:3px;border-radius:2px;display:inline-block}
+tr.rec td{font-weight:600}
+
+.rule-t td:first-child{color:var(--muted);width:150px;white-space:normal;vertical-align:top}.rule-t td{text-align:left;white-space:normal}
+tr.chosen td{font-weight:600;background:var(--soft)}
+.sweeps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:14px}.sweeps>*{min-width:0}
+.tag{font-size:12px;color:var(--muted)}
+.heat{display:grid;gap:3px;font-size:13px}.heat div{padding:7px 6px;text-align:center;border-radius:5px;background:var(--soft)}
+.heat .h{background:none;color:var(--muted);font-weight:600}.heat .sel{outline:2.5px solid var(--ink);outline-offset:-2px;font-weight:700}
+.heat .g{background:color-mix(in srgb,var(--pos) 28%,var(--surface))}.heat .gg{background:color-mix(in srgb,var(--pos) 50%,var(--surface))}
+.heat .r{background:color-mix(in srgb,var(--neg) 25%,var(--surface))}.heat .rr{background:color-mix(in srgb,var(--neg) 45%,var(--surface))}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:14px}.grid2>*{min-width:0}
+td.ok{color:var(--pos);font-weight:600}td.no{color:var(--neg)}
+#funnel td:first-child{white-space:normal}
+.verdict{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--pos);border-radius:10px;padding:14px 16px;margin:0 0 18px;max-width:90ch}
+.verdict p{margin:6px 0}
+</style></head><body><div class="wrap">
+<h1>Can open interest spot false breakouts?</h1>
+<p class="lede">A search for anything in Binance's positioning data (open interest, long/short ratios, liquidation flushes) that tells the bot's <b>real 4h breakouts from false ones</b>, tested properly: <b id="scale"></b>, every idea as a <b>grid of settings</b>, judged by <b>six gates fixed before any result was seen</b>. The base is today's bot (v2.6 rules <i>with</i> the open-interest filter it already has), so anything that passes adds to what is live now.</p>
+<div class="verdict" id="verdict"></div>
+<div class="big" id="tiles"></div>
+
+<h2>How the ideas were judged</h2>
+<p class="hint">Coins in three groups. <b>Dev</b> (where ideas were picked): our 5 + XRP, DOGE, AVAX, LINK, DOT, LTC, TRX. <b>Untouched big coins</b> (14: BCH, XLM, SUI, HBAR, SHIB, PEPE, NEAR, UNI, ETC, APT, AAVE, ATOM, FIL, ICP) and <b>untouched small coins</b> (25), looked at only at the end. Periods: 2022–23 and 2024–26 (open-interest history starts Dec 2021). "Ratio" = profit ÷ worst drop, in R (shorts count half, as in the bot).</p>
+<div class="grid2">
+<div class="panel"><table class="rule-t" id="gates"></table></div>
+<div class="panel"><h3>How many settings survived each gate</h3><table id="funnel"></table></div>
+</div>
+
+<h2>The one that passed: no order when open interest is near its 90-day low</h2>
+<p class="hint">At each 4h close the bot would rank the coin's open interest (USD value, hourly) against the last 90 days. If it is in the <b>lowest 20%</b>, no breakout order is placed for that candle. Low open interest = few positions open, little leverage, little interest in the coin: a breakout then has no fuel behind it. The current OI filter (OI down ≥3% in 72 h) is about a <i>fall</i>; this one is about the <i>level</i>, so they catch different candles.</p>
+<div class="controls"><div><div class="ctl-title">Start</div><div class="seg" id="start"></div></div><div><div class="ctl-title">Scale</div><div class="seg" id="sc"></div></div></div>
+<div class="panel">
+ <div class="legend" id="legend"></div>
+ <svg id="eq" height="340" role="img" aria-label="Balance: bot now and with the OI-low filter"></svg><div class="tip" id="tip"></div>
+ <div class="chart-cap" id="cap"></div>
+ <svg id="dd" height="160" role="img" aria-label="Drop from the highest balance"></svg>
+ <div class="chart-cap">Drop from the highest balance so far, counting every open trade not yet at breakeven as if it hit its stop (worst case). The bot's real sizing: risk ladder, open-risk cap, compounding, from $300; panic sleeve not included.</div>
+</div>
+
+<h2>Do the skipped breakouts really fail?</h2>
+<p class="hint">Today's trades, split by the filter: the average result of the trades it would skip vs the ones it keeps (R per trade, after fees). If it only got lucky, the skipped ones would look like the rest somewhere.</p>
+<div class="scroll panel"><table id="flag"></table></div>
+
+<h2>It is really about shorts</h2>
+<p class="hint">Open interest sits near its 90-day low mostly after a fall, when everyone has already closed out. That is when the bot's <b>short</b> breakouts happen, and those are the ones it removes: a breakdown with nobody left to be forced out tends to fizzle. Average R per trade, flagged vs the rest of the same side.</p>
+<div class="scroll panel"><table id="sides"></table></div>
+
+<h2>Is it a plateau or one lucky setting?</h2>
+<p class="hint">Every combination of window (rows) and how low counts as "low" (columns), re-run on all 51 coins. Each cell: <b>2022–23 / 2024–26</b>. The outlined cell is the setting fixed before the test. Green = better than today's bot in both periods.</p>
+<div class="controls"><div class="seg" id="hsel"></div></div>
+<div class="panel"><div class="heat" id="heat"></div><div class="chart-cap" id="hcap"></div></div>
+<h3 style="margin-top:18px">Money test across the plateau</h3>
+<p class="hint">The bot's real sizing from $300 on our 5 coins: money vs today's bot (×) and the worst drop's change (points; negative = smaller drop), from 2022 / from 2024.</p>
+<div class="scroll panel"><table id="mgrid"></table></div>
+
+<h2>Luck test</h2>
+<p class="hint">The same filter, shifted in time by a random amount (40 times), so it skips the same share of candles in the same streaks, just at the wrong moments. If the real one were luck, it would sit inside this cloud.</p>
+<div class="panel"><svg id="luck" height="120" role="img" aria-label="Real filter vs 40 time-shifted copies"></svg><div class="chart-cap" id="lcap"></div></div>
+
+<h2>Our 5 coins, year by year</h2>
+<p class="hint">Profit in R (shorts count half) without → with the filter. The filter removes about 15% of trades.</p>
+<div class="scroll panel"><table id="coins"></table></div>
+
+<h2>Is it just price in disguise?</h2>
+<p class="hint">Open interest in dollars also falls when the price falls. So: the same "lowest 20% of 90 days" test on open interest in <b>coins</b> (no price in it) and on <b>price alone</b>. Average R of the flagged trades vs the rest; ✓ = the flagged ones did worse (the test works).</p>
+<div class="scroll panel"><table id="disg"></table></div>
+
+<h2>Every idea tested</h2>
+<p class="hint">Each idea family as a grid; the counts say how many of its settings passed each gate. "Best" = the setting with the highest worse-period ratio on the dev coins (×, 2022–23 / 2024–26).</p>
+<div class="scroll panel"><table id="fams"></table></div>
+<h2>Close calls</h2>
+<p class="hint">Settings that passed gates 1 and 2, and what stopped them. Untouched coins in R (profit change vs today's bot).</p>
+<div class="scroll panel"><table id="near"></table></div>
+
+<h2>Notes</h2>
+<ul class="notes" id="notes"></ul>
+</div>
+<script>
+const D=/*DATA*/null;
+let S={s:'2022',scale:'log',h:'OUR5|rx'};
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const money=v=>'$'+Math.round(v).toLocaleString('en-US');
+const pc=(v,d=1)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d)+'%';
+const sg=(v,d=2)=>(v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d);
+const cl=v=>v>0?'pos':v<0?'neg':'';
+function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg',n);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}">${t}</button>`).join('');e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
+const P=D.periods,W=D.win,C22=D.curves['2022'],C24=D.curves['2024'];
+document.getElementById('scale').textContent=`${D.ncoins} coins, ${D.ntrades.toLocaleString('en-US')} breakout trades`;
+document.getElementById('verdict').innerHTML=`<p><b>${D.funnel[D.funnel.length-1][1]} of ${D.funnel[0][1]} settings passed all six gates</b>: skip the breakout when open interest is in its lowest 20% of the last 90 days. Everything else (squeeze exits, flushes, long/short ratios, coin-vs-market OI, coils, tired levels) failed at least one gate.</p>
+<p>The gain is real but <b>modest</b>: on our 5 coins it removes about 15% of trades, ones that lose on average, and keeps the profit. From $300: ${money(C22.base.final)} → <b>${money(C22.win.final)}</b> from 2022 (worst drop −${C22.base.dd.toFixed(1)}% → −${C22.win.dd.toFixed(1)}%), ${money(C24.base.final)} → <b>${money(C24.win.final)}</b> from 2024 (−${C24.base.dd.toFixed(1)}% → −${C24.win.dd.toFixed(1)}%).</p>`;
+document.getElementById('tiles').innerHTML=[
+ [`×${W.our[0].toFixed(2)} / ×${W.our[1].toFixed(2)}`,'profit ÷ drop on our 5, 2022–23 / 2024–26'],
+ [`×${W.btc[0].toFixed(2)} / ×${W.btc[1].toFixed(2)}`,'the same on BTC alone'],
+ [`${sg(W.hb[0],0)}R / ${sg(W.hb[1],0)}R`,'14 untouched big coins, profit change'],
+ [`${sg(W.hs[0],0)}R / ${sg(W.hs[1],0)}R`,'25 untouched small coins, profit change']].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+document.getElementById('gates').innerHTML=[
+ ['1 · Dev coins','ratio ×1.05 or better in both periods, and profit at least 90% of today (12 dev coins, each weighted 1)'],
+ ['2 · Plateau','at least 60% of the setting\'s neighbours in its grid are also better in both periods'],
+ ['3 · Luck','beats at least 95% of 40 random time-shifted copies of itself'],
+ ['4 · Untouched big coins','better in both periods on the 14 big coins never used for picking (small coins shown, not a gate)'],
+ ['5 · Our 5','ratio better in both periods with the bot\'s weights (BTC 6, ETH 4, alts 0.83); BTC alone shown'],
+ ['6 · Money','the bot\'s real sizing from $300, starts 2022 and 2024: more money and the worst drop at most 1 point deeper']].map(([a,b])=>`<tr><td>${a}</td><td>${b}</td></tr>`).join('');
+document.getElementById('funnel').innerHTML='<tbody>'+D.funnel.map(([a,n],i)=>`<tr${i===D.funnel.length-1?' class="chosen"':''}><td>${a}</td><td><b>${n}</b></td></tr>`).join('')+'</tbody>';
+
+function draw(){
+ const SK=['2022','2024'];
+ seg('start',SK.map(k=>'From '+k),i=>SK[i]===S.s,i=>S.s=SK[i]);
+ seg('sc',['Log','Linear'],i=>(i===0)===(S.scale==='log'),i=>S.scale=i?'lin':'log');
+ const R=D.curves[S.s],ser=[{k:'base',l:'Bot now',col:css('--s1'),d:R.base},{k:'win',l:'With the OI-low filter',col:css('--s3'),d:R.win}];
+ const sv=document.getElementById('eq');sv.innerHTML='';const Wd=sv.clientWidth,H=340,L=64,Rm=Wd<600?10:150,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${Wd} ${H}`);
+ const t0=new Date(R.t0+'T00:00:00Z').getTime(),n=R.base.bal.length,DAY=864e5,t1=t0+(n-1)*DAY,lg=S.scale==='log';
+ const vals=ser.flatMap(s=>s.d.bal),mn=Math.min(...vals),mx=Math.max(...vals);
+ const lo_=lg?Math.log10(mn*0.9):0,hi_=lg?Math.log10(mx*1.1):mx*1.05;
+ const x=t=>L+(t-t0)/(t1-t0)*(Wd-L-Rm),y=v=>T+(1-((lg?Math.log10(v):v)-lo_)/(hi_-lo_))*(H-T-B);
+ let ticks=[];if(lg){for(let e=1;e<=9;e++)for(const k of[1,2,5]){const v=k*10**e;if(v>=mn*0.9&&v<=mx*1.1)ticks.push(v);}}else{const st=Math.pow(10,Math.floor(Math.log10(hi_/4)));const s2=hi_/st>20?st*5:hi_/st>8?st*2:st;for(let v=0;v<=hi_;v+=s2)ticks.push(v);}
+ for(const v of ticks){el('line',{x1:L,x2:Wd-Rm,y1:y(v),y2:y(v),stroke:css('--rule')},sv);el('text',{x:L-8,y:y(v)+4,'text-anchor':'end'},sv).textContent=money(v);}
+ const y0=new Date(t0).getUTCFullYear();for(let yy=y0+1;Date.UTC(yy,0,1)<t1;yy++){const tx=x(Date.UTC(yy,0,1));el('line',{x1:tx,x2:tx,y1:T,y2:H-B,stroke:css('--rule')},sv);el('text',{x:tx,y:H-6,'text-anchor':'middle'},sv).textContent=yy;}
+ for(const s of ser){let p='';s.d.bal.forEach((v,i)=>p+=(i?'L':'M')+x(t0+i*DAY).toFixed(1)+','+y(v).toFixed(1));el('path',{d:p,fill:'none',stroke:s.col,'stroke-width':2,'stroke-linejoin':'round'},sv);}
+ const ends=ser.map(s=>({s,yv:y(s.d.bal[n-1])})).sort((a,b)=>a.yv-b.yv);let last=-99;
+ if(Rm>100)for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:Wd-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='win'?700:500}`},sv).textContent=`${e.s.k==='base'?'Now':'With filter'} ${money(e.s.d.bal[n-1])}`;}
+ document.getElementById('legend').innerHTML=ser.map(s=>`<span><i style="background:${s.col}"></i>${s.l}</span>`).join('');
+ document.getElementById('cap').textContent=`From $300, ${S.s} to Sep 2026, our 5 coins. Daily balance; hover for values.`;
+ const dv=document.getElementById('dd');dv.innerHTML='';const DH=160;dv.setAttribute('viewBox',`0 0 ${Wd} ${DH}`);
+ const dmin=Math.min(-10,...ser.flatMap(s=>s.d.ddser)),ylo=Math.floor(dmin/10)*10,yd=v=>6+(v/ylo)*(DH-6-22);
+ for(let v=0;v>=ylo;v-=10){el('line',{x1:L,x2:Wd-Rm,y1:yd(v),y2:yd(v),stroke:css('--rule')},dv);el('text',{x:L-8,y:yd(v)+4,'text-anchor':'end'},dv).textContent=v+'%';}
+ for(const s of ser){let p='';s.d.ddser.forEach((v,i)=>p+=(i?'L':'M')+x(t0+i*DAY).toFixed(1)+','+yd(v).toFixed(1));el('path',{d:p,fill:'none',stroke:s.col,'stroke-width':1.5},dv);}
+ const hl=el('line',{y1:T,y2:H-B,stroke:css('--muted'),'stroke-dasharray':'3 3',visibility:'hidden'},sv),tip=document.getElementById('tip');
+ sv.onmousemove=ev=>{const rc=sv.getBoundingClientRect(),px=(ev.clientX-rc.left)*(Wd/rc.width);if(px<L||px>Wd-Rm){tip.style.display='none';hl.setAttribute('visibility','hidden');return;}
+  const i=Math.max(0,Math.min(n-1,Math.round((px-L)/(Wd-L-Rm)*(n-1))));hl.setAttribute('x1',px);hl.setAttribute('x2',px);hl.setAttribute('visibility','visible');
+  tip.innerHTML=`<div style="color:var(--muted);margin-bottom:3px">${new Date(t0+i*DAY).toISOString().slice(0,10)}</div>`+ser.map(s=>`<div class="r"><span><span class="dot" style="background:${s.col}"></span>${s.l}</span><b>${money(s.d.bal[i])}</b>&nbsp;<span style="color:var(--muted)">${s.d.ddser[i].toFixed(0)}%</span></div>`).join('');
+  tip.style.display='block';const pr=sv.parentNode.getBoundingClientRect();let lx=ev.clientX-pr.left+14;if(lx>pr.width-300)lx=ev.clientX-pr.left-300;tip.style.left=lx+'px';tip.style.top=(ev.clientY-pr.top+10)+'px';};
+ sv.onmouseleave=()=>{tip.style.display='none';hl.setAttribute('visibility','hidden');};
+ // heat map
+ const HS=[['OUR5|rx','Our 5 (ratio ×)'],['BTC|rx','BTC (ratio ×)'],['DEV12|rx','12 dev coins (ratio ×)'],['HOLD_BIG|dnet','Untouched big: profit R'],['HOLD_BIG|ddd','Untouched big: drop R'],['HOLD_SMALL|dnet','Untouched small: profit R'],['HOLD_SMALL|ddd','Untouched small: drop R']];
+ seg('hsel',HS.map(h=>h[1]),i=>HS[i][0]===S.h,i=>S.h=HS[i][0]);
+ const hm=D.heat[S.h],isR=S.h.endsWith('rx'),isD=S.h.endsWith('ddd');
+ const good=v=>isR?v>1:isD?v<0:v>0,fmt=v=>isR?v.toFixed(2):sg(v,0);
+ let h=`<div class="h"></div>`+D.ps.map(p=>`<div class="h">lowest ${Math.round((1-p)*100)}%</div>`).join('');
+ D.Ws.forEach((Wv,i)=>{h+=`<div class="h">${Wv} days</div>`;hm[i].forEach((c,j)=>{const g=c.filter(good).length,str=isR?Math.min(...c):isD?-Math.max(...c):Math.min(...c);
+  const k=g===2?((isR?str>=1.1:str>=10)?'gg':'g'):g===0?'rr':'r';h+=`<div class="${k}${Wv===90&&D.ps[j]===0.8?' sel':''}">${fmt(c[0])} / ${fmt(c[1])}</div>`;});});
+ const he=document.getElementById('heat');he.style.gridTemplateColumns=`72px repeat(${D.ps.length},minmax(0,1fr))`;he.innerHTML=h;
+ document.getElementById('hcap').textContent=isR?'Profit ÷ worst drop vs today\'s bot (×; above 1 = better).':isD?'Change in the worst drop, in R (negative = smaller drop = better).':'Change in profit, in R (positive = better).';
+}
+const f=D.flag,G=[['OUR5','Our 5'],['BTC','BTC'],['DEV12','12 dev coins'],['HOLD_BIG','14 untouched big'],['HOLD_SMALL','25 untouched small']];
+document.getElementById('flag').innerHTML='<thead><tr><th>Coins</th>'+P.map(p=>`<th>${p}: skipped</th><th>avg R skipped</th><th>avg R kept</th>`).join('')+'</tr></thead><tbody>'+
+ G.map(([g,l])=>`<tr><td>${l}</td>`+P.map(p=>{const r=f[g+'|'+p];return `<td>${r.share.toFixed(0)}% (${r.n})</td><td class="${cl(r.fl)}">${sg(r.fl)}</td><td class="${cl(r.rest)}">${sg(r.rest)}</td>`;}).join('')+'</tr>').join('')+'</tbody>';
+const GN={OUR5:'Our 5',DEV12:'12 dev coins',HOLD39:'39 untouched'};
+document.getElementById('sides').innerHTML='<thead><tr><th>Period</th><th>Coins</th><th>Shorts flagged</th><th>avg R flagged</th><th>avg R other shorts</th><th>Longs flagged</th><th>avg R flagged</th><th>avg R other longs</th></tr></thead><tbody>'+
+ D.sides.map(r=>`<tr><td>${r.period}</td><td>${GN[r.grp]}</td>`+['short','long'].map(k=>{const [n,nf,a,b]=r[k];return `<td>${nf} of ${n} (${(nf/n*100).toFixed(0)}%)</td><td class="${cl(a)}">${a==null?'–':sg(a)}</td><td class="${cl(b)}">${sg(b)}</td>`;}).join('')+'</tr>').join('')+'</tbody>';
+const mg=D.mgrid;
+document.getElementById('mgrid').innerHTML='<thead><tr><th>Window</th>'+D.ps.concat([0.95]).filter(p=>D.Ws.some(Wv=>mg[Wv+'|'+p])).map(p=>`<th>lowest ${Math.round((1-p)*100)}%</th>`).join('')+'</tr></thead><tbody>'+
+ D.Ws.map(Wv=>`<tr><td>${Wv} days</td>`+D.ps.concat([0.95]).filter(p=>D.Ws.some(W2=>mg[W2+'|'+p])).map(p=>{const c=mg[Wv+'|'+p];if(!c)return '<td style="color:var(--muted)">–</td>';
+  const ok=c.every(([x,d])=>x>1&&d<=1);return `<td class="${ok?'ok':c.some(([x])=>x<1)?'no':''}"${Wv===90&&p===0.8?' style="outline:2px solid var(--ink);outline-offset:-2px"':''}>×${c[0][0].toFixed(2)} ${sg(c[0][1],1)} / ×${c[1][0].toFixed(2)} ${sg(c[1][1],1)}</td>`;}).join('')+'</tr>').join('')+'</tbody>';
+(function(){const sv=document.getElementById('luck'),Wd=sv.clientWidth,H=120,L=20,R=20;sv.setAttribute('viewBox',`0 0 ${Wd} ${H}`);
+ const xs=D.luck.sims,real=D.luck.real,mn=Math.min(...xs,real,0.9)-0.02,mx=Math.max(...xs,real)+0.02,x=v=>L+(v-mn)/(mx-mn)*(Wd-L-R);
+ for(let v=Math.ceil(mn*20)/20;v<=mx;v+=0.05){el('line',{x1:x(v),x2:x(v),y1:10,y2:H-24,stroke:css('--rule')},sv);el('text',{x:x(v),y:H-6,'text-anchor':'middle'},sv).textContent='×'+v.toFixed(2);}
+ el('line',{x1:x(1),x2:x(1),y1:10,y2:H-24,stroke:css('--muted'),'stroke-dasharray':'3 3'},sv);
+ xs.forEach((v,i)=>el('circle',{cx:x(v),cy:30+(i%5)*12,r:5,fill:css('--s1'),'fill-opacity':0.45},sv));
+ el('line',{x1:x(real),x2:x(real),y1:8,y2:H-24,stroke:css('--s3'),'stroke-width':3},sv);
+ const beat=xs.filter(v=>real>v).length;
+ document.getElementById('lcap').innerHTML=`Blue dots = 40 time-shifted copies; green line = the real filter (×${real.toFixed(3)}, its worse period on the 12 dev coins). It beats <b>${beat} of ${xs.length}</b> (${(beat/xs.length*100).toFixed(0)}%).`;})();
+document.getElementById('coins').innerHTML='<thead><tr><th>Coin</th><th>Trades</th>'+[2022,2023,2024,2025,'2026 (to Sep)'].map(y=>`<th>${y}</th>`).join('')+'</tr></thead><tbody>'+
+ D.coins.map(c=>`<tr><td>${c.coin}</td><td>${c.n0} → ${c.n1}</td>`+c.years.map(([a,b])=>`<td>${sg(a,1)} → <b class="${b>a+0.05?'pos':b<a-0.05?'neg':''}">${sg(b,1)}</b></td>`).join('')+'</tr>').join('')+'</tbody>';
+document.getElementById('disg').innerHTML=D.disg.length?'<thead><tr><th>Period</th><th>Coins</th><th>OI in $ (the filter)</th><th>OI in coins</th><th>Price</th></tr></thead><tbody>'+
+ D.disg.map(r=>`<tr><td>${r.period}</td><td>${r.grp==='DEV12'?'12 dev':'39 untouched'}</td>`+['val','coins','price'].map(k=>{const [s,a,b]=r[k];return `<td>${s.toFixed(0)}% flagged: <b>${sg(a)}</b> vs ${sg(b)} <span class="${a<b?'pos':'neg'}">${a<b?'✓ worse':'✗ not worse'}</span></td>`;}).join('')+'</tr>').join('')+'</tbody>':'<tbody><tr><td>not run</td></tr></tbody>';
+document.getElementById('fams').innerHTML='<thead><tr><th>Idea</th><th>Action</th><th>Settings</th><th>Gate 1</th><th>+2</th><th>+3</th><th>+4, 5</th><th>Best on dev coins</th><th>Its result on our 5</th></tr></thead><tbody>'+
+ D.fams.map(r=>`<tr><td style="white-space:normal;min-width:240px"><b>${r.fam}</b> · ${r.idea}</td><td>${r.mode}</td><td>${r.n}</td><td>${r.g1}</td><td>${r.g2}</td><td>${r.g3}</td><td class="${r.g45?'ok':''}">${r.g45}</td><td>×${r.best_dev[0].toFixed(2)} / ×${r.best_dev[1].toFixed(2)}</td><td>×${r.best_our[0].toFixed(2)} / ×${r.best_our[1].toFixed(2)}</td></tr>`).join('')+'</tbody>';
+const yn=v=>v==null?'<td style="color:var(--muted)">–</td>':v?'<td class="ok">✓</td>':'<td class="no">✗</td>';
+document.getElementById('near').innerHTML='<thead><tr><th>Setting</th><th>Dev ×</th><th>Luck</th><th>Untouched big R</th><th>Untouched small R</th><th>Our 5 ×</th><th>BTC ×</th><th>Gate 4</th><th>Gate 5</th><th>Money</th></tr></thead><tbody>'+
+ D.near.map(r=>`<tr${r.name===W.name?' class="chosen"':''}><td>${r.name}</td><td>${r.dev.map(v=>v.toFixed(2)).join(' / ')}</td><td class="${r.luck>=95?'ok':'no'}">${r.luck==null?'–':r.luck.toFixed(0)+'%'}</td><td>${r.hb.map(v=>sg(v,0)).join(' / ')}</td><td>${r.hs.map(v=>sg(v,0)).join(' / ')}</td><td>${r.our.map(v=>v.toFixed(2)).join(' / ')}</td><td>${r.btc.map(v=>v.toFixed(2)).join(' / ')}</td>${yn(r.g4)}${yn(r.g5)}${yn(r.g6)}</tr>`).join('')+'</tbody>';
+const b=D.base;
+document.getElementById('notes').innerHTML=[
+ `Today's rules barely make money outside our 5: untouched big coins ${sg(b.HOLD_BIG[P[0]][0],0)}R / ${sg(b.HOLD_BIG[P[1]][0],0)}R on ${b.HOLD_BIG[P[0]][2]+b.HOLD_BIG[P[1]][2]} trades, small coins ${sg(b.HOLD_SMALL[P[0]][0],0)}R / ${sg(b.HOLD_SMALL[P[1]][0],0)}R; BTC alone ${sg(b.BTC[P[0]][0],0)}R / ${sg(b.BTC[P[1]][0],0)}R. That is why the untouched coins are judged by profit and drop in R (a ratio × of a near-zero base is meaningless).`,
+ 'Leverage (open interest ÷ 30-day trading volume) at a 90-day low looked even stronger on our 5 (×1.2–1.3) but lost money on the untouched small coins in 2024–26 and was not better in money from 2024: not adopted.',
+ '"Tired" levels (touched 6–8 times) beat the luck test but were worse on the untouched big coins in 2022–23. Long/short ratios, liquidation flushes, coils, coin-vs-market OI and squeeze exits: nothing beyond chance.',
+ 'Live: Binance\'s open-interest API only returns the last 30 days, and the filter needs 90. The bot would load the older part from data.binance.vision (public daily files, same numbers as this study) and the rest from the API.',
+ 'All numbers: fees, slippage and funding included; fills on 1-minute data; the bot\'s exact rules (v2.6 incl. the profit lock and the current OI filter). Code: research/crypto/studies/oi_support.py.'].map(s=>`<li>${s}</li>`).join('');
+draw();addEventListener('resize',draw);
+</script></body></html>

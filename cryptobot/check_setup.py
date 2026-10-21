@@ -12,6 +12,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import notify, strategy as S                                    # noqa: E402
 from binance_futures import Futures, BinanceError               # noqa: E402
+from oi_history import OIHistory                                # noqa: E402
 
 notify.load_env(HERE / ".env")
 testnet = "--testnet" in sys.argv
@@ -115,6 +116,18 @@ for c in cfgs:
                     " but not enough recent rows (the filter is skipped until there are)"), warn=chg is None)
             except Exception as e:
                 res(False, f"open interest data unavailable ({e}): the bot then trades without the filter", warn=True)
+        if p.oi_low_days > 0:                           # also fills the bot's cache (oi_<SYMBOL>.json)
+            try:
+                h = OIHistory(x, sym, p.oi_low_days, HERE, "_testnet" if testnet else "")
+                h.update(budget_s=180)
+                rank = S.oi_rank(h.series(), x.now_ms(), p.oi_low_days * 24, p.oi_low_days * 12)
+                res(rank is not None, f"open interest history: {h.hours()} hours (need {p.oi_low_days * 12} of {p.oi_low_days * 24})" + (
+                    f", now at {rank * 100:.0f}% of its {p.oi_low_days}-day range -> " + ("new entries PAUSED by the OI-low filter right now"
+                                                                                     if S.oi_low_blocks(p, rank) else "entries allowed")
+                    if rank is not None else ": data.binance.vision unreachable? the bot trades without the OI-low filter until it loads"),
+                    warn=rank is None)
+            except Exception as e:
+                res(False, f"open interest history unavailable ({e}): the bot then trades without the OI-low filter", warn=True)
     except BinanceError as e:
         res(False, f"{sym}: {e}")
 print(f" all coins in a trade at once: up to {total_risk * 100:.2f}% of the balance at risk (${eq * total_risk:.2f})")

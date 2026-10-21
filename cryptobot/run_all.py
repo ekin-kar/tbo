@@ -31,7 +31,7 @@ def cfg_of(c):
     return json.loads((HERE / c).read_text())
 
 
-ORDER = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
+ORDER = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "AVAXUSDT"]
 SYMS = sorted((cfg_of(c)["strategy"]["symbol"] for c in cfgs), key=lambda s: (ORDER.index(s) if s in ORDER else 99, s))
 COIN = {s: s[:-4] for s in SYMS}
 
@@ -172,6 +172,9 @@ def short_reason(line):
     oi = re.search(r"open interest ([−+-]?[\d.]+)%", line)
     if oi:
         return f"OI {notify.num(float(oi.group(1).replace('−', '-')), 0, sign=True)}% (filter)"
+    low = re.search(r"near its (\d+)-day low", line)
+    if low:
+        return f"OI at {low.group(1)}-day low (filter)"
     for key, short in (("no clear daily trend", "no trend"), ("stretched", "price stretched"), ("weekend", "weekend"),
                        ("PAUSE", "paused"), ("minimum", "size below minimum"), ("cap is full", "cap full")):
         if key in line:

@@ -48,6 +48,8 @@ class FakeFutures:
             return dict(tick=0.00001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=30_000_000, min_notional=5, status="TRADING")
         if sym == "ADAUSDT":
             return dict(tick=0.0001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=3_000_000, min_notional=5, status="TRADING")
+        if sym == "AVAXUSDT":
+            return dict(tick=0.001, step=1.0, min_qty=1.0, mkt_step=1.0, mkt_max=100_000, min_notional=5, status="TRADING")
         if sym == "BNBUSDT":
             return dict(tick=0.01, step=0.01, min_qty=0.01, mkt_step=0.01, mkt_max=2000, min_notional=5, status="TRADING")
         if sym == "SOLUSDT":
@@ -161,6 +163,24 @@ class FakeFutures:
                 self._fill(od["side"], od["qty"], px, "entry")
 
 
+class FakeOIHistory:
+    """bot.oi_hist on the simulated exchange: the archive's hourly rows up to now (no downloads)."""
+
+    def __init__(self, fx, sym):
+        self.fx, self.oi = fx, RP.load_oi(sym)
+
+    def update(self, max_days=None):
+        return 0
+
+    def series(self):
+        i = int(np.searchsorted(self.oi[0], self.fx.now_ms(), side="right"))
+        lo = max(0, i - 24 * 95)
+        return [(int(t), float(v)) for t, v in zip(self.oi[0][lo:i], self.oi[1][lo:i])]
+
+    def hours(self):
+        return len(self.series())
+
+
 def params(sym):
     """The coin's live strategy settings (config_xxx.json)."""
     return S.Params(**json.load(open(HERE / f"config_{sym[:-4].lower()}.json"))["strategy"])
@@ -176,6 +196,7 @@ def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):
     bot.dir, bot.suffix = Path(f"/tmp/claude_tbo_sim_{os.getpid()}"), ""            # no portfolio.json there: cap off
     bot.dir.mkdir(exist_ok=True)
     bot.state_path = bot.dir / f"state_{sym}.json"; bot.x = fx; bot.f = fx.exchange_info(sym)
+    bot.oi_hist = FakeOIHistory(fx, sym) if bot.p.oi_low_days > 0 else None
     bot.short_mult = 1.0; bot.cfg = cfg; bot.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
     j0, j1 = np.searchsorted(m["t"], C.D.minutes(start)), np.searchsorted(m["t"], C.D.minutes(end))
     tf_ms = 240 * 60_000

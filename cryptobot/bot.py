@@ -28,9 +28,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import strategy as S                                   # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
+from oi_history import OIHistory                       # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.7"
+VERSION = "2.8"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -70,6 +71,7 @@ class Bot:
         self.x = Futures(key, sec, testnet=testnet, base_url=cfg.get("base_url"))
         self.f = self.x.exchange_info(self.sym)
         self.st = self.load_state()
+        self.oi_hist = OIHistory(self.x, self.sym, self.p.oi_low_days, self.dir, self.suffix) if self.p.oi_low_days > 0 else None
 
     # ── state ──
     def load_state(self):
@@ -441,6 +443,21 @@ class Bot:
             if chg is not None:
                 log.debug(f"open interest {chg * 100:+.1f}% over {self.p.oi_lookback_h} h"
                          + (f" (<= {self.p.oi_min_chg * 100:.0f}%: no new entry order)" if blocked else ""))
+        # open interest near its low of the last oi_low_days days (v2.8): no new order
+        low_blocked = False
+        if self.oi_hist is not None:
+            try:
+                self.oi_hist.update(budget_s=20)        # (the archive part is fetched at start-up)
+                rank = S.oi_rank(self.oi_hist.series(), close_ms, self.p.oi_low_days * 24, self.p.oi_low_days * 12)
+            except Exception as e:                     # never let missing data stop the bot: no filter then
+                rank = None
+                log.warning(f"open interest history unavailable ({e}): OI-low filter not applied this candle")
+            if rank is None:
+                log.debug(f"OI-low filter: not enough history yet ({self.oi_hist.hours()} of {self.p.oi_low_days * 12} hours): not applied")
+            else:
+                low_blocked = S.oi_low_blocks(self.p, rank)
+                log.debug(f"open interest ranks {rank * 100:.0f}% of its last {self.p.oi_low_days} days"
+                          + (f" (< {self.p.oi_low_rank * 100:.0f}%: no new entry order)" if low_blocked else ""))
         # 3. new entry order while flat (re-read: the old entry order may have filled in the meantime)
         if amt == 0 and not self.dry:
             amt, _ = self.x.position(self.sym)
@@ -461,6 +478,8 @@ class Bot:
             status = "weekend: no new orders"
         elif blocked:
             status = f"no order · open interest {notify.pct(chg * 100, sign=True, dec=1)} in {self.p.oi_lookback_h} h (filter)"
+        elif low_blocked:
+            status = f"no order · open interest near its {self.p.oi_low_days}-day low (filter)"
         elif dec.trend == 0:
             status = "no order · no clear daily trend"
         elif dec.long_trigger is None and dec.short_trigger is None:
@@ -470,7 +489,7 @@ class Bot:
         if amt == 0 and not self.paused():
             self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
-                if trig is None or blocked:
+                if trig is None or blocked or low_blocked:
                     continue
                 trig = ceil_step(trig, self.f["tick"]) if side == 1 else floor_step(trig, self.f["tick"])
                 if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
@@ -707,6 +726,12 @@ class Bot:
             # exchange leverage only sets the margin locked per position (cross margin); position size is still
             # capped at max_leverage x equity by size(). Higher here = less margin locked when all coins are open.
             self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
+        if self.oi_hist is not None:                   # first start: up to ~90 archive files (a few seconds per coin)
+            try:
+                n = self.oi_hist.update(budget_s=300)
+                log.debug(f"open interest history: {self.oi_hist.hours()} hours ({n} archive days fetched)")
+            except Exception as e:
+                log.warning(f"open interest history not loaded yet ({e}); retried at the next 4h close")
         eq = self.equity()
         exempt = self.sym in self.portfolio().get("cap_exempt", [])
         log.info(f"TBO v{VERSION} online{' (DRY RUN)' if self.dry else ''} · balance {eq:.2f} USDT · risk {self.risk_now(eq) * 100:g}% "

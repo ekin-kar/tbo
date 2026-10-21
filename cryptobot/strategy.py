@@ -10,6 +10,9 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
   Open int.  : oi_lookback_h > 0 -> no new order while Binance open interest (USD value, hourly) is down by
                oi_min_chg or more versus oi_lookback_h hours earlier (positions are being closed, not opened:
                breakouts then follow through less). Missing / stale data -> no filter.
+  OI low     : oi_low_days > 0 -> no new order while open interest (USD value, hourly) ranks in the lowest
+               oi_low_rank of its last oi_low_days days (v2.8; nearly always a short after a sell-off: nobody
+               left to force out, the breakdown fizzles). Fewer than half the window known / stale -> no filter.
   Entry      : at each 4h candle close, while flat: a stop order at the highest high of the last `n`
                closed 4h candles (long) / lowest low (short). The order lives until the next 4h close,
                where it is cancelled and re-placed at the new level.
@@ -49,6 +52,8 @@ class Params:
     max_ext: float = 4.0         # in daily ATR14 from the daily EMA; 99 = off
     oi_lookback_h: int = 0       # open-interest filter: hours back (hourly rows); 0 = off
     oi_min_chg: float = -0.03    # skip new orders when OI changed by this much or less over the lookback
+    oi_low_days: int = 0         # OI-low filter: window in days of hourly rows; 0 = off
+    oi_low_rank: float = 0.2     # skip new orders while OI ranks below this fraction of its window
 
     def to_dict(self):
         return asdict(self)
@@ -104,6 +109,26 @@ def oi_change(hist, order_ms, lookback_h):
 
 def oi_blocks(p: "Params", chg):
     return p.oi_lookback_h > 0 and chg is not None and chg <= p.oi_min_chg
+
+
+def oi_rank(hist, order_ms, window_rows, min_rows):
+    """hist: [(timestamp_ms, open interest USD value), ...] hourly, oldest first. Percentile (0-1] of the last row
+    strictly before order_ms among the last window_rows rows up to it, ties averaged (pandas rank(pct=True), as the
+    research); None when fewer than min_rows usable rows or the last row is stale (>= 3 h old)."""
+    ts = [t for t, _ in hist]
+    i = int(np.searchsorted(ts, order_ms, side="left")) - 1
+    if i < 0 or order_ms - ts[i] >= 3 * 3600_000:
+        return None
+    w = np.array([v for _, v in hist[max(0, i - window_rows + 1):i + 1]], float)
+    w = w[np.isfinite(w) & (w > 0)]
+    if len(w) < min_rows or not (hist[i][1] > 0):
+        return None
+    x = hist[i][1]
+    return (np.sum(w < x) + (np.sum(w == x) + 1) / 2) / len(w)
+
+
+def oi_low_blocks(p: "Params", rank):
+    return p.oi_low_days > 0 and rank is not None and rank < p.oi_low_rank
 
 
 @dataclass

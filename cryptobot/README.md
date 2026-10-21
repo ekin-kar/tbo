@@ -1,4 +1,4 @@
-# TBO v2.7: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve (Binance USD-M futures)
+# TBO v2.8: trend-breakout bot (BTC, ETH, BNB, SOL, ADA, AVAX) + panic sleeve (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -8,8 +8,9 @@
 |---|---|
 | Trend filter | Long only while the last closed **daily** close is above the daily **EMA50** and the EMA is higher than 5 days ago; short only when below and falling. Otherwise no order |
 | Stretch filter (v2.1) | No new order while the daily close is more than **4 daily ATR14** away from the daily EMA50 (do not chase) |
-| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/studies/all12.py`, `combos22.py`). At $300 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
+| Coins (Oct 2026) | BTC, ETH, BNB, SOL, ADA, **AVAX (v2.8)**, risk per trade by the ladder below (DOGE dropped: weakest coin over the last 12 months; BNB and SOL strongest alts; `research/crypto/studies/all12.py`, `combos22.py`). At $300 SOL's 1-SOL minimum order may skip SOL trades until the account is larger: `check_setup.py` shows it |
 | Open-interest filter (v2.4) | No new order while Binance open interest (USD, hourly) is **down 3% or more versus 72 hours earlier** (`oi_lookback_h` / `oi_min_chg`; 0 = off). Data missing -> no filter. Tested 2022-26 (`research/crypto/studies/filter_test3.py`): $200 2024-26 $8.3k -> $14.0k at 2x risk, worst drop 49% -> 44% |
+| OI-low filter (v2.8) | No new order while open interest (USD, hourly) is in the **lowest 20% of its last 90 days** (`oi_low_days` / `oi_low_rank`; 0 = off). Nearly always a short after a sell-off: nobody left to force out, the breakdown fizzles. 90 days of history: Binance's public archive (data.binance.vision) + the API, cached in `oi_<SYMBOL>.json`; not enough history -> no filter. See "OI-low filter and AVAX" below |
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
@@ -20,6 +21,25 @@
 | Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (6.6% of equity under $1,000, 5.5% to $10,000, 2.75% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
+
+## OI-low filter and AVAX (v2.8, Oct 2026): `oi_history.py`, page `reports/breakout_support.html`
+
+Study `research/crypto/studies/oi_support.py`: 51 coins (our 5 + 7 dev coins to pick ideas; 14 big + 25 small coins
+untouched until the end), 9,555 breakout trades 2022-26, today's rules incl. the 72 h OI filter as the base. 7 idea families
+(OI vs price over the setup, squeeze exits after the fill, leverage build-up, coin vs market OI, long/short ratios,
+liquidation flushes, tired levels) as grids of 430 settings, six gates fixed in advance (dev coins both periods, plateau,
+40 time-shifted luck copies, untouched big coins, our 5 with the bot's weights, real money from $300). **One passed**: no
+order while OI ranks in the lowest 20% of 90 days. Our 5 ratio (profit / drop) x1.05 / x1.10, BTC x1.05 / x1.05, untouched
+big coins +25R / +17R and smaller drops, small coins +24R / +34R, luck test 98%; plateau 45-90 days x lowest 10-30%. It is
+about shorts: it flags ~30-40% of short breakouts (avg -0.37R / -0.13R on our 5 vs +0.84R / +0.61R for the other shorts) and
+~2% of longs. Not price in disguise (price at a 90-day low: those breakouts did better). Money, bot sizing from $300 (5 coins):
+2022 $367.5k / 46.4% -> $461.6k / 39.4%; 2024 $39.1k / 41.8% -> $41.6k / 40.5%.
+AVAX added (user's choice): best untouched-by-us big coin with profit in both periods; with the filter, 6 coins: 2022
+$526.8k / 47.0%, 2024 $45.8k / 41.5% (more money, deeper worst drop than 5 coins). Delete `config_avax.json` to drop it.
+Parity (`dev/test_oi_low.py`): live `strategy.oi_rank` vs the research's rank at every 4h close 2022-26 on all 6 coins:
+0 of ~62,000 decisions differ; live-logic replay vs research engine with the filter: identical trades on all 6 coins.
+`dev/test_bot_sim.py`: BTC / SOL / AVAX 2024-25 every entry on the same minute; `dev/test_cap_sim.py` with 6 coins: 0 off the rule.
+The archive files are the same numbers the research used (max difference 2e-16). First start: ~90 files per coin (~30 s).
 
 ## Panic sleeve (v2.7, Oct 2026): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
 
@@ -216,7 +236,9 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
   knock-on re-entry), 1-minute entry shifts from tick rounding, and SOL's minute-data gaps (the engine counts bars, the
   bot clock time); none involves the profit lock or the cap. `check_replay_engine.py`: replay = engine on all five coins.
   `dev/test_cap_sim.py 2024-01-01 2026-09-01`: see below (re-run with the current ladder).
-- `python cryptobot/dev/test_cap_sim.py 2024-01-01 2026-09-01` - the **five bots together on one simulated account**
+- `python cryptobot/dev/test_oi_low.py` - the OI-low filter (v2.8): live rank vs research rank at every 4h close and the
+  trades with the filter, every coin (see "OI-low filter and AVAX").
+- `python cryptobot/dev/test_cap_sim.py 2024-01-01 2026-09-01` - the **coin bots together on one simulated account**
   with `portfolio.json`: every entry's risk is checked against the cap rule of the research simulation (BTC
   always full size; the others shrunk to the room left by the coins that filled before them).
   With the current ladder (Oct 2026), 2024-01..2026-09 at `CAPSIM_EQ=500 / 3000 / 10000 / 20000` (the 6/4/.83, 5/3.3/.83
@@ -334,7 +356,7 @@ entries, breakeven moves and the 5-day exit until it is back.
 
 1. **Binance account (website/app):** open a USD-M Futures account and move the USDT you want to trade into the
    USD-M Futures wallet. Futures settings: **Position Mode = One-way**. Margin mode **Cross** for BTCUSDT, ETHUSDT,
-   BNBUSDT, SOLUSDT, ADAUSDT. Do not trade these five coins by hand on this account. Keep some BNB in the USD-M
+   BNBUSDT, SOLUSDT, ADAUSDT, AVAXUSDT. Do not trade these six coins by hand on this account. Keep some BNB in the USD-M
    Futures wallet with the BNB fee discount on (10% off fees).
 2. **API key:** API Management -> create a key (system generated). Tick **Enable Futures**. **Do NOT enable
    withdrawals.** Restrict it to your server's IP address (on a home PC: your home IP, if it is fixed).

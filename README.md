@@ -1,6 +1,6 @@
 # TBO: trend-breakout bot for Binance USD-M futures
 
-A 4-hour channel-breakout strategy (long and short) on BTC, ETH, BNB, SOL and ADA, plus a **panic sleeve** that buys
+A 4-hour channel-breakout strategy (long and short) on BTC, ETH, BNB, SOL, ADA and AVAX, plus a **panic sleeve** that buys
 forced-liquidation crashes on a Binance sub-account, with the research that built them.
 **Live settings, how they were chosen and how to run the bot: [`cryptobot/README.md`](cryptobot/README.md).**
 The full research log (every idea tested, what worked and what did not): [`HANDOFF.md`](HANDOFF.md).
@@ -13,7 +13,7 @@ The full research log (every idea tested, what worked and what did not): [`HANDO
 | `cryptobot/` (Windows tools) | `TBO-VDS.bat` (watch / control my server), `tbo_install.bat` (set up and update servers: mine and other people's), `start-bots.bat` (run on this PC) |
 | `cryptobot/` (server side) | `vds_setup.sh` (installs / updates the bot on an Ubuntu server), `server_clean.sh` (weekly cleanup of old logs and caches), `tbo.service` (keeps the bot running) |
 | `cryptobot/dev/` | Developer checks, not needed to trade: the bot on a simulated exchange vs the backtest (`test_bot_sim.py`, `test_cap_sim.py`, `parity_detail.py`), the panic sleeve on a simulated exchange vs the research (`test_panic_sim.py`), the live-logic replay (`replay.py`), a one-order live test (`live_test.py`) |
-| `reports/` | The HTML pages (open in a browser): every trade (`trades.html`), statistics, monthly results, risk and cap comparisons (the trend bot), and the panic sleeve (`panic.html`: bot alone vs bot + sleeve, its trades, every setting's plateau). Rebuilt by `research/crypto/pages/` |
+| `reports/` | The HTML pages (open in a browser): every trade (`trades.html`), statistics, monthly results, risk and cap comparisons (the trend bot), the panic sleeve (`panic.html`: bot alone vs bot + sleeve, its trades, every setting's plateau), and the breakout support study (`breakout_support.html`: what open interest can and cannot tell about a breakout, the OI-low filter of v2.8). Rebuilt by `research/crypto/pages/` |
 | `research/engine/` | The backtest engine (orders, fills, costs, indicators) |
 | `research/crypto/core/` | The research library everything uses: data and costs (`common.py`), the strategy in the engine (`families.py`, `xengine.py`), live settings (`wf2.py`, `grid_v25.py`), the bot's sizing (`botsim.py`), the panic sleeve (`panic_sleeve.py`), the trade list (`build_trades.py`, `trade_prices.py`), 1-minute trade simulators (`tradepath.py`, `tradesim.py`), expectations (`three_months.py`), data downloads, engine-vs-replay check |
 | `research/crypto/pages/` | The page generators (`make_*.py`) and their HTML templates |

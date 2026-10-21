@@ -1,5 +1,5 @@
 """
-Open-risk cap test: the five coin bots (bot.py, live configs) run together on ONE simulated account fed with historical
+Open-risk cap test: the coin bots (bot.py, live configs) run together on ONE simulated account fed with historical
 1m bars, with portfolio.json's cap. Every entry is then checked against the rule the research simulation uses
 (research/crypto/studies/sizing_v4.py, cap checked at the fill):
   * BTC (exempt) always trades its full size
@@ -23,9 +23,9 @@ sys.path[:0] = [str(HERE), str(Path(__file__).resolve().parent)]
 import bot as B                                      # noqa: E402
 import strategy as S                                 # noqa: E402
 from replay import C                                 # noqa: E402
-from test_bot_sim import FakeFutures                 # noqa: E402
+from test_bot_sim import FakeFutures, FakeOIHistory  # noqa: E402
 
-COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
+COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "AVAXUSDT"]
 EQ = float(os.environ.get("CAPSIM_EQ", 10_000))
 PF = Path(os.environ.get("CAPSIM_PORTFOLIO", HERE / "portfolio.json"))
 
@@ -52,6 +52,7 @@ def run(start, end):
         b.max_lev, b.poll, b.dir, b.suffix = cfg["max_leverage"], 0, tmp, ""
         b.state_path = tmp / f"state_{sym}.json"; b.x = fx; b.f = fx.exchange_info(sym)
         b.st = dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0)
+        b.oi_hist = FakeOIHistory(fx, sym) if b.p.oi_low_days > 0 else None
         fxs.append(fx); bots.append(b)
     for fx in fxs:
         fx.group = fxs

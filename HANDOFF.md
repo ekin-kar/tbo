@@ -2,7 +2,7 @@
 
 **Layout (Oct 2026 cleanup):** research scripts are in `research/crypto/core/` (library), `research/crypto/pages/` (page generators + templates) and `research/crypto/studies/` (experiments); the bot's developer checks in `cryptobot/dev/`. Script names below are unchanged; see the top-level `README.md` for what is where.
 
-**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
+**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA (+ AVAX from v2.8); risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v2.8 (Oct 2026): + OI-low filter (no order while OI is in the lowest 20% of its 90 days) and AVAX (alt risk), see the last entry.** **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
 
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
@@ -304,3 +304,23 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
   for a green hour: worse. In 27% of sleeve trades the bot is short the same coin -> separate sub-account (one-way mode).
   Final (bot real sizing from $300): 2022 $367.5k/46.4% -> $652k/29.2%; 2024 $39.1k/41.8% -> $50.7k/36.1%; 86 trades, 74% win,
   +5.9% / -3.3%, PF 5.2. Live parity (`test_panic_sim.py`): signals 0 missed / 0 extra over 3,115 hours, trades 85/86 same.
+- **Breakout support study -> OI-low filter + AVAX (adopted, v2.8):** `research/crypto/studies/oi_support.py` (build / eval /
+  luck), page `reports/breakout_support.html` (`pages/make_breakout_support_html.py`). 51 coins (12 dev = our 5 + XRP DOGE
+  AVAX LINK DOT LTC TRX; 14 big + 25 small untouched), base = v2.6 + 72 h OI filter, 9,555 trades 2022-26. Families as grids
+  (430 settings): A price moved with OI falling (skip / half), A+ coil (x1.5), B OI drop after the fill -> exit, C OI level
+  or OI / 30-day volume at a high / low (7/30/90 d), D coin vs market OI, E long/short ratio extremes (3 measures), F flush
+  in the last 12-48 h, G touches / quiet. Six gates fixed in advance; funnel 430 -> 44 (dev) -> 26 (plateau) -> 16 (40
+  time-shifted copies, 95%) -> 4 (untouched big) -> 4 (our 5) -> 1 (money): **skip while OI (USD) ranks in its lowest 20% of
+  90 days**. Our 5 ratio x1.05 / x1.10, BTC x1.05 / x1.05; untouched big +25R / +17R with drops 20-37R smaller; small +24R /
+  +34R; fine grid 45-180 d x 10-30%: dev better in 24/25 (22-23) and 21/25 (24-26), untouched-big drop smaller in 25/25;
+  money 45-90 d better, 120 d neutral, 180 d worse. It is a short filter (flags 29-43% of shorts, ~2% of longs; flagged
+  shorts -0.37/-0.13R vs +0.84/+0.61R on our 5; same sign on every group). OI in coins (no price) low: same effect in
+  2022-23; price at a 90-day low: the opposite (those breakouts better) -> not price in disguise. Near misses: leverage
+  (OI / volume) low x1.2-1.3 on our 5 but small coins -58R in 2024-26 and x0.99 money from 2024; tired levels (6-8 touches)
+  beat luck but lose on untouched big coins 2022-23; long/short ratios, flushes, coils, coin-vs-market OI, squeeze exits:
+  nothing. Money from $300 (5 coins): 2022 $367.5k/46.4% -> $461.6k/39.4%; 2024 $39.1k/41.8% -> $41.6k/40.5%. Side finding:
+  today's rules on other coins ~breakeven (14 big +6R / +22R on 2,765 trades); per coin per 100 trades BTC 78R, ETH 47R, SOL
+  40R, AVAX 29R, BNB 27R, ADA 26R; only 13 of 51 coins positive in both periods. AVAX added on the user's call: 6 coins with
+  the filter 2022 $526.8k / 47.0%, 2024 $45.8k / 41.5%. Live: `cryptobot/oi_history.py` (archive data.binance.vision + API,
+  cache `oi_<SYM>.json`), `strategy.oi_rank` (= pandas rolling rank pct); `dev/test_oi_low.py` 0 / ~62k decisions differ,
+  trades identical on 6 coins; `test_cap_sim.py` 6 coins 0 off the rule.
