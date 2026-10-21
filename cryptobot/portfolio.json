@@ -3,8 +3,8 @@
   "cap_exempt": ["BTCUSDT"],
   "cap_min_fraction": 0.25,
   "risk_ladder": [
-    {"from_usdt": 0,     "BTCUSDT": 6,   "ETHUSDT": 4,    "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "AVAXUSDT": 0.83, "cap_pct": 6.6},
-    {"from_usdt": 1000,  "BTCUSDT": 5,   "ETHUSDT": 3.3,  "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "AVAXUSDT": 0.83, "cap_pct": 5.5},
-    {"from_usdt": 10000, "BTCUSDT": 2.5, "ETHUSDT": 1.7,  "BNBUSDT": 0.42, "SOLUSDT": 0.42, "ADAUSDT": 0.42, "AVAXUSDT": 0.42, "cap_pct": 2.75}
+    {"from_usdt": 0,     "BTCUSDT": 6,   "ETHUSDT": 4,    "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "cap_pct": 6.6},
+    {"from_usdt": 1000,  "BTCUSDT": 5,   "ETHUSDT": 3.3,  "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83, "cap_pct": 5.5},
+    {"from_usdt": 10000, "BTCUSDT": 2.5, "ETHUSDT": 1.7,  "BNBUSDT": 0.42, "SOLUSDT": 0.42, "ADAUSDT": 0.42, "cap_pct": 2.75}
   ]
 }

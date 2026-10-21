@@ -25,7 +25,7 @@ import strategy as S                                 # noqa: E402
 from replay import C                                 # noqa: E402
 from test_bot_sim import FakeFutures, FakeOIHistory  # noqa: E402
 
-COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "AVAXUSDT"]
+COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 EQ = float(os.environ.get("CAPSIM_EQ", 10_000))
 PF = Path(os.environ.get("CAPSIM_PORTFOLIO", HERE / "portfolio.json"))
 

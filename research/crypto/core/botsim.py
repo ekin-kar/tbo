@@ -13,7 +13,7 @@ COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}
 PF = json.load(open(C.ROOT / "cryptobot" / "portfolio.json"))
 import os
-TAG = os.environ.get("BOT_TRADES", "v26")          # v26 = live rules incl. the profit lock (build_trades.py); v24 = before
+TAG = os.environ.get("BOT_TRADES", "v28")          # v28 = live rules (profit lock + OI-low filter, build_trades.py); v26 = before the OI-low filter
 ALL = pickle.load(open(C.D.CACHE / f"portfolio_trades_{TAG}.pkl", "rb"))
 T = pd.concat([ALL[(s, 0.0003)] for s in COINS])
 T = T.assign(_c=T.sym.map({s: i for i, s in enumerate(COINS)})).sort_values(["entry_time", "_c"], kind="stable").drop(columns="_c").reset_index(drop=True)

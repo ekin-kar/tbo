@@ -42,6 +42,27 @@ def oi_skip(sym, tf, hours=72, thr=-0.03):
     return f
 
 
+def oi_low_skip(sym, tf, days=90, rank=0.2):
+    """The v2.8 OI-low filter: True where open interest (USD) ranks below `rank` of its last days x 24 hourly rows (at least
+    half of them), at the last row before the order is placed (= cryptobot/strategy.oi_rank and studies/oi_support.py)."""
+    key = ("low", sym, days)
+    if key not in _OI:
+        g = pd.read_csv(EX / f"{sym}_metrics_1h.csv.gz", usecols=["create_time", "sum_open_interest_value"])
+        t = pd.to_datetime(g.create_time).values.astype("datetime64[m]").astype(np.int64)
+        o = np.argsort(t, kind="stable"); t, v = t[o], g.sum_open_interest_value.to_numpy()[o]
+        keep = np.r_[t[1:] != t[:-1], True]; t, v = t[keep], v[keep]          # a duplicated hour: the later row
+        v = pd.Series(np.where(v > 0, v, np.nan)).ffill()
+        _OI[key] = (t, v.rolling(days * 24, min_periods=days * 12).rank(pct=True).to_numpy())
+
+    def f(c, a, hi, lo, s):
+        t, r = _OI[key]
+        to = c["t"] + tf
+        q = np.searchsorted(t, to, side="left") - 1
+        ok = (q >= 0) & (to - t[np.clip(q, 0, None)] < 180)
+        return np.where(ok, r[np.clip(q, 0, None)], np.nan) < rank
+    return f
+
+
 def trades(sym, cfg, extra=None):
     if sym not in _D:
         _D[sym] = C.load(sym)

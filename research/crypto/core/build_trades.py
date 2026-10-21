@@ -1,9 +1,10 @@
 """Builds the bot's backtest trade list for the five coins with the research engine (live settings: 4h, channel 20,
 1.0 ATR stop, breakeven 1.5R, 120 h, OI filter 72 h <= -3%; slippage BTC/ETH 0.01%, alts 0.03%), optionally with the
-v2.6 profit lock (+5R -> stop +1.5R). Writes cache/portfolio_trades_<tag>.pkl (same format as v24: sym, entry_time,
+v2.6 profit lock (+5R -> stop +1.5R) and the v2.8 OI-low filter (OI in the lowest 20% of 90 days -> no order). Writes cache/portfolio_trades_<tag>.pkl (same format as v24: sym, entry_time,
 exit_time, be_time, dir, R, hours) and cache/trade_prices_<tag>.pkl (entry, exit, sl_dist, reason).
     python build_trades.py check     # rebuild without the lock and compare with v24 (must be identical)
-    python build_trades.py v26       # with the profit lock"""
+    python build_trades.py v26       # with the profit lock
+    python build_trades.py v28       # + the OI-low filter (the live rules since v2.8; botsim's default)"""
 import pickle, sys
 from multiprocessing import Pool
 import numpy as np, pandas as pd
@@ -15,11 +16,15 @@ COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 
 
 def build(args):
-    sym, lock = args
+    sym, tag = args
+    lock, low = tag != "check", tag == "v28"
     m = C.load(sym)
     C.SLIP = 0.0001 if sym in ("BTCUSDT", "ETHUSDT") else 0.0003
     kw = dict(V21, tf=240, n=20, be_R=1.5, hold_h=120, **G.STOPS[1][1])
     kw["skip_fn"] = G.oi_skip(sym, 240)
+    if low:
+        f72, flow = kw["skip_fn"], G.oi_low_skip(sym, 240)
+        kw["skip_fn"] = lambda c, a, hi, lo, s: f72(c, a, hi, lo, s) | flow(c, a, hi, lo, s)
     if lock:
         kw.update(lock_R=5.0, lock_to=1.5)
     x = C.between(F.channel_breakout(m, **kw), "2020-01-01", "2026-10-01").reset_index(drop=True)
@@ -39,7 +44,7 @@ def build(args):
 if __name__ == "__main__":
     tag = sys.argv[1] if len(sys.argv) > 1 else "check"
     with Pool(3) as p:
-        res = dict(p.map(build, [(s, tag != "check") for s in COINS]))
+        res = dict(p.map(build, [(s, tag) for s in COINS]))
     cols = ["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours"]
     if tag == "check":
         V = pickle.load(open(C.D.CACHE / "portfolio_trades_v24.pkl", "rb"))

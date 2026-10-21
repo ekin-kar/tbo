@@ -1,6 +1,6 @@
-"""Builds reports/tbo_statistics.html (TBO v2.6, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
+"""Builds reports/tbo_statistics.html (TBO v2.8, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
 botsim.py) and Python reference results (botsim) for checking the page's math (check_tbo_stats.py).
-Trades: TBO v2.4 rules (v2.2 + open-interest filter from 2022, filter_test3.py 'USD 3d <= -3%'; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
+Trades: botsim's list (v2.8: v2.6 rules + OI-low filter, build_trades.py v28; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import sys, pathlib; sys.path[:0] = [str(pathlib.Path(__file__).resolve().parents[1] / d) for d in ("core", "studies")]  # research/crypto layout
 import json, pickle
 import numpy as np, pandas as pd

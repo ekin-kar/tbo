@@ -498,6 +498,10 @@ def money(vid, mode, pex=None, keep=None):
     """Bot sizing from $300 (botsim, the live ladder + cap), starts 2022 and 2024: base vs variant (vid = CONDS index
     or a condition dict)."""
     import botsim as B
+    T0 = pd.concat([pickle.load(open(C.D.CACHE / "portfolio_trades_v26.pkl", "rb"))[(s, 0.0003)] for s in OUR5])
+    T0 = T0.assign(_c=T0.sym.map(OUR5.index)).sort_values(["entry_time", "_c"], kind="stable")
+    mn = lambda col: T0[col].values.astype("datetime64[m]").astype(np.int64)
+    TR0 = np.c_[mn("entry_time"), mn("exit_time"), mn("be_time"), T0.dir.values, T0.R.values, T0._c.values]   # the base: v2.6, no OI-low filter
     with Pool(4) as p:
         rows = p.starmap(_bot_rows, [(s, vid, mode, pex) for s in OUR5])
     X = np.concatenate(rows); X = X[np.lexsort((X[:, 5], X[:, 0]))]
@@ -505,7 +509,7 @@ def money(vid, mode, pex=None, keep=None):
     for a in ("2022-01-01", "2024-01-01"):
         t0 = pd.Timestamp(a).value // 60_000_000_000; t1 = pd.Timestamp("2026-10-01").value // 60_000_000_000
         res = []
-        for TR in (B.TR, X):
+        for TR in (TR0, X):
             x = TR[(TR[:, 0] >= t0) & (TR[:, 0] < t1)].copy(); x[:, :3] -= t0
             r = B.run(x, B.bot_policy(), 300.0, keep=keep); res.append((r["final"], r["dd"]) if keep is None else r)
         out[a[:4]] = res

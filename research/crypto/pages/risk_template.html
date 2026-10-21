@@ -51,7 +51,7 @@ tr.sel td{background:var(--soft);font-weight:600}
 .warn{border-left:3px solid var(--neg);padding:8px 12px;background:var(--surface);border-radius:6px;font-size:14px;color:var(--muted);max-width:90ch}
 </style></head><body><div class="wrap">
 <h1>Risk comparison: $300 for 2 years</h1>
-<p class="lede">What the bot (<b>TBO v2.6</b>: BTC, ETH, BNB, SOL, ADA, open-interest filter, shorts at half size, open-risk cap with BTC exempt, profit lock +5R → +1.5R) could do with <b>$300 over 24 months</b> with its <b>risk ladder</b> (BTC 6% / ETH 4% under $1,000, 5% / 3.3% up to $10,000, 2.5% / 1.7% above; alts 0.83%, from $10,000 0.42%) and with flat risk levels. Each level was run on the <b>same</b> <span id="nj"></span> simulated 2-year market paths, built from random 4-week blocks of the bot's real trades, so the levels are compared fairly. Fees, slippage and funding included.</p>
+<p class="lede">What the bot (<b>TBO v2.8</b>: BTC, ETH, BNB, SOL, ADA, open-interest filters (72-hour fall, 90-day low), shorts at half size, open-risk cap with BTC exempt, profit lock +5R → +1.5R) could do with <b>$300 over 24 months</b> with its <b>risk ladder</b> (BTC 6% / ETH 4% under $1,000, 5% / 3.3% up to $10,000, 2.5% / 1.7% above; alts 0.83%, from $10,000 0.42%) and with flat risk levels. Each level was run on the <b>same</b> <span id="nj"></span> simulated 2-year market paths, built from random 4-week blocks of the bot's real trades, so the levels are compared fairly. Fees, slippage and funding included.</p>
 <div class="controls">
  <div><div class="ctl-title">Risk per trade (BTC / ETH / each alt; the ladder changes with the balance)</div><div class="seg" id="risk"></div></div>
 </div>
@@ -80,7 +80,7 @@ tr.sel td{background:var(--soft);font-weight:600}
 <li>Each path glues together random 4-week blocks of the bot's real backtest trades (all 5 coins together, as the bot trades them). The same paths are used for every risk level and deposit, so differences come from the settings, not from luck.</li>
 <li>"Risk" is the share of the balance lost if a trade's stop is hit: BTC / ETH / each of BNB, SOL, ADA. The ladder (the bot's <code>portfolio.json</code>) picks the row for the current balance at every trade, and goes back up if the balance falls below a step. Every profile uses the open-risk cap (1.1× the BTC risk; BTC never shrunk but counted). Higher BTC risk needs a higher position-size cap (<code>max_leverage</code>) so tight-stop trades are not cut: the bot has 12× for BTC.</li>
 <li>"Worst drop" counts open trades as if they hit their stop (worst case), from the highest balance reached so far.</li>
-<li>This is a backtest of past markets, with the open-interest filter and BNB/SOL chosen partly after seeing 2022-26. Real results are usually worse than a backtest: read the chances as optimistic. A market unlike 2022-26 can do worse than every path here.</li>
+<li>This is a backtest of past markets, with the open-interest filters and BNB/SOL chosen partly after seeing 2022-26. Real results are usually worse than a backtest: read the chances as optimistic. A market unlike 2022-26 can do worse than every path here.</li>
 <li>Below about $100 some alt trades become smaller than Binance's minimum order and are skipped, so very small balances recover more slowly than shown.</li>
 </ul>
 </div>

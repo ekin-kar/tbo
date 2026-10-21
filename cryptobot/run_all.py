@@ -31,7 +31,7 @@ def cfg_of(c):
     return json.loads((HERE / c).read_text())
 
 
-ORDER = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT", "AVAXUSDT"]
+ORDER = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 SYMS = sorted((cfg_of(c)["strategy"]["symbol"] for c in cfgs), key=lambda s: (ORDER.index(s) if s in ORDER else 99, s))
 COIN = {s: s[:-4] for s in SYMS}
 
