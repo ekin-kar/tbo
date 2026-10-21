@@ -326,3 +326,28 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
   36.5%; BTC+ETH+1 alt $304-374k / 45-47%, $35-38k / 35-40%; all 5 best money per drop from 2022. Live: `cryptobot/oi_history.py` (archive data.binance.vision + API,
   cache `oi_<SYM>.json`), `strategy.oi_rank` (= pandas rolling rank pct); `dev/test_oi_low.py` 0 / ~62k decisions differ,
   trades identical on 6 coins (incl. AVAX); `test_cap_sim.py` 0 off the rule.
+- **Second event sleeve search (rejected, Oct 2026; script `research/crypto/studies/sleeve2.py`, kept out of git):** 7 event
+  families on hourly bars, 249 settings, 51 coins (DEV12 to pick, HOLD39 untouched), panic-sleeve exits (TP 3 / SL 4 ATR
+  max -20%, BE +2 ATR, 12 h, next-hour entry; simulator = panic research 10/10 on BTC). Gates fixed in advance (dev avg > 0
+  and PF >= 1.2 both periods, plateau 60%, 200 random-entry copies 95%, HOLD39 > 0, money with bot + panic). Failed S1:
+  euphoria fade (short: pump + OI up + premium), new-money follow (move + OI up, best +0.09/+0.17%), squeeze fade (short:
+  pump + OI down), wick reversal (too few), crowd extreme (long/short ratio z, -0.06/-0.09%). Passed S1-S4: flash flush
+  (1 h fall >= 4-6 sigma, OI down >= 3-6% -> long; monotonic, dev k5 x6% +0.51/+1.29%, untouched big +0.93/+1.69%) and
+  premium extreme (z <= -4 -> long, +0.57/+0.42%), all beat 100% of random entries. Failed S5: their edge IS the panic
+  sleeve's events (trades overlapping a panic trade +1..+7%; the rest ~0 / negative 2024-26: flash flush our 5 -0.25..-0.78%,
+  premium -0.06..-0.38%). Bot + panic + either: 2022 $672-785k / 30.6-34.8% vs $827k / 28.2%. Bot + flash flush instead of
+  panic: worse than panic. Panic rule on more coins (avg +2.5-2.8% per trade elsewhere) but no limit on open sleeve trades:
+  12 dev coins 2022 $885k / 30.4%, 2024 $67k / 36.1%, reshuffled 1-in-10 drop 62% (= now); 26 coins drops 55-59% (1-in-10
+  71%); 51 coins > 90%. Untested: panic on 12 coins with a cap on open sleeve trades; macro dates (FOMC / CPI calendars not
+  reachable from the cloud); funding extremes (funding only for 12 coins). User: no more research for now, the bot runs.
+- **Stress tests (Oct 2026, v2.8 live settings, scratchpad scripts):** 2-yr block-reshuffled paths (2022-26 blocks): bot drop
+  typical 48% / 1-in-10 66% / 1-in-20 71% (end typ $13.7k); bot + panic 45% / 62% / 67% ($19.0k) -> the history's 39% is a lucky
+  path. BTC risk 2-8% (others fixed): growth keeps rising (typ $3.5k -> $20.2k), 1-in-10 drop 58 -> 75%; all risks x0.5: 43%.
+  Stops filled at the worst price of the exit minute: -0.16R per stop, 2022 $462k / 39% -> $147k / 59%, 2024 $41.6k / 41% ->
+  $30.7k / 46% (5 min: -0.27R, $81k / 66%) -> live stop fills are the key unknown (expected -1.05..-1.10R incl. fees).
+  Without the best 10 trades: 2024 run $6.4k vs $41.6k (trend following: uptime matters). Panic without its best 3 events: 2022
+  $631k / 38.7% (FTX + Luna carry 2022), 2024 without its best 5: $53.6k / 38.8% (still > bot $41.6k / 40.5%); Oct 2025 crash:
+  5 sleeve trades, +1.0% avg. Total notional at entries: median 1.2-1.4x, 90% 3.6-5.4x, max 11-12x; a total-notional cap 4-10x
+  costs a lot (6x: 2-yr typ end $8.1k vs $14.5k) for 1-4 points of drop: not adopted. Binance BTCUSDT min notional is $50
+  (not $100). Deribit DVOL / federalreserve.gov blocked from the cloud; BVOL (same idea) was rejected earlier.
+
