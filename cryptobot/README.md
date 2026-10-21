@@ -42,6 +42,8 @@ Parity (`dev/test_oi_low.py`): live `strategy.oi_rank` vs the research's rank at
 0 of ~62,000 decisions differ; live-logic replay vs research engine with the filter: identical trades on all 6 coins.
 `dev/test_bot_sim.py`: BTC / SOL / AVAX 2024-25 every entry on the same minute; `dev/test_cap_sim.py`: 0 off the rule.
 The archive files are the same numbers the research used (max difference 2e-16). First start: ~90 files per coin (~30 s).
+With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
+(bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
 
 ## Panic sleeve (v2.7, Oct 2026): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
 
