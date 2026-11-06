@@ -71,6 +71,12 @@ better on 97.5% of the phase-shifted copies in both periods. The 2022-start drop
 (12 coins = more sleeve risk open in a crash) and 0.3 lower on the research account's. Caveat: no untouched hold-out is
 left (2024-26 was a gate); live trading is the out-of-sample test. Trade list: `build_trades.py v30` (botsim's default).
 
+### Your own trades on the same account (Nov 2026)
+Open them in **isolated margin** on a coin no bot trades (e.g. TAOUSDT): the bots then leave them out of the balance they size
+on (its isolated margin + P&L; back in once it is closed) and out of the open-risk cap, and do not warn about them.
+A position on a bot coin always counts (one-way mode merges it with the bot's position anyway); a cross-margin position on
+another coin is counted like before. `check_setup.py` lists the trades it leaves out.
+
 ## Panic sleeve (v2.7, Oct 2026; v3.0: + 7 extra coins): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
 
 A second, separate strategy that buys **forced-liquidation crashes** and sells the rebound. When a coin falls hard while

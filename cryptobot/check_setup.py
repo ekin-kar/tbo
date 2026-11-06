@@ -38,6 +38,15 @@ except Exception as e:
     res(False, f"cannot reach Binance futures at {base or ('testnet' if testnet else 'fapi.binance.com')}: {e}"); sys.exit(1)
 try:
     acct = x.account(); bal = float(acct["totalMarginBalance"]); res(True, f"futures account reachable, balance {bal:.2f} USDT")
+    try:                                                            # the user's own isolated trades on non-bot coins
+        bots_ = {json.loads(f.read_text())["strategy"]["symbol"] for f in HERE.glob("config_*.json")}
+        man = {k: v for k, v in x.isolated_positions().items() if k not in bots_}
+        if man:
+            bal -= sum(man.values())
+            res(True, f"your own isolated trades {', '.join(k[:-4] for k in man)} (margin + P&L ${sum(man.values()):.2f}) are left out: "
+                      f"the bots size on {bal:.2f} USDT and do not count them in the open-risk cap")
+    except Exception as e:
+        res(False, f"isolated positions unreadable ({e})", warn=True)
     res(bal >= 100, "balance at least 100 USDT", warn=True)
 except BinanceError as e:
     res(False, f"futures account: {e} (key invalid, futures not enabled for the key, or IP not whitelisted)"); sys.exit(1)

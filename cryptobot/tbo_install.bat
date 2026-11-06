@@ -12,6 +12,12 @@ set "LIST=%~dp0servers.txt"
 set "MINE=%~dp0my_server.txt"
 set "KEY=%USERPROFILE%\.ssh\id_ed25519"
 set "SSHO=-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+rem the SSH key kept in the (private) repo: copied to this PC's .ssh folder (Windows ssh refuses keys with loose file rights)
+if exist "%~dp0secrets\tbo_key" (
+  if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
+  copy /y "%~dp0secrets\tbo_key" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
+  set "SSHO=%SSHO% -i "%USERPROFILE%\.ssh\tbo_repo_key""
+)
 
 :main
 set "MYIP="
@@ -156,7 +162,7 @@ if exist "%ROOT%\.git" (
 )
 set "PKG=%TEMP%\cryptobot.tgz"
 del "%PKG%" >nul 2>&1
-tar -czf "%PKG%" --exclude=venv --exclude=.env --exclude="state_*" --exclude=logs --exclude=__pycache__ --exclude=trial_results --exclude=PAUSE --exclude=servers.txt --exclude=my_server.txt --exclude="*.tmp" --exclude=dev -C "%ROOT%" cryptobot
+tar -czf "%PKG%" --exclude=venv --exclude=.env --exclude="state_*" --exclude=logs --exclude=__pycache__ --exclude=trial_results --exclude=PAUSE --exclude=servers.txt --exclude=my_server.txt --exclude=secrets --exclude="*.tmp" --exclude=dev -C "%ROOT%" cryptobot
 if errorlevel 1 (
   echo   Could not build the package.
   exit /b 1

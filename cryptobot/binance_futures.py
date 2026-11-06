@@ -136,6 +136,18 @@ class Futures:
                 out[r["symbol"]] = (a0 + amt, e0 or float(r["entryPrice"]))
         return out
 
+    def isolated_positions(self):
+        """Open ISOLATED-margin positions: {symbol: isolated wallet + unrealized PnL in USDT} (the bots use cross margin;
+        an isolated position on a coin no bot trades is a manual trade: bot.py / panic.py leave it out of sizing and the cap)."""
+        out = {}
+        for r in self._req("GET", "/fapi/v3/positionRisk", signed=True):
+            if float(r["positionAmt"]) == 0:
+                continue
+            iso = str(r.get("marginType", "")).lower() == "isolated" or float(r.get("isolatedWallet") or 0) > 0
+            if iso:
+                out[r["symbol"]] = out.get(r["symbol"], 0.0) + float(r.get("isolatedWallet") or 0) + float(r.get("unRealizedProfit") or 0)
+        return out
+
     def api_restrictions(self):
         """Spot API (api.binance.com): enableWithdrawals, enableFutures, ipRestrict ... (live keys only)."""
         if self.base != LIVE:

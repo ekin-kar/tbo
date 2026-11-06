@@ -113,6 +113,17 @@ class Sleeve:
         sub = self.sub_equity()
         try:
             main = float(self.cfg.get("dry_run_equity_main", 300)) if self.dry else float(self.main.account()["totalMarginBalance"])
+            if not self.dry:                             # the user's own isolated trades on non-bot coins: not in the pool
+                bots = set()
+                for f in HERE.glob("config_*.json"):
+                    try:
+                        bots.add(json.loads(f.read_text())["strategy"]["symbol"])
+                    except (OSError, ValueError, KeyError):
+                        pass
+                try:
+                    main -= sum(v for s, v in self.main.isolated_positions().items() if s not in bots)
+                except Exception as e:
+                    log.info(f"isolated positions unreadable ({e}): counted in the balance this time")
         except Exception as e:
             log.warning(f"main account balance unreadable ({e}): sizing on the sub-account balance x 4")
             main = 3 * sub

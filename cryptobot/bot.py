@@ -199,7 +199,37 @@ class Bot:
         (one pool, as in the research; portfolio.json "pool_panic_balance": false sizes on this account alone)."""
         if self.dry:
             return float(self.cfg.get("dry_run_equity", 1000))
-        return float(self.x.account()["totalMarginBalance"]) + self.panic_balance()
+        return float(self.x.account()["totalMarginBalance"]) - sum(self.manual_positions().values()) + self.panic_balance()
+
+    def bot_symbols(self):
+        """The coins the bots on this account trade (config_*.json next to this one)."""
+        if getattr(self, "_bot_syms", None) is None:
+            syms = {self.sym}
+            for f in self.dir.glob("config_*.json"):
+                try:
+                    syms.add(json.loads(f.read_text())["strategy"]["symbol"])
+                except (OSError, ValueError, KeyError):
+                    pass
+            self._bot_syms = syms
+        return self._bot_syms
+
+    def manual_positions(self):
+        """The user's own trades: ISOLATED-margin positions on coins no bot trades, {symbol: isolated margin + PnL}. They
+        are left out of the balance the bot sizes on and out of the open-risk cap (the bots trade cross margin)."""
+        fn = getattr(self.x, "isolated_positions", None)
+        if fn is None:
+            return {}
+        now = time.time()
+        if now - getattr(self, "_man_t", 0) < 10:
+            return self._man
+        try:
+            iso = fn()
+            self._man = {s: v for s, v in iso.items() if s not in self.bot_symbols()}
+        except Exception as e:
+            log.info(f"isolated positions unreadable ({e}): manual trades counted this time")
+            self._man = {}
+        self._man_t = now
+        return self._man
 
     def panic_balance(self):
         if not (os.environ.get("PANIC_API_KEY") and os.environ.get("PANIC_API_SECRET")) or not self.portfolio().get("pool_panic_balance", True):
@@ -297,6 +327,8 @@ class Bot:
         pos = self.x.positions()
         exempt = set(self.portfolio().get("cap_exempt", []))
         pos.pop(self.sym, None)
+        for s in self.manual_positions():              # the user's own isolated trades: not in the cap
+            pos.pop(s, None)
         if not pos:
             return 0.0, ""
         stops = {}

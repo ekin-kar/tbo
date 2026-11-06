@@ -6,7 +6,5 @@ cryptobot/logs/
 cryptobot/.env
 cryptobot/PAUSE
 cryptobot/trial_results/
-cryptobot/servers.txt
-cryptobot/my_server.txt
 cryptobot/oi_*.json
 data/extra2/

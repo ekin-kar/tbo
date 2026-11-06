@@ -13,6 +13,13 @@ if not defined MYIP (
   >"%MINE%" echo !MYIP!
 )
 set "HOST=root@!MYIP!"
+rem the SSH key kept in the (private) repo: copied to this PC's .ssh folder and used
+set "SSHI="
+if exist "%~dp0secrets\tbo_key" (
+  if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
+  copy /y "%~dp0secrets\tbo_key" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
+  set "SSHI=-i "%USERPROFILE%\.ssh\tbo_repo_key""
+)
 :menu
 cls
 echo.
@@ -31,19 +38,19 @@ echo    0  Exit
 echo.
 set "c="
 set /p "c=  Choose: "
-if "!c!"=="1" ssh -t !HOST! "journalctl -u tbo -f -o cat _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo)"
-if "!c!"=="2" ssh -t !HOST! "journalctl -u tbo -o cat --no-pager _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo) | tail -200"
-if "!c!"=="3" ssh -t !HOST! "systemctl status tbo --no-pager | head -12; echo; free -h; echo; uptime"
-if "!c!"=="4" ssh -t !HOST! "systemctl restart tbo && echo Bot restarted."
-if "!c!"=="5" ssh -t !HOST! "su - tbo -c 'cd trade3 && git pull' && systemctl restart tbo && echo Updated and restarted."
+if "!c!"=="1" ssh -t !SSHI! !HOST! "journalctl -u tbo -f -o cat _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo)"
+if "!c!"=="2" ssh -t !SSHI! !HOST! "journalctl -u tbo -o cat --no-pager _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo) | tail -200"
+if "!c!"=="3" ssh -t !SSHI! !HOST! "systemctl status tbo --no-pager | head -12; echo; free -h; echo; uptime"
+if "!c!"=="4" ssh -t !SSHI! !HOST! "systemctl restart tbo && echo Bot restarted."
+if "!c!"=="5" ssh -t !SSHI! !HOST! "su - tbo -c 'cd trade3 && git pull' && systemctl restart tbo && echo Updated and restarted."
 if "!c!"=="6" (
   set "y="
   set /p "y=  Stop the bot? No new orders; open trades keep their stop loss on Binance. Type y to confirm: "
-  if /i "!y!"=="y" ssh -t !HOST! "systemctl stop tbo && echo Bot stopped."
+  if /i "!y!"=="y" ssh -t !SSHI! !HOST! "systemctl stop tbo && echo Bot stopped."
 )
-if "!c!"=="7" ssh -t !HOST! "systemctl start tbo && echo Bot started."
-if "!c!"=="8" ssh -t !HOST!
-if "!c!"=="9" ssh -t !HOST! "sed -i 's/\r$//' /home/tbo/trade3/cryptobot/server_clean.sh; bash /home/tbo/trade3/cryptobot/server_clean.sh --install"
+if "!c!"=="7" ssh -t !SSHI! !HOST! "systemctl start tbo && echo Bot started."
+if "!c!"=="8" ssh -t !SSHI! !HOST!
+if "!c!"=="9" ssh -t !SSHI! !HOST! "sed -i 's/\r$//' /home/tbo/trade3/cryptobot/server_clean.sh; bash /home/tbo/trade3/cryptobot/server_clean.sh --install"
 if "!c!"=="0" exit /b
 echo.
 pause
