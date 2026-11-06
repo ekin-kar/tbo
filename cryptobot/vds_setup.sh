@@ -1,7 +1,9 @@
 #!/bin/bash
 # TBO server install / update, run as root by tbo_servers.bat (Ubuntu 22.04 / 24.04).
-# Safe to run again: keeps .env, the state files and the logs. A server set up with git (/home/tbo/trade3/.git) is
-# updated with git pull; otherwise the bot files come from /root/cryptobot.tgz (sent by tbo_servers.bat).
+# Safe to run again: keeps .env, the state files and the logs. The bot files come from /root/cryptobot.tgz (sent by
+# tbo_install.bat: only the cryptobot folder, never secrets/). A server that was set up as a git clone is switched to
+# this once: everything in /home/tbo/trade3 except cryptobot/ (research, data, reports, .git) is removed from it.
+# Without a package a git clone still updates itself with git pull.
 set -e
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a
 PKG=/root/cryptobot.tgz
@@ -17,14 +19,19 @@ if ! id tbo >/dev/null 2>&1; then
 fi
 
 mkdir -p /home/tbo/trade3
-if [ -d /home/tbo/trade3/.git ]; then
-  echo "== this server uses git: pulling the latest code"
-  sudo -u tbo git -C /home/tbo/trade3 pull
-elif [ -f "$PKG" ]; then
+if [ -f "$PKG" ]; then
+  if [ -d /home/tbo/trade3/.git ]; then
+    echo "== switching this server from git to package updates: only the bot folder stays on the server"
+    find /home/tbo/trade3 -mindepth 1 -maxdepth 1 ! -name cryptobot -exec rm -rf {} +
+  fi
   echo "== copying the bot files"
   tar xzf "$PKG" -C /home/tbo/trade3
+elif [ -d /home/tbo/trade3/.git ]; then
+  echo "== this server uses git: pulling the latest code"
+  sudo -u tbo git -C /home/tbo/trade3 pull
 fi
 rm -f "$PKG"
+rm -rf "$D/secrets"                                  # the installers' private files never stay on a server
 
 if [ -f /root/tbo.env ]; then
   mv /root/tbo.env "$D/.env"

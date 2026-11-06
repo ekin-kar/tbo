@@ -29,7 +29,7 @@ echo    1  Live output  (Ctrl+C to come back here)
 echo    2  Last 200 lines
 echo    3  Status + memory
 echo    4  Restart the bot
-echo    5  Update from GitHub + restart
+echo    5  Update (latest code from GitHub, sent as the bot folder) + restart
 echo    6  Stop the bot
 echo    7  Start the bot
 echo    8  Open a server terminal
@@ -42,7 +42,7 @@ if "!c!"=="1" ssh -t !SSHI! !HOST! "journalctl -u tbo -f -o cat _SYSTEMD_INVOCAT
 if "!c!"=="2" ssh -t !SSHI! !HOST! "journalctl -u tbo -o cat --no-pager _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value tbo) | tail -200"
 if "!c!"=="3" ssh -t !SSHI! !HOST! "systemctl status tbo --no-pager | head -12; echo; free -h; echo; uptime"
 if "!c!"=="4" ssh -t !SSHI! !HOST! "systemctl restart tbo && echo Bot restarted."
-if "!c!"=="5" ssh -t !SSHI! !HOST! "su - tbo -c 'cd trade3 && git pull' && systemctl restart tbo && echo Updated and restarted."
+if "!c!"=="5" call "%~dp0tbo_install.bat" update-mine
 if "!c!"=="6" (
   set "y="
   set /p "y=  Stop the bot? No new orders; open trades keep their stop loss on Binance. Type y to confirm: "

@@ -19,6 +19,13 @@ if exist "%~dp0secrets\tbo_key" (
   set "SSHO=%SSHO% -i "%USERPROFILE%\.ssh\tbo_repo_key""
 )
 
+if /i "%~1"=="update-mine" (
+  set "MYIP="
+  if exist "%MINE%" set /p MYIP=<"%MINE%"
+  call :myip && call :update
+  exit /b
+)
+
 :main
 set "MYIP="
 if exist "%MINE%" set /p MYIP=<"%MINE%"
