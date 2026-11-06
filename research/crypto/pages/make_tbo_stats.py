@@ -1,6 +1,6 @@
 """Builds reports/tbo_statistics.html (TBO v2.8, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
 botsim.py) and Python reference results (botsim) for checking the page's math (check_tbo_stats.py).
-Trades: botsim's list (v2.8: v2.6 rules + OI-low filter, build_trades.py v28; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
+Trades: botsim's list (v3.0: v2.8 + cooldown and exit curve, build_trades.py v30; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import sys, pathlib; sys.path[:0] = [str(pathlib.Path(__file__).resolve().parents[1] / d) for d in ("core", "studies")]  # research/crypto layout
 import json, pickle
 import numpy as np, pandas as pd
@@ -49,7 +49,7 @@ if __name__ == "__main__":
                 strat=cfg["BTCUSDT"]["strategy"], maxlev=cfg["BTCUSDT"]["max_leverage"], exlev=cfg["BTCUSDT"].get("exchange_leverage", cfg["BTCUSDT"]["max_leverage"]))
     html = open(pathlib.Path(__file__).resolve().parent / "tbo_stats_template.html").read().replace("/*DATA*/null", json.dumps(data, separators=(",", ":")))
     (ROOT / "reports" / "tbo_statistics.html").write_text(html)
-    T0, T1 = int(pd.Timestamp("2020-01-01").value // 10**6), int(pd.Timestamp("2026-10-01").value // 10**6)
+    T0, T1 = int(pd.Timestamp("2020-01-01").value // 10**6), int(pd.Timestamp("2026-11-07").value // 10**6)
     T24 = int(pd.Timestamp("2024-01-01").value // 10**6)
     cases = {"all5": ([1, 1, 1, 1, 1], T0), "btc": ([1, 0, 0, 0, 0], T0), "btc_eth": ([1, 1, 0, 0, 0], T0), "alts_2024": ([0, 0, 1, 1, 1], T24),
              "all5_2024": ([1, 1, 1, 1, 1], T24)}

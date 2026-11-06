@@ -41,7 +41,7 @@ def flagged(R, vid):
 def curve(r, a):
     e = pd.DataFrame(r["events"], columns=["t", "bal", "worst"])
     e["t"] = pd.Timestamp(a) + pd.to_timedelta(e.t, unit="m"); e = e.set_index("t")
-    idx = pd.date_range(pd.Timestamp(a), pd.Timestamp("2026-09-30"), freq="D")
+    idx = pd.date_range(pd.Timestamp(a), pd.Timestamp("2026-11-06"), freq="D")
     bal = e.bal.resample("D").last().reindex(idx).ffill().fillna(300.0)
     w = e.worst.resample("D").min().reindex(idx).ffill().fillna(300.0)
     dd = (w / np.maximum.accumulate(np.maximum(w.values, 1e-9)) - 1) * 100

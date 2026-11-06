@@ -1,6 +1,9 @@
 {
   "coins": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"],
   "units": 3,
+  "extra_coins": ["XRPUSDT", "DOGEUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "TRXUSDT"],
+  "extra_share": 0.75,
+  "max_extra_open": 2,
   "signal": {
     "window_h": 4,
     "move_k": 1.5,
@@ -9,7 +12,7 @@
     "hold_h": 12,
     "tp_atr": 3.0,
     "stop_atr": 4.0,
-    "stop_max": 0.20,
+    "stop_max": 0.2,
     "be_atr": 2.0
   },
   "max_leverage": 4,

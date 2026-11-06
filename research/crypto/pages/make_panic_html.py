@@ -7,7 +7,7 @@ import common as C
 import botsim as B
 import panic_sleeve as PSL
 
-END = "2026-10-01"; EQ0 = 300.0
+END = "2026-11-07"; EQ0 = 300.0
 STARTS = {"2022": "2022-01-01", "2024": "2024-01-01"}
 
 
@@ -53,7 +53,8 @@ SWEEPS = [
 
 if __name__ == "__main__":
     ev = PSL.events()
-    data = dict(params=PSL.P0, units=PSL.UNITS, coins=[c[:-4] for c in PSL.COINS], runs={}, years=[], sweeps=[], trades=[])
+    data = dict(params=PSL.P0, units=PSL.UNITS, coins=[c[:-4] for c in PSL.COINS], extra=[c[:-4] for c in PSL.EXTRA_COINS],
+                extra_share=PSL.EXTRA_SHARE, max_extra_open=PSL.MAX_EXTRA_OPEN, runs={}, years=[], sweeps=[], trades=[])
     for k, a in STARTS.items():
         r0, b0, d0 = series(a); r1, b1, d1 = series(a, ev)
         data["runs"][k] = dict(t0=a, bot=dict(final=r0["final"], dd=r0["dd"], bal=[float(f"{v:.4g}") for v in b0.values], ddser=[round(float(v), 2) for v in d0]),

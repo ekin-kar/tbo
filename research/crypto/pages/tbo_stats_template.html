@@ -47,7 +47,7 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:90ch}ul.n
 details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-height:560px;overflow:auto}
 </style></head><body><div class="wrap">
 <h1>TBO crypto bot statistics</h1>
-<p class="lede">Every trade of <b>TBO v2.8</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, February 2020 (first trade) to September 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: the <b>risk ladder</b> (BTC 6% / ETH 4% of the balance under $1,000, 5% / 3.3% up to $10,000, 2.5% / 1.7% above; alts 0.83%, from $10,000 0.42%) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size. Pick coins, period and starting balance, or switch to fixed risks; everything recalculates.</p>
+<p class="lede">Every trade of <b>TBO v3.0</b> (4-hour trend breakout, long and short) on <b>BTC, ETH, BNB, SOL and ADA</b> on Binance USD-M futures, February 2020 (first trade) to 6 November 2026, after fees, slippage and funding. Percent and dollar figures run <b>one account</b> trading the selected coins together, sized the way the bot sizes: the <b>risk ladder</b> (BTC 6% / ETH 4% of the balance under $1,000, 5% / 3.3% up to $10,000, 2.5% / 1.7% above; alts 0.83%, from $10,000 0.42%) with the <b>open-risk cap</b> (BTC never shrunk), shorts at half size. Pick coins, period and starting balance, or switch to fixed risks; everything recalculates.</p>
 <div class="controls">
  <div><div class="ctl-title">Coins</div><div class="seg" id="coins"></div></div>
  <div><div class="ctl-title">Period</div><div class="seg" id="periods"></div></div>
@@ -122,7 +122,7 @@ details summary{cursor:pointer;color:var(--muted);margin:6px 0 10px}.months{max-
 const D=/*DATA*/null;
 const COINS=D.coins,CV=['--btc','--eth','--bnb','--sol','--ada'];
 const Y=y=>Date.UTC(y,0,1),M=(y,m)=>Date.UTC(y,m,1);
-const PERIODS=[['All (Feb 2020 – Sep 2026)',M(2020,1),M(2026,9)],['2024 – Sep 2026',Y(2024),M(2026,9)],['Last 3 years',M(2023,9),M(2026,9)],['Last 12 months',M(2025,9),M(2026,9)],['2020 – 2023',M(2020,1),Y(2024)]];
+const PERIODS=[['All (Feb 2020 – 6 Nov 2026)',M(2020,1),Date.UTC(2026,10,7)],['2024 – 6 Nov 2026',Y(2024),Date.UTC(2026,10,7)],['Last 3 years',Date.UTC(2023,10,7),Date.UTC(2026,10,7)],['Last 12 months',Date.UTC(2025,10,7),Date.UTC(2026,10,7)],['2020 – 2023',M(2020,1),Y(2024)]];
 let S={on:D.coins.map(()=>1),per:1,risk:D.risk.slice(),smult:D.smult,start:300,scale:'log',which:-1,mode:'bot',cap:1};
 const spec=()=>({mode:S.mode,risk:S.risk.slice(),smult:S.smult,cap:S.cap});
 // the bot's sizing (bot.py v2.5): ladder row for the balance -> each coin's risk % and the open-risk cap %; BTC exempt but counted
@@ -199,7 +199,7 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
   [`${C0.pos} of ${C0.months}`,`months positive · best ${pct(C0.best)} · worst ${pct(C0.worst)}`],[pct(-C0.res.ddw),`worst drawdown (closed balance ${pct(-C0.res.ddc)})`],
   [(rs?rs.n/C0.months:0).toFixed(1),`trades per month · ${rs?rs.n:0} in total`],[rs?rs.win.toFixed(1)+'%':'-',`winning trades · ${rs?rs.be.toFixed(0):0}% breakeven · ${rs?rs.loss.toFixed(0):0}% losses`]]
   .map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
- document.getElementById('caveat').innerHTML=t0<Y(2024)?`<b>Read with care:</b> this period includes the 2020–21 crypto boom and settings chosen with hindsight, and compounding turns that into very large numbers. Live results will be much lower. The <b>2024 – Sep 2026</b> view (fresh ${money(S.start)}) is the best guide.`:`The rules were not designed on this period, but BNB and SOL were chosen partly because of their 2024–26 results (Oct 2026), so it flatters those two a little. Still the most honest view here; expect live results somewhat below it.`;
+ document.getElementById('caveat').innerHTML=t0<Y(2024)?`<b>Read with care:</b> this period includes the 2020–21 crypto boom and settings chosen with hindsight, and compounding turns that into very large numbers. Live results will be much lower. The <b>2024 – 6 Nov 2026</b> view (fresh ${money(S.start)}) is the best guide.`:`The rules were not designed on this period, but BNB and SOL were chosen partly because of their 2024–26 results (Oct 2026), so it flatters those two a little. Still the most honest view here; expect live results somewhat below it.`;
  // equity chart
  const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=360,L=64,R=58,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
  const series=[{k:'comb',name:'Combined account',col:css('--comb'),cv:C0.res.curve,w:2.5}].concat(single.map(s=>({k:COINS[s.i],name:COINS[s.i]+' alone',col:css(CV[s.i]),cv:s.a.res.curve,w:1.5})));
@@ -261,7 +261,7 @@ function draw(){controls();const [lab,t0,t1]=PERIODS[S.per],on=S.on,sel=COINS.ma
 
 // ── simulated journeys (random 4-week blocks of the real trades) ──
 const J={src:0,hz:1,seed:7,cache:{}};
-const JSRC=[['2024 – Sep 2026 (unseen by the design)',Y(2024),M(2026,9)],['All years 2020 – 2026',M(2020,1),M(2026,9)]],JHZ=[6,12,24];
+const JSRC=[['2024 – 6 Nov 2026 (unseen by the design)',Y(2024),M(2026,9)],['All years 2020 – 2026',M(2020,1),M(2026,9)]],JHZ=[6,12,24];
 const MO=30.44*864e5,BLK=28*864e5,NJ=800;
 const PROF=[['The bot: risk ladder + cap',{mode:'bot'}],['Fixed 2.5 / 1.25 / 0.42% + cap',{mode:'flat',risk:[2.5,1.25,0.42,0.42,0.42],cap:1}],
  ['Fixed 5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[5,2.5,0.83,0.83,0.83],cap:1}],['Fixed 7.5 / 2.5 / 0.83% + cap',{mode:'flat',risk:[7.5,2.5,0.83,0.83,0.83],cap:1}],
@@ -371,7 +371,7 @@ document.getElementById('settings').innerHTML='<thead><tr><th>Setting</th><th>Va
  ['max_leverage',D.maxlev+' (BTC) / 8','per-position size cap: notional at most this many times the balance'],['exchange_leverage',D.exlev,'leverage set on Binance (only sets the margin each position locks)'],['tf_min',st.tf_min,'candle size in minutes (4 hours)'],
  ['n',st.n,'breakout channel: last n closed 4-hour candles'],['atr_n',st.atr_n,'ATR length for the stop'],['sl_atr',st.sl_atr,'stop distance in ATRs'],
  ['ema_n',st.ema_n,'daily trend EMA'],['slope_d',st.slope_d,'EMA must rise / fall over this many days'],['max_ext',st.max_ext,'skip when more than this many daily ATRs from the EMA'],['oi_lookback_h',st.oi_lookback_h,'open-interest filter: compare with this many hours ago (0 = off)'],['oi_min_chg',st.oi_min_chg,'no new order when open interest changed by this much or less'],['oi_low_days / oi_low_rank',`${st.oi_low_days} / ${st.oi_low_rank}`,'OI-low filter: no new order while open interest ranks below this share of its last days (0 = off)'],
- ['no_weekend',st.no_weekend,'no new orders Sat / Sun'],['be_R',st.be_R,'move the stop to entry at this profit (in R)'],['be_off',st.be_off,'where the breakeven stop goes (0 = exactly the entry)'],['lock_R / lock_to',`${st.lock_R} / ${st.lock_to}`,'profit lock: at +lock_R the stop moves to +lock_to (R)'],
+ ['no_weekend',st.no_weekend,'no new orders Sat / Sun'],['be_R',st.be_R,'move the stop to entry at this profit (in R)'],['be_off',st.be_off,'where the breakeven stop goes (0 = exactly the entry)'],['lock_R / lock_to',`${st.lock_R} / ${st.lock_to}`,'profit lock: at +lock_R the stop moves to +lock_to (R)'],['lock2_R / lock2_to',`${st.lock2_R} / ${st.lock2_to}`,'second profit lock (v3.0)'],['stale_h / stale_thr / stale_to',`${st.stale_h} / ${st.stale_thr} / ${st.stale_to}`,'v3.0: at stale_h hours after the fill, a trade that never reached +be_R and is above stale_thr R gets its stop at +stale_to R'],['cool_h / cool_R',`${st.cool_h} / ${st.cool_R}`,'v3.0: after a trade closed below cool_R, no new entry on that coin for cool_h hours'],
  ['max_hold_h',st.max_hold_h,'close after this many hours'],['trail_m / trail_atr',`${st.trail_m} / ${st.trail_atr}`,'trailing exit: off'],['sides',st.sides,'long and short']]
  .map(r=>`<tr><td><code>${r[0]}</code></td><td>${r[1]}</td><td style="text-align:left">${r[2]}</td></tr>`).join('')+'</tbody>';
 draw();addEventListener('resize',()=>draw());matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>draw());

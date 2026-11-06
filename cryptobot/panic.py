@@ -15,6 +15,10 @@ Every hour, right after the hourly close, for each coin of panic.json:
           been +2 x ATR above it; otherwise closed at market 12 h after the entry
   size    `units` per panic event (1 unit = 1/6 of the ladder's BTC risk; a 5% move = 1 unit's risk), on the
           balance of the main account + this sub-account, split equally over the coins that trigger in the same hour
+  v3.0    the same signal and exits on `extra_coins` (panic.json) with their own pool of extra_share x units per event
+          (split over the extra coins entered that hour; the core `coins` keep their full units) and at most
+          max_extra_open extra-coin trades at a time: if more extra coins trigger than free slots, the largest
+          |OI drop| x |premium z| first (research/crypto/core/panic_sleeve.events, checked by dev/test_panic_sim.py)
 State in state_panic.json; a restart picks up the open trades (the exchange is the source of truth for positions).
 """
 import argparse
@@ -75,7 +79,8 @@ def ladder_btc_pct(total):
 class Sleeve:
     def __init__(self, cfg, testnet=False, dry=False):
         self.cfg, self.testnet, self.dry = cfg, testnet, dry
-        self.p = cfg["signal"]; self.coins = cfg["coins"]
+        self.p = cfg["signal"]; self.core = list(cfg["coins"]); self.extra = list(cfg.get("extra_coins", []))
+        self.coins = self.core + [s for s in self.extra if s not in self.core]
         self.sub = Futures(os.environ.get("PANIC_API_KEY", ""), os.environ.get("PANIC_API_SECRET", ""), testnet=testnet)
         self.main = Futures(os.environ.get("BINANCE_API_KEY", ""), os.environ.get("BINANCE_API_SECRET", ""), testnet=testnet)
         self.f = {s: self.sub.exchange_info(s) for s in self.coins}
@@ -147,13 +152,27 @@ class Sleeve:
                         move=c[-1] / c[-1 - int(self.p["window_h"])] - 1)
             log.debug(f"{sym} hour {notify.when(last_open + HOUR)}: move {info['move'] * 100:+.2f}% ({info['rz']:+.2f}x normal), "
                       f"OI {info['doi'] * 100:+.1f}%, premium z {info['pz']:+.2f}" + (" -> SIGNAL" if sig[-1] else ""))
-            if sig[-1] and sym not in self.st["trades"]:
-                hits.append((sym, info))
+            if sig[-1] and sym not in self.st["trades"] and last_open > self.st.get("exit_hour", {}).get(sym, -1):
+                hits.append((sym, info))                # (as the research: not in the hour its last trade closed)
         return hits
 
     # ── trading ──
-    def open_trade(self, sym, info, n, total, sub):
-        f = self.f[sym]; units = float(self.cfg.get("units", 3))
+    def select(self, hits):
+        """The trades to open this hour: [(sym, info, n, units)]. Core coins all enter (units split over them); extra coins
+        only into the free extra slots, the largest |doi| x |pz| first, extra_share x units split over those entered."""
+        U = float(self.cfg.get("units", 3))
+        core = [(s, i) for s, i in hits if s in self.core]
+        ext = [(s, i) for s, i in hits if s not in self.core]
+        cap = self.cfg.get("max_extra_open")
+        if ext and cap is not None:
+            free = int(cap) - sum(1 for s in self.st["trades"] if s not in self.core)
+            ext = sorted(ext, key=lambda z: (-abs(z[1]["doi"]) * abs(z[1]["pz"]), z[0]))[:max(0, free)]
+        out = [(s, i, len(core), U) for s, i in core]
+        out += [(s, i, len(ext), U * float(self.cfg.get("extra_share", 0.75))) for s, i in ext]
+        return out
+
+    def open_trade(self, sym, info, n, total, sub, units=None):
+        f = self.f[sym]; units = float(self.cfg.get("units", 3)) if units is None else float(units)
         risk = total * ladder_btc_pct(total) / 100 * units / 6 / n          # $ lost on a 5% move
         price = self.main.last_price(sym)
         notional = risk / 0.05
@@ -255,10 +274,22 @@ class Sleeve:
                 self.sub.market(sym, "SELL", fmt(amt, self.f[sym]["step"]), reduce_only=True, client_id=self.cid("x", sym))
         self.finish(sym, why)
 
-    def finish(self, sym, why):
+    def trigger_ms(self, algo_id):
+        """When a stop / take-profit order triggered (Binance triggerTime), 0 if unknown."""
+        if not algo_id or self.dry:
+            return 0
+        try:
+            return int(self.sub.algo_order(algo_id=algo_id).get("triggerTime") or 0)
+        except BinanceError:
+            return 0
+
+    def finish(self, sym, why, exit_ms=None):
         tr = self.st["trades"].pop(sym, None)
         if tr is None:
             return
+        now = self.sub.now_ms() if not self.dry else int(time.time() * 1000)
+        ex = exit_ms or max(self.trigger_ms(tr.get("tp_id")), self.trigger_ms(tr.get("sl_id"))) or now
+        self.st.setdefault("exit_hour", {})[sym] = (min(ex, now) // HOUR) * HOUR   # no new signal in the hour it closed
         self.cancel(tr.get("sl_id")); self.cancel(tr.get("tp_id")); self.save()
         exit_px, pnl, fees = self.result(sym, tr)
         ret = exit_px / tr["entry"] - 1
@@ -349,7 +380,8 @@ class Sleeve:
                     log.warning(f"{s}: leverage not set ({e})")
         total, sub = self.total_equity()
         log.info(f"panic sleeve online{' (DRY RUN)' if self.dry else ''} · sub-account {sub:.2f} USDT, main + sub {total:.2f} · "
-                 f"{' '.join(s[:-4] for s in self.coins)} · {self.cfg.get('units', 3):g} units per event")
+                 f"{' '.join(s[:-4] for s in self.core)} · {self.cfg.get('units', 3):g} units per event"
+                 + (f" · extra {' '.join(s[:-4] for s in self.extra)} at {self.cfg.get('extra_share', 0.75):g}x, max {self.cfg.get('max_extra_open')} open" if self.extra else ""))
         self.adopt()
         while True:
             try:
@@ -365,8 +397,12 @@ class Sleeve:
                         self.st["last_hour"] = last_open; self.save()
                         if hits and not late:
                             total, sub = self.total_equity()
-                            for sym, info in hits:
-                                self.open_trade(sym, info, len(hits), total, sub)
+                            picked = self.select(hits)
+                            for sym, _ in hits:
+                                if sym not in [z[0] for z in picked]:
+                                    log.info(f"{sym}: panic signal, but {self.cfg.get('max_extra_open')} extra-coin trades are already open / ranked higher: skipped")
+                            for sym, info, n, u in picked:
+                                self.open_trade(sym, info, n, total, sub, units=u)
                 self.manage()
             except BinanceError as e:
                 log.error(f"Binance: {e}")

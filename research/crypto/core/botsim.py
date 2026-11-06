@@ -13,7 +13,7 @@ COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}
 PF = json.load(open(C.ROOT / "cryptobot" / "portfolio.json"))
 import os
-TAG = os.environ.get("BOT_TRADES", "v28")          # v28 = live rules (profit lock + OI-low filter, build_trades.py); v26 = before the OI-low filter
+TAG = os.environ.get("BOT_TRADES", "v30")            # v30 = live rules since Nov 2026 (build_trades.py v30); v28nov = v2.8 to 2026-11-06
 ALL = pickle.load(open(C.D.CACHE / f"portfolio_trades_{TAG}.pkl", "rb"))
 T = pd.concat([ALL[(s, 0.0003)] for s in COINS])
 T = T.assign(_c=T.sym.map({s: i for i, s in enumerate(COINS)})).sort_values(["entry_time", "_c"], kind="stable").drop(columns="_c").reset_index(drop=True)
@@ -130,7 +130,7 @@ def window(a, b):
     return TR[(TR[:, 0] >= t0) & (TR[:, 0] < t1)], t0, t1
 
 
-def journey_trades(seed, a="2022-01-01", b="2026-10-01", months=24):
+def journey_trades(seed, a="2022-01-01", b="2026-11-07", months=24):
     """Random 4-week blocks of the real trades glued into one path starting at t=0 (blocks start on a 4h boundary)."""
     r = np.random.default_rng(seed)
     pool, t0, t1 = window(a, b)

@@ -1,4 +1,4 @@
-# TBO v2.8: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve (Binance USD-M futures)
+# TBO v3.0: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve on 12 coins (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -14,8 +14,10 @@
 | Entry | At every 4h close while flat (**not on Saturday / Sunday UTC**): a stop order at the **highest high (long) / lowest low (short) of the last 20 closed 4h candles**, valid until the next 4h close, then re-placed |
 | Stop loss | **1.0 x ATR14 (4h)** from the fill price, server-side (median 1.5% of price) |
 | Breakeven | Once price has gone **+1.5R** in favour, the stop moves to the entry price |
-| Profit lock (v2.6) | Once price has gone **+5R** in favour, the stop moves to **+1.5R** (`lock_R` / `lock_to` in the configs). See "Profit lock" below |
-| Exit | stop, breakeven stop, or **120 hours (5 days)** after the fill. No take profit |
+| Profit lock (v2.6, v3.0) | Once price has gone **+5R** in favour, the stop moves to **+2R** (v2.6: +1.5R; `lock_R` / `lock_to`), and at **+8R** to **+3.5R** (`lock2_R` / `lock2_to`, v3.0). See "v3.0" below |
+| Stale stop (v3.0) | Exactly **60 hours** after the fill, a trade that never reached +1.5R and is above -0.3R gets its stop moved to the **entry** (closed at once if the price is below the entry) (`stale_h` / `stale_thr` / `stale_to`) |
+| Cooldown (v3.0) | After a trade on a coin closed below **-0.5R** (a stop-out), that coin takes **no new entry for 16 hours** (`cool_h` / `cool_R`); the 4h order of a close inside the cooldown waits and is placed when it ends (until that candle's order expires; at market if the price is already past the level, as the backtest) |
+| Exit | stop (initial, breakeven, lock, stale), or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
 | Risk ladder (Oct 2026) | `portfolio.json`: BTC 6% / ETH 4% / alts 0.83% under $1,000; 5% / 3.3% / 0.83% to $10,000; 2.5% / 1.7% / 0.42% above. See "Risk ladder" below |
 | Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (6.6% of equity under $1,000, 5.5% to $10,000, 2.75% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
@@ -45,7 +47,31 @@ The archive files are the same numbers the research used (max difference 2e-16).
 With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
 (bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
 
-## Panic sleeve (v2.7, Oct 2026): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
+## v3.0 (Nov 2026): cooldown, exit curve, panic sleeve on 12 coins
+
+Research: `research/results/v30_REPORT.md` (4,687 settings, protocol fixed in advance: fixed-unit return / drop in the dev
+period and 2024-26, neighbour plateau, 40 phase-shifted candle copies + random nulls, drawdown-matched money with 1,000
+bootstrap journeys) and `research/crypto/studies/v30_deploy.py` (the adopted combination). Adopted (user decision, Nov 2026):
+- **C1** 16 h cooldown after a stop-out (see the table above); **C2** the all-coins exit curve: lock +5R -> +2R, second lock
+  +8R -> +3.5R, stale stop at 60 h (breakeven stays at +1.5R). Not adopted: the alts entry geometry (grid edges, +1% money).
+- **C4** the panic sleeve also on XRP, DOGE, AVAX, LINK, DOT, LTC, TRX (`extra_coins` in `panic.json`): their own pool of
+  **0.75 x 3 = 2.25 units per event**, the 5 core coins keep their full 3 units; at most **2 extra-coin trades open**
+  (`max_extra_open`), the largest |open-interest drop| x |premium z| first when more trigger.
+
+| From $300 (botsim page definition: worst drop incl. open sleeve risk) | v2.8 + v2.7 | **v3.0** |
+|---|---|---|
+| 2020 start | $10.47M, drop 35.5% | $10.51M, drop 34.6% |
+| 2022 start | $689k, drop 28.2% | **$1.125M**, drop 29.8% |
+| 2024 start | $50.3k, drop 36.1% | **$61.0k**, drop 34.0% |
+| 2-yr bootstrap (1,000 journeys from 2022, research account): median / 1-in-10 low / 1-in-10 drop | $18.95k / $2.92k / 64.6% | **$23.4k / $4.87k / 56.7%** |
+
+The bot alone: 2022 $472k / drop 27.1% (v2.8 $384k / 39.4%), 2024 $33.8k / 34.8% (v2.8 $34.6k / 40.5%), 2020 $4.48M (v2.8 $5.86M:
+the cooldown costs in the 2020-21 run). Fixed-unit return / drop vs v2.8: x1.25 (2020-23), x1.46 (2022-23), x1.11 (2024-26),
+better on 97.5% of the phase-shifted copies in both periods. The 2022-start drop is 1.6 points higher on the page definition
+(12 coins = more sleeve risk open in a crash) and 0.3 lower on the research account's. Caveat: no untouched hold-out is
+left (2024-26 was a gate); live trading is the out-of-sample test. Trade list: `build_trades.py v30` (botsim's default).
+
+## Panic sleeve (v2.7, Oct 2026; v3.0: + 7 extra coins): `panic.py`, `panic_signal.py`, `panic.json`, page `reports/panic.html`
 
 A second, separate strategy that buys **forced-liquidation crashes** and sells the rebound. When a coin falls hard while
 **open interest collapses**, leveraged longs are being liquidated: market sells at any price, so the price overshoots
@@ -54,7 +80,7 @@ and tends to snap back. (If open interest RISES during the drop, new shorts are 
 | | |
 |---|---|
 | Account | A Binance **sub-account** with its own API key (`PANIC_API_KEY` / `PANIC_API_SECRET` in `.env`): its positions never touch the bot's (in 27% of panic trades the bot is short the same coin) |
-| Signal | Checked after every hourly close on BTC, ETH, BNB, SOL, ADA: over the last **4 hours** the price fell **>= 1.5x its normal 4-hour move** (std of the last 168 hourly returns x 2), **open interest fell >= 12%**, and the futures **premium is at a discount** (z-score <= -1 over 30 days) |
+| Signal | Checked after every hourly close on BTC, ETH, BNB, SOL, ADA (+ v3.0 extra coins XRP, DOGE, AVAX, LINK, DOT, LTC, TRX): over the last **4 hours** the price fell **>= 1.5x its normal 4-hour move** (std of the last 168 hourly returns x 2), **open interest fell >= 12%**, and the futures **premium is at a discount** (z-score <= -1 over 30 days) |
 | Entry | Market buy at once (the next hour's open in the backtest). Long only (short squeezes: rare and losing) |
 | Exits | Take-profit **+3 x ATR(1h)**, stop **-4 x ATR(1h), never more than 20% below the entry** (both on Binance; without the limit the FTX crash would have put the stop 68% away), the stop moves to the **entry once the price was +2 ATR** above it, otherwise **closed after 12 hours** |
 | Size | **3 units per panic event**: 1 unit = 1/6 of the ladder's BTC risk, a 5% move = 1 unit's risk. At the $0-1k row (BTC 6%) a 5% move against the position costs 3% of the balance (position = 60% of the balance), split equally if several coins trigger in the same hour. Sized on **main + sub-account** (one pool, as in the research); follows the ladder automatically |
@@ -224,6 +250,26 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 - `portfolio.json` is read every time: an edit applies without a restart. Delete it (or set 0) to turn the cap off.
 
 ## Parity tests
+
+**v3.0 (Nov 2026), all re-run on the v3.0 configs:**
+- `dev/replay.py <coin> 2020-09-01 2026-11-07` (live decision code with the v3.0 rules) vs `research/crypto/core/v30lib.trades_v30`
+  (xengine30): BTC 258/258, ETH 259/260 (the window's first minute), BNB 263/263, SOL 200/219 (19 before the replay's
+  1000-candle warm-up), ADA 227/227 on the same entry AND exit minute, same prices.
+- `dev/test_bot_sim.py <coin> 2021-03-01 2026-11-06` (bot.py itself on a simulated exchange vs the replay): BTC 234/234,
+  ETH 231/231, BNB 233/233, ADA 199/200, SOL 193/200 on the same entry minute. Every difference (`dev/parity_detail.py`)
+  is one of the old categories: the backtest's stop inside the fill minute (BNB 5, ADA 3; the bot's stop is placed seconds
+  after the fill), 1-minute entry shifts from tick rounding (the simulated exchange serves tick-rounded prices; one SOL
+  entry 3 h earlier at the same 49.00 level), SOL's minute-data gaps (bar count vs clock); none is a cooldown, stale or
+  lock difference. (Fixed: the simulated OI history ignored bot.py's `budget_s`, so earlier sims ran without the OI-low filter.)
+- `dev/test_oi_low.py`: block decisions identical on all five coins (10,623 4h closes each); trades with the v2.8 exits
+  identical except SOL 171/172 (minute-data gap).
+- `dev/test_panic_sim.py` (12 coins, one chronological run with the real Sleeve.select): signal parity 0 missed / 0 extra
+  in 3,449 hours; trades 208/208 (coin, entry hour, units share), 207/208 the same result (ADA 2024-04-12: the take-profit
+  order rounded up to the tick sat just above the hour's high). Fixed for v3.0: a coin's new signal counts only after the
+  hour in which its last trade closed (the research rule; the live code allowed that same hour).
+- `dev/test_cap_sim.py 2024-01-01 2026-11-06` (the five v3.0 bots on one simulated account): at $10,000 507 entries, 62 shrunk
+  by the cap, BTC 121/121 full size; at `CAPSIM_EQ=500` 468 entries, 68 shrunk, BTC 118/121 full (Binance's 0.001 BTC step);
+  **0 entries off the rule** at both balances.
 
 - `python cryptobot/dev/replay.py BTCUSDT` - the live decision code (`strategy.py`, same 1000 x 4h / 500 x 1d
   windows the bot downloads) vs the research engine: v2.1 347 / 347 trades (2020-09..2026-09), same minute, same prices.

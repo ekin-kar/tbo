@@ -169,7 +169,7 @@ class FakeOIHistory:
     def __init__(self, fx, sym):
         self.fx, self.oi = fx, RP.load_oi(sym)
 
-    def update(self, max_days=None):
+    def update(self, max_days=None, **kw):              # (bot.py passes budget_s)
         return 0
 
     def series(self):

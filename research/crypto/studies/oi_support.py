@@ -59,7 +59,7 @@ HOLD_SMALL = ["ALGOUSDT", "ARBUSDT", "AXSUSDT", "CRVUSDT", "ENAUSDT", "EOSUSDT",
 HOLD39 = HOLD_BIG + HOLD_SMALL
 ALL = DEV12 + HOLD39
 BOT_W = {"BTCUSDT": 6.0, "ETHUSDT": 4.0, "BNBUSDT": 0.83, "SOLUSDT": 0.83, "ADAUSDT": 0.83}
-PERIODS = (("2022-23", "2022-01-01", "2024-01-01"), ("2024-26", "2024-01-01", "2026-10-01"))
+PERIODS = (("2022-23", "2022-01-01", "2024-01-01"), ("2024-26", "2024-01-01", "2026-11-07"))
 BASE_KW = dict(V21, tf=240, n=20, be_R=1.5, hold_h=120, sl_mode="atr", sl_atr=1.0, lock_R=5.0, lock_to=1.5)
 TF = 240
 
@@ -255,7 +255,7 @@ class Coin:
         def skip(c, a, hi, lo, s):
             assert len(c["t"]) == len(bl)
             return bl if s > 0 else bs
-        x = C.between(F.channel_breakout(self.m, **dict(BASE_KW, skip_fn=skip)), "2022-01-01", "2026-10-01").reset_index(drop=True)
+        x = C.between(F.channel_breakout(self.m, **dict(BASE_KW, skip_fn=skip)), "2022-01-01", "2026-11-07").reset_index(drop=True)
         mn = lambda col: x[col].values.astype("datetime64[m]").astype(np.int64)
         return pd.DataFrame(dict(e=mn("entry_time"), x=mn("exit_time"), d=x.dir.values.astype(int), R=x.R.values,
                                  entry=x.entry.values, exit=x.exit.values, sl=x.sl_dist.values))
@@ -445,7 +445,7 @@ def luck(nshift=40):
         return min((sc[p][0] / sc[p][1]) / (base[p][0] / base[p][1]) for p in P)
     res = {}
     if items:
-        with Pool(4) as pool:
+        with Pool(6) as pool:
             got = dict(pool.map(_luck_one, [(s, items, nshift) for s in DEV12]))
         for vid, mode in items:
             sims = []
@@ -502,12 +502,12 @@ def money(vid, mode, pex=None, keep=None):
     T0 = T0.assign(_c=T0.sym.map(OUR5.index)).sort_values(["entry_time", "_c"], kind="stable")
     mn = lambda col: T0[col].values.astype("datetime64[m]").astype(np.int64)
     TR0 = np.c_[mn("entry_time"), mn("exit_time"), mn("be_time"), T0.dir.values, T0.R.values, T0._c.values]   # the base: v2.6, no OI-low filter
-    with Pool(4) as p:
+    with Pool(6) as p:
         rows = p.starmap(_bot_rows, [(s, vid, mode, pex) for s in OUR5])
     X = np.concatenate(rows); X = X[np.lexsort((X[:, 5], X[:, 0]))]
     out = {}
     for a in ("2022-01-01", "2024-01-01"):
-        t0 = pd.Timestamp(a).value // 60_000_000_000; t1 = pd.Timestamp("2026-10-01").value // 60_000_000_000
+        t0 = pd.Timestamp(a).value // 60_000_000_000; t1 = pd.Timestamp("2026-11-07").value // 60_000_000_000
         res = []
         for TR in (TR0, X):
             x = TR[(TR[:, 0] >= t0) & (TR[:, 0] < t1)].copy(); x[:, :3] -= t0
@@ -523,7 +523,7 @@ if __name__ == "__main__":
         market_oi()
         syms = sys.argv[2].split(",") if len(sys.argv) > 2 else ALL
         print(len(CONDS), "conditions,", sum("skip" in v["modes"] for v in CONDS), "skip runs per coin,", len(EXITS), "exits", flush=True)
-        with Pool(4) as p:
+        with Pool(6) as p:
             for s, msg in p.imap_unordered(build_one, syms):
                 print(s, msg, flush=True)
     elif cmd == "eval":

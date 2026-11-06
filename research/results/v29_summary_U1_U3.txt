@@ -1,0 +1,114 @@
+BASE v2.8 fixed-unit: 2020-23 net 1653.3 dd 70.2 ratio 23.56 n 851, 2022-23 net 704.7 dd 70.2 ratio 10.04 n 385, 2024-26 net 962.0 dd 69.9 ratio 13.77 n 552
+BASE HOLD_BIG (w 1): 2020-23 net 256.9 dd 91.3 ratio 2.81 n 1600, 2022-23 net 27.2 dd 91.3 ratio 0.30 n 878, 2024-26 net 0.7 dd 123.5 ratio 0.01 n 1443
+
+U2 + U3 floor (engine variants)
+                   id  x2020  x2022  x2024  net_x2022  net_x2024  plateau  shift_win2022  shift_win2024  hold_x2022  hold_x2024    G1    G2    G3    G4    G5       m2020  dd2020      m2022     m2024  boot_med  boot_dd90    G6  ALL6
+        hold_L120_S60  0.917  0.876  0.938      0.904      0.938    0.000          0.000          0.000       0.089      15.465 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L120_S72  0.984  0.966  0.959      0.957      0.959    0.000          0.025          0.000       1.239      10.454 False False False False  True         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L120_S96  0.987  0.967  0.971      0.956      0.971    0.000          0.000          0.000       0.522       1.121 False False False False False 4469203.506  35.531 347321.311 35601.196 13185.968     68.001 False False
+        hold_L144_S60  0.758  0.732  0.783      0.875      0.878    0.000          0.000          0.000      -0.068      15.018 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L144_S72  0.783  0.776  0.802      0.929      0.898    0.000          0.400          0.000       1.048      10.185 False False False False  True         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L144_S96  0.782  0.775  0.812      0.927      0.910    0.000          0.250          0.000       0.356       1.165 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+       hold_L144_S120  0.803  0.812  0.838      0.971      0.939    0.000          0.400          0.150       0.824       1.046 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L168_S60  0.775  0.694  0.920      0.798      1.031    0.000          0.000          0.350       0.454      -5.159 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L168_S72  0.800  0.740  0.938      0.851      1.052    0.000          0.225          0.325       1.553      -9.389 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L168_S96  0.800  0.739  0.949      0.850      1.064    0.000          0.075          0.450       0.861     -16.588 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+       hold_L168_S120  0.821  0.777  0.975      0.894      1.093    0.000          0.350          0.550       1.312     -16.240 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L192_S60  0.831  0.689  0.843      0.775      0.963    0.000          0.000          0.125       0.415     -12.083 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L192_S72  0.857  0.736  0.861      0.828      0.983    0.000          0.000          0.150       1.494     -15.466 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        hold_L192_S96  0.856  0.735  0.872      0.827      0.995    0.000          0.000          0.325       0.815     -21.402 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+       hold_L192_S120  0.879  0.774  0.898      0.871      1.024    0.000          0.000          0.450       1.259     -21.539 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+   lock_None_(12,7.0)  0.857  0.924  0.996      0.958      0.996    0.500          0.150          0.000       0.472     -26.563 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+   lock_None_(12,8.0)  0.899  0.955  0.976      0.967      0.976    0.333          0.350          0.000       0.177      -8.348 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+    lock_(8,3.5)_None  1.094  1.151  1.006      1.027      0.983    0.250          0.900          0.575       0.517      -0.750  True  True False False False 4362041.492  35.531 441867.070 35089.351 14457.624     66.616 False False
+lock_(8,3.5)_(12,7.0)  0.921  1.053  1.003      0.985      0.979    0.143          0.550          0.650       0.216     -40.046 False  True False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+lock_(8,3.5)_(12,8.0)  0.956  1.077  0.982      0.994      0.959    0.200          0.550          0.525      -0.079     -20.681 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+    lock_(8,4.5)_None  0.891  0.810  1.017      0.816      0.981    0.667          0.200          0.575      -0.106     -32.703 False  True  True False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+lock_(8,4.5)_(12,7.0)  0.749  0.768  1.014      0.825      0.977    0.400          0.300          0.600      -0.332     -58.732 False  True False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+lock_(8,4.5)_(12,8.0)  0.766  0.757  0.992      0.804      0.957    0.333          0.300          0.550      -0.658     -39.295 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+            run_R3_k2  0.950  0.982  0.910      0.984      0.968    0.000          0.200          0.250       1.607     -22.445 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+            run_R3_k3  0.871  0.880  0.906      0.941      0.966    0.000          0.350          0.000       1.154     -20.302 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+         run_R3_ema10  0.973  1.013  0.838      0.952      0.940    0.000          0.825          0.075       0.850     -49.867 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+            run_R4_k2  0.968  0.984  0.912      0.986      0.970    0.000          0.200          0.250       1.623     -14.775 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+            run_R4_k3  0.905  0.881  0.896      0.942      0.955    0.000          0.375          0.000       1.330     -19.856 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+         run_R4_ema10  1.009  1.013  0.843      0.951      0.945    0.000          0.825          0.075       0.906     -42.223 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+            run_R6_k2  0.977  0.984  0.982      0.983      0.982    0.000          0.200          0.750       1.541      -9.101 False False False False False 4590127.120  35.531 337394.168 37195.019 13889.197     67.997 False False
+            run_R6_k3  0.983  0.955  0.949      0.954      0.949    0.000          0.800          0.100       1.298      -4.254 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+         run_R6_ema10  1.008  1.014  0.938      0.953      0.938    0.000          0.825          0.300       0.531     -34.377 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+     stale_36h_to-0.5  1.004  1.006  1.039      1.006      1.009    1.000          0.825          0.950       0.928       2.976 False  True  True  True False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        stale_36h_to0  0.998  1.001  1.042      0.996      0.982    1.000          0.300          0.975       0.935      12.070 False  True  True False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+     stale_48h_to-0.5  1.003  1.005  1.028      1.004      0.999    1.000          0.850          0.475       0.856       2.975 False  True  True False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        stale_48h_to0  0.997  1.018  1.074      1.012      1.012    1.000          0.850          0.775       0.846      -0.379 False  True  True  True False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+     stale_60h_to-0.5  1.004  1.009  1.026      1.006      0.996    1.000          0.925          0.425       0.932       5.652 False  True  True False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+        stale_60h_to0  1.012  1.020  1.053      1.014      1.002    1.000          1.000          0.575       1.115       9.509 False  True  True False  True 5916599.196  35.531 379507.771 34039.286 14592.218     67.136 False False
+         floor_0.6pct  0.984  0.978  0.990      0.989      0.990    0.000          0.000          0.175       1.000       1.000 False False False False False 5579116.850  35.531 398227.546 33804.518 13958.525     67.648 False False
+         floor_0.8pct  0.998  0.965  0.954      0.914      0.954    0.000          0.200          0.000       0.983       1.013 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+           floor_1pct  0.887  0.845  0.880      0.837      0.880    0.000          0.000          0.000       0.940       1.114 False False False False False         NaN     NaN        NaN       NaN       NaN        NaN   NaN False
+base money: m2020          5857113.0, m2022           384407.3, m2024            34636.9, dd2020              35.5, dd2022              39.4, dd2024              40.5, boot_med         14341.7, boot_p10          1748.7, boot_dd_med         49.1, boot_dd90           67.6, boot_p_loss          0.0, G6                   0.0
+
+U3 fee-aware sizing
+      id  x2020  x2022  x2024  net_x2022  net_x2024  plateau  shift_win2022  shift_win2024  hold_x2022  hold_x2024    G1    G2    G3    G4    G5  null_pct  avg_factor  stop_loss_R       m2020  dd2020      m2022     m2024  boot_med  boot_dd90    G6  ALL6
+fee_c0.5  0.998  0.988  0.976      0.936      0.940      0.0          0.025            0.0       0.959       3.621 False False False False False     0.070       0.961       -1.047 3963923.502  35.147 286764.099 32391.708 13098.762     65.929 False False
+  fee_c1  0.998  0.979  0.955      0.880      0.888      0.0          0.075            0.0       0.924       6.071 False False False False False     0.050       0.925       -1.007 2967715.767  34.775 251021.791 29650.721 11614.968     64.687 False False
+fee_c1.5  0.999  0.972  0.937      0.831      0.842      0.0          0.075            0.0       0.894       8.371 False False False False False     0.070       0.892       -0.971 2249881.208  34.415 237309.596 24815.361 10488.261     63.262 False False
+  fee_c2  1.001  0.967  0.922      0.788      0.800      0.0          0.100            0.0       0.869      10.541 False False False False False     0.055       0.862       -0.938 1728063.983  34.065 157165.147 25061.689  9217.092     61.897 False False
+
+U1 short tiers (fixed-unit gates)
+                     id  x2020  x2022  x2024  net_x2022  net_x2024  plateau  shift_win2022  shift_win2024  hold_x2022  hold_x2024    G1   G2    G3    G4    G5  null_pct
+     btc1_eth0.5_alt0.5  0.947  1.027  1.071      1.188      1.097    0.429          0.625          0.975         NaN         NaN False True False False  True     0.800
+    btc1_eth0.75_alt0.5  0.913  1.019  1.104      1.262      1.148    0.364          0.650          0.975         NaN         NaN False True False False  True     0.540
+  btc0.75_eth0.5_alt0.5  0.972  1.014  1.049      1.094      1.049    0.273          0.650          1.000         NaN         NaN False True False False  True     0.760
+       btc1_eth1_alt0.5  0.884  1.012  1.136      1.336      1.200    0.286          0.650          1.000         NaN         NaN False True False False  True     0.535
+ btc0.75_eth0.75_alt0.5  0.934  1.007  1.083      1.168      1.100    0.235          0.650          1.000         NaN         NaN False True False False  True     0.480
+    btc0.75_eth1_alt0.5  0.901  1.000  1.116      1.242      1.151    0.273          0.625          1.000         NaN         NaN False True False False  True     0.505
+  btc0.5_eth0.75_alt0.5  0.957  0.993  1.035      1.074      1.051    0.182          0.525          1.000         NaN         NaN False True False False  True     0.435
+     btc0.5_eth1_alt0.5  0.921  0.986  1.069      1.148      1.102    0.143          0.525          1.000         NaN         NaN False True False False  True     0.420
+    btc1_eth0.5_alt0.25  0.912  0.982  1.078      1.172      1.096    0.364          0.425          0.975      -0.120       7.275 False True False False False     0.715
+   btc1_eth0.75_alt0.25  0.881  0.977  1.111      1.246      1.147    0.294          0.425          0.975      -0.120       7.275 False True False False False     0.785
+      btc1_eth1_alt0.25  0.854  0.973  1.144      1.320      1.198    0.273          0.450          1.000      -0.120       7.275 False True False False False     0.640
+ btc0.75_eth0.5_alt0.25  0.933  0.967  1.050      1.078      1.047    0.235          0.250          1.000      -0.120       7.275 False True False False False     0.795
+btc0.75_eth0.75_alt0.25  0.899  0.963  1.085      1.152      1.098    0.192          0.400          1.000      -0.120       7.275 False True False False False     0.590
+   btc0.75_eth1_alt0.25  0.869  0.959  1.118      1.227      1.149    0.176          0.425          1.000      -0.120       7.275 False True False False False     0.645
+  btc0.5_eth0.5_alt0.25  0.957  0.950  1.002      0.984      0.998    0.182          0.000          0.650      -0.120       7.275 False True False False False     0.725
+ btc0.5_eth0.75_alt0.25  0.919  0.946  1.037      1.058      1.050    0.118          0.200          1.000      -0.120       7.275 False True False False False     0.635
+    btc0.5_eth1_alt0.25  0.886  0.943  1.071      1.133      1.101    0.091          0.375          1.000      -0.120       7.275 False True False False False     0.530
+       btc1_eth0.5_alt0  0.878  0.940  1.085      1.156      1.094    0.000          0.200          0.975      -1.393      14.988 False True False False False     0.865
+      btc1_eth0.75_alt0  0.851  0.938  1.119      1.230      1.145    0.000          0.250          0.975      -1.393      14.988 False True False False False     0.860
+         btc1_eth1_alt0  0.826  0.936  1.148      1.305      1.196    0.000          0.350          1.000      -1.393      14.988 False True False False False     0.790
+    btc0.75_eth0.5_alt0  0.897  0.923  1.052      1.062      1.045    0.000          0.150          1.000      -1.393      14.988 False True False False False     0.915
+   btc0.75_eth0.75_alt0  0.866  0.922  1.087      1.137      1.097    0.000          0.150          1.000      -1.393      14.988 False True False False False     0.875
+      btc0.75_eth1_alt0  0.839  0.920  1.120      1.211      1.148    0.000          0.225          1.000      -1.393      14.988 False True False False False     0.805
+       btc0.5_eth1_alt0  0.854  0.903  1.073      1.117      1.099    0.000          0.150          1.000      -1.393      14.988 False True False False False     0.825
+    btc0.5_eth0.75_alt0  0.883  0.903  1.038      1.043      1.048    0.000          0.150          1.000      -1.393      14.988 False True False False False     0.795
+     btc0.5_eth0.5_alt0  0.918  0.903  1.003      0.969      0.997    0.000          0.000          0.650      -1.393      14.988 False True False False False     0.860
+
+U1 money (bot sizing, $300) incl. directional cap / ETH-exempt-on-shorts
+                                          m2020       m2022     m2024  dd2020  dd2022  dd2024  boot_med  boot_p10  boot_dd_med  boot_dd90  boot_p_loss     G6
+base                                 5857113.00   384407.29  34636.88   35.53   39.43   40.48  14341.68   1748.73        49.11      67.59         0.01  False
+btc1_eth0.5_alt0.5                  10671044.18   770906.68  44881.14   35.53   31.85   40.48  18669.89   2082.92        51.88      70.96         0.01  False
+btc1_eth0.5_alt0.5+capS             10671044.18   770906.68  44881.14   35.53   31.85   40.48  18669.89   2082.92        51.88      70.96         0.01  False
+btc1_eth0.5_alt0.5+ETHexS            9948573.46   639411.50  44065.33   37.01   29.99   40.48  18091.30   2088.25        51.98      71.45         0.01  False
+btc1_eth0.5_alt0.5+capS+ETHexS       9948573.46   639411.50  44065.33   37.01   29.99   40.48  18091.30   2088.25        51.98      71.45         0.01  False
+btc1_eth0.75_alt0.5                 13725821.30   820468.22  53896.42   35.82   30.09   41.02  20088.58   2233.42        52.17      71.79         0.01  False
+btc1_eth0.75_alt0.5+capS            13725821.30   820468.22  53896.42   35.82   30.09   41.02  20088.58   2233.42        52.17      71.79         0.01  False
+btc1_eth0.75_alt0.5+ETHexS          11448418.44   869882.87  50860.71   38.43   30.99   41.02  20360.73   2340.58        52.37      72.76         0.01  False
+btc1_eth0.75_alt0.5+capS+ETHexS     11448418.44   869882.87  50860.71   38.43   30.99   41.02  20360.73   2340.58        52.37      72.76         0.01  False
+btc0.75_eth0.5_alt0.5                8397801.22   601661.85  40933.53   35.53   34.31   40.48  16832.68   2057.81        50.64      69.48         0.00  False
+btc0.75_eth0.5_alt0.5+capS           7913151.67   505458.48  38601.90   35.53   37.14   40.48  15667.14   1957.10        50.16      69.19         0.00  False
+btc0.75_eth0.5_alt0.5+ETHexS         8313134.29   667190.34  40945.39   35.53   30.07   40.48  16875.92   2049.68        50.58      69.51         0.00  False
+btc0.75_eth0.5_alt0.5+capS+ETHexS    7030058.13   589923.30  36850.39   35.53   32.56   40.48  15888.70   1981.94        50.12      69.85         0.01  False
+btc1_eth1_alt0.5                    16473513.84  1076170.23  64333.24   37.02   36.00   41.57  21100.63   2490.15        52.75      72.56         0.01  False
+btc1_eth1_alt0.5+capS               16473513.84  1076170.23  64333.24   37.02   36.00   41.57  21100.63   2490.15        52.75      72.56         0.01  False
+btc1_eth1_alt0.5+ETHexS             13122122.85  1061567.41  57945.15   39.84   33.90   41.57  22165.78   2491.36        52.88      73.23         0.01  False
+btc1_eth1_alt0.5+capS+ETHexS        13122122.85  1061567.41  57945.15   39.84   33.90   41.57  22165.78   2491.36        52.88      73.23         0.01  False
+btc0.75_eth0.75_alt0.5              10335805.87   659705.24  48147.56   35.53   30.06   41.02  18420.25   2212.41        50.90      70.14         0.00  False
+btc0.75_eth0.75_alt0.5+capS         10274824.64   735187.88  45392.00   35.53   31.21   41.02  17309.47   2116.96        50.38      69.57         0.00  False
+btc0.75_eth0.75_alt0.5+ETHexS       10718799.43   756460.11  47511.11   35.53   30.71   41.02  18071.91   2210.50        50.92      70.56         0.00  False
+btc0.75_eth0.75_alt0.5+capS+ETHexS   8011210.76   771089.39  42799.43   35.53   30.58   41.02  16877.76   2159.24        50.57      70.60         0.00  False
+btc0.75_eth1_alt0.5                 13226671.49   943365.65  57300.08   35.53   34.57   41.57  19844.48   2438.02        51.74      70.98         0.00  False
+btc0.75_eth1_alt0.5+capS            13173452.86   764766.11  55657.89   35.53   36.98   41.57  19044.65   2268.10        51.26      70.53         0.01  False
+btc0.75_eth1_alt0.5+ETHexS          12110812.25   831356.30  54341.95   36.56   35.09   41.57  20162.47   2428.45        51.81      71.65         0.00  False
+btc0.75_eth1_alt0.5+capS+ETHexS      8998343.28   905926.38  47640.09   40.73   33.19   41.57  18385.83   2248.83        51.63      71.62         0.01  False
+btc0.5_eth0.5_alt0.5+capS            4802182.09   354762.13  31775.99   35.53   44.40   40.48  13921.13   1645.04        48.64      67.32         0.01  False
+btc0.5_eth0.5_alt0.5+ETHexS          5857113.00   384407.29  34636.88   35.53   39.43   40.48  14363.92   1748.73        49.11      67.59         0.01  False
+btc0.5_eth0.5_alt0.5+capS+ETHexS     4695679.52   307882.61  34686.27   35.53   44.86   40.48  13423.24   1649.85        48.58      67.92         0.01  False

@@ -11,7 +11,7 @@ import botsim as BS
 PROFILES = [("lad", BS.bot_policy(), 12), ("f25", BS.flat_policy(2.5, 1.25, 0.42), 8), ("f5", BS.flat_policy(5, 2.5, 0.83), 8),
             ("f6", BS.flat_policy(6, 2.5, 0.83), 10), ("f75", BS.flat_policy(7.5, 2.5, 0.83), 12), ("f10", BS.flat_policy(10, 2.5, 0.83), 16)]
 DEPS = [0, 50, 100]
-SRCS = {"2022": ("2022-01-01", "2026-10-01"), "2024": ("2024-01-01", "2026-10-01")}
+SRCS = {"2022": ("2022-01-01", "2026-11-07"), "2024": ("2024-01-01", "2026-11-07")}
 MONTHS, START, N = 24, 300.0, 1000
 LEVELS = [1000, 5000, 10000, 20000]
 MON = BS.MON
@@ -52,7 +52,7 @@ def summarize(results):
 
 if __name__ == "__main__":
     data = dict(profiles=[(k, BS.label(p), lev) for k, p, lev in PROFILES], deps=DEPS, levels=LEVELS, months=MONTHS, start=START, n=N,
-                srcs={"2022": "Trades from 2022 – Sep 2026 (no 2020-21 bull run)", "2024": "Trades from 2024 – Sep 2026"}, res={})
+                srcs={"2022": "Trades from 2022 – 6 Nov 2026 (no 2020-21 bull run)", "2024": "Trades from 2024 – 6 Nov 2026"}, res={})
     for src in SRCS:
         with Pool(4) as p:
             res = p.map(journey, [(s, src) for s in range(N)], chunksize=20)

@@ -8,9 +8,9 @@ import common as C, families as F
 import botsim as BS
 
 START_BAL = 300.0
-RUNS = {"2020": ("2020-01-01", "Feb 2020 – Sep 2026 (every trade since the first)"), "2022": ("2022-01-01", "Jan 2022 – Sep 2026 (no 2020-21 boom)"),
-        "2024": ("2024-01-01", "Jan 2024 – Sep 2026 (most recent)")}
-END = "2026-10-01"
+RUNS = {"2020": ("2020-01-01", "Feb 2020 – 6 Nov 2026 (every trade since the first)"), "2022": ("2022-01-01", "Jan 2022 – 6 Nov 2026 (no 2020-21 boom)"),
+        "2024": ("2024-01-01", "Jan 2024 – 6 Nov 2026 (most recent)")}
+END = "2026-11-07"
 r5 = lambda v: float(f"{v:.6g}")
 
 

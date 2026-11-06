@@ -2,6 +2,8 @@
 Replays history through strategy.decide() exactly as the live bot uses it (trailing windows of
 LIVE_4H_CANDLES 4h candles and LIVE_1D_CANDLES daily candles, decision at each 4h close), with the
 research engine's fill rules on 1m bars, and compares the trades with research/engine.
+v3.0: second profit lock, stale stop at stale_h and the cooldown after a loss (strategy.stop_level / stale_moves /
+cooldown_after); the reference is research/crypto/core/v30lib.trades_v30 (xengine30).
 
     python cryptobot/dev/replay.py [BTCUSDT] [start] [end]
 """
@@ -46,7 +48,11 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
     trades = []
     pos, entry_px, entry_i, sl, dist = 0, 0.0, -1, 0.0, 0.0
     be_i = lock_i = -1
+    be_hit = False
+    cool_until = -1
     max_bars = int(p.max_hold_h * 60)
+    stale_bars = int(round(p.stale_h * 60))
+    cool_bars = int(round(p.cool_h * 60))
     for k in range(LIVE_4H_CANDLES, len(c4["t"])):
         j0 = c4["act"][k]                                  # first 1m bar after candle k closed
         if c4["t"][k] < t0 or j0 >= n1 or m["t"][j0] >= t1:
@@ -59,7 +65,9 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
         dec = S.decide(p, c4["h"][sl_], c4["l"][sl_], c4["c"][sl_], d1["c"][ds], wd, d1["h"][ds], d1["l"][ds])
 
         def close(j, px, why):
-            nonlocal pos
+            nonlocal pos, cool_until
+            if S.cooldown_after(p, pos, entry_px, px, dist):
+                cool_until = j + cool_bars
             trades.append(dict(entry_time=m["t"][entry_i], exit_time=m["t"][j], dir=pos, entry=entry_px,
                                exit=px, sl_dist=dist, reason=why, be_time=m["t"][be_i] if be_i >= 0 else m["t"][j],
                                lock_time=m["t"][lock_i] if lock_i >= 0 else m["t"][j]))
@@ -93,11 +101,15 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
             o, h, l = m["o"][j], m["h"][j], m["l"][j]
             if pos != 0 and j - entry_i >= max_bars:
                 close(j, o, "TIME")
-            if pos == 0 and order is not None:
+            if pos != 0 and stale_bars > 0 and j - entry_i == stale_bars and S.stale_moves(p, pos, entry_px, dist, o, be_hit):
+                st_ = entry_px + pos * p.stale_to * dist     # stale stop (v3.0): at this minute's open, then checked below
+                sl = max(sl, st_) if pos == 1 else min(sl, st_)
+            if pos == 0 and order is not None and j >= cool_until:
                 d, trig = order
                 if (d == 1 and h >= trig) or (d == -1 and l <= trig):
                     pos, entry_i, dist = d, j, dec.sl_dist
                     be_i = lock_i = -1
+                    be_hit = False
                     entry_px = max(trig, o) if d == 1 else min(trig, o)
                     sl = entry_px - d * dist
                     order = None
@@ -116,6 +128,10 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
                     if p.lock_R > 0 and h - entry_px >= p.lock_R * dist and sl < entry_px + p.lock_to * dist:
                         sl = entry_px + p.lock_to * dist     # profit lock, from the next bar
                         lock_i = j
+                    if p.be_R > 0 and h - entry_px >= p.be_R * dist:
+                        be_hit = True
+                    if p.lock2_R > 0 and h - entry_px >= p.lock2_R * dist and sl < entry_px + p.lock2_to * dist:
+                        sl = entry_px + p.lock2_to * dist   # second profit lock (v3.0)
             elif pos == -1:
                 if j > entry_i and o >= sl:
                     close(j, o, "SL")
@@ -128,6 +144,10 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
                     if p.lock_R > 0 and entry_px - l >= p.lock_R * dist and sl > entry_px - p.lock_to * dist:
                         sl = entry_px - p.lock_to * dist
                         lock_i = j
+                    if p.be_R > 0 and entry_px - l >= p.be_R * dist:
+                        be_hit = True
+                    if p.lock2_R > 0 and entry_px - l >= p.lock2_R * dist and sl > entry_px - p.lock2_to * dist:
+                        sl = entry_px - p.lock2_to * dist
     tr = pd.DataFrame(trades)
     for col in ("entry_time", "exit_time", "be_time", "lock_time"):
         tr[col] = C.D.to_datetime(tr[col])
@@ -140,23 +160,20 @@ def replay(m, p: S.Params, start, end, fee=C.FEE_SIDE, oi=None):
 
 
 if __name__ == "__main__":
+    import json
     sym = sys.argv[1] if len(sys.argv) > 1 else "BTCUSDT"
     start = sys.argv[2] if len(sys.argv) > 2 else "2020-09-01"
-    end = sys.argv[3] if len(sys.argv) > 3 else "2026-10-01"
-    p = S.Params(symbol=sym)
+    end = sys.argv[3] if len(sys.argv) > 3 else "2026-11-07"
+    p = S.Params(**json.loads((HERE / f"config_{sym[:-4].lower()}.json").read_text())["strategy"])
     m = C.load(sym)
     live = replay(m, p, start, end)
-    eng = C.between(F.channel_breakout(m, tf=p.tf_min, n=p.n, sl_atr=p.sl_atr, hold_h=p.max_hold_h, ema_n=p.ema_n,
-                                       atr_n=p.atr_n, sides=p.sides, trail_m=p.trail_m, trail_atr=p.trail_atr,
-                                       slope_d=p.slope_d, no_weekend=p.no_weekend, be_R=p.be_R, be_off=p.be_off,
-                                       max_ext=p.max_ext),
-                    start, end)
+    import v30lib as V                                   # research engine with the v3.0 rules (+ OI filters)
+    eng = V.trades_v30(sym, start=start, end=end)
     a = live.set_index("entry_time"); b = eng.set_index("entry_time")
     both = a.join(b, how="inner", lsuffix="_live", rsuffix="_eng")
-    print(f"live-logic replay: {len(live)} trades, {live['R'].sum():.1f}R | research engine: {len(eng)} trades, {eng['R'].sum():.1f}R")
+    print(f"live-logic replay: {len(live)} trades, {live['R'].sum():.1f}R | research engine (v30): {len(eng)} trades, {eng['R'].sum():.1f}R")
     print(f"same entry minute: {len(both)}; same exit minute: {(both.exit_time_live == both.exit_time_eng).sum()}; "
-          f"max entry price diff: {np.abs(both.entry_live - both.entry_eng).max():.2f}; "
+          f"max entry price diff: {np.abs(both.entry_live - both.entry_eng).max():.6g}; "
           f"max SL-distance diff: {(np.abs(both.sl_dist_live - both.sl_dist_eng) / both.sl_dist_eng).max() * 100:.3f}%")
     only_live = a.index.difference(b.index); only_eng = b.index.difference(a.index)
     print("only in live replay:", list(only_live[:10])); print("only in engine:", list(only_eng[:10]))
-    print(live.groupby(live.entry_time.dt.year)["R"].sum().round(1).to_dict())

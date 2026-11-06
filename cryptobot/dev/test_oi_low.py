@@ -3,9 +3,12 @@ Parity of the OI-low filter (v2.8): the live code (strategy.oi_rank / oi_low_blo
 against the research that found it (research/crypto/studies/oi_support.py), on every coin the bot trades.
   1. the block decision at every 4h close from 2022 (live rank vs the research's pandas rolling rank)
   2. the trades: replay.py (the live decision logic with the 1m fill rules) vs the research engine with the filter
+     (with the v3.0 exits / cooldown switched off, as that study's engine has the v2.8 exits; v3.0 is checked by replay.py
+     against research/crypto/core/v30lib and by test_bot_sim.py)
 
     python cryptobot/dev/test_oi_low.py [BTCUSDT,ETHUSDT,...]
 """
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -38,7 +41,8 @@ for sym in syms:
     diff = int((live != mask[ks]).sum())
     # trades
     m = X.m
-    rp = RP.replay(m, p, "2022-01-01", "2026-10-01", fee=(O.C.TAKER + O.C.SLIP, O.C.TAKER + O.C.SLIP), oi=oi)
+    p28 = dataclasses.replace(p, lock_to=1.5, lock2_R=0.0, stale_h=0.0, cool_h=0.0)       # the study's v2.8 exits
+    rp = RP.replay(m, p28, "2022-01-01", O.PERIODS[-1][2], fee=(O.C.TAKER + O.C.SLIP, O.C.TAKER + O.C.SLIP), oi=oi)
     L_, S_ = X.cond(COND)
     eng = X.run(L_, S_)
     e_live = rp.entry_time.values.astype("datetime64[m]").astype(np.int64)

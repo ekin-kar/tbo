@@ -78,7 +78,7 @@ tr.chosen td{font-weight:600;background:var(--soft)}
  <div class="tv"><div><svg id="tv" height="470" role="img" aria-label="The selected panic trade: hourly price, open interest and premium"></svg><div class="tip" id="ptip"></div>
  <div class="chart-cap" id="tvcap"></div></div><dl id="tvd"></dl></div>
 </div>
-<details open><summary>Every panic trade (2022 to Sep 2026)</summary><div class="scroll panel months"><table id="trades"></table></div></details>
+<details open><summary>Every panic trade (2022 to 6 Nov 2026)</summary><div class="scroll panel months"><table id="trades"></table></div></details>
 <h2>Every setting, one at a time</h2>
 <p class="hint">Each table changes one setting and keeps the others at the chosen values (highlighted). "Bot + sleeve" = the whole account from $300 (the bot alone: <span id="basehint"></span>). Look for broad flat areas, not single best cells: the chosen point is near the middle of each plateau, and a lucky exact value would not survive live trading.</p>
 <div class="sweeps" id="sweeps"></div>
@@ -102,7 +102,7 @@ function el(n,a,p){const e=document.createElementNS('http://www.w3.org/2000/svg'
 function seg(id,items,cur,fn){const e=document.getElementById(id);e.innerHTML=items.map((t,i)=>`<button aria-pressed="${cur(i)}">${t}</button>`).join('');e.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{fn(i);draw();});}
 const P=D.params;
 document.getElementById('rules').innerHTML=[
- ['Coins',D.coins.join(', ')+', checked after every hourly close'],
+ ['Coins',D.coins.join(', ')+(D.extra&&D.extra.length?` · v3.0 also ${D.extra.join(', ')}: their own pool of ${D.extra_share}× the units per event, at most ${D.max_extra_open} of them open at a time (biggest open-interest drop × discount first)`:'')+'; checked after every hourly close'],
  ['Signal',`over the last ${P.window_h} hours the price fell at least ${P.move_k}× its normal ${P.window_h}-hour move, open interest fell at least ${(P.oi_drop*100).toFixed(0)}%, and the futures price is at a discount to spot (premium z-score ≤ ${P.premium_z})`],
  ['Entry','buy at once (the next hour\'s open), long only'],
  ['Exits',`take-profit +${P.tp_atr} × hourly ATR; stop −${P.stop_atr} × ATR (never more than ${(P.stop_max*100).toFixed(0)}% below), moved to the entry once the price was +${P.be_atr} ATR above it; otherwise sold ${P.hold_h} hours after the entry`],
@@ -116,7 +116,7 @@ function draw(){
  document.getElementById('tiles').innerHTML=[
   [`${money(R.bot.final)} → ${money(R.both.final)}`,`final balance from $300 (${pc((R.both.final/R.bot.final-1)*100,0)})`],
   [`−${R.bot.dd.toFixed(1)}% → −${R.both.dd.toFixed(1)}%`,'worst drop: bot alone → bot + sleeve'],
-  [`${D.sleeve.events} events · ${D.sleeve.n} trades`,`panic trades 2022 to Sep 2026 (about ${(D.sleeve.events/57).toFixed(1)} a month)`]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
+  [`${D.sleeve.events} events · ${D.sleeve.n} trades`,`panic trades 2022 to 6 Nov 2026 (about ${(D.sleeve.events/58.2).toFixed(1)} a month)`]].map(([b,s])=>`<div><b>${b}</b><span>${s}</span></div>`).join('');
  const sv=document.getElementById('eq');sv.innerHTML='';const W=sv.clientWidth,H=360,L=64,Rm=140,T=10,B=24;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
  const t0=new Date(R.t0+'T00:00:00Z').getTime(),n=R.bot.bal.length,DAY=864e5,t1=t0+(n-1)*DAY,lg=S.scale==='log';
  const vals=ser.flatMap(s=>s.d.bal),mn=Math.min(...vals),mx=Math.max(...vals);
@@ -129,7 +129,7 @@ function draw(){
  const ends=ser.map(s=>({s,yv:y(s.d.bal[n-1])})).sort((a,b)=>a.yv-b.yv);let last=-99;
  for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:W-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='both'?700:500}`},sv).textContent=`${e.s.k==='bot'?'Bot':'Bot + sleeve'} ${money(e.s.d.bal[n-1])}`;}
  document.getElementById('legend').innerHTML=ser.map(s=>`<span><i style="background:${s.col}"></i>${s.l}</span>`).join('');
- document.getElementById('cap').textContent=`From $300, ${S.s} to Sep 2026. Daily closed balance; hover for values.`;
+ document.getElementById('cap').textContent=`From $300, ${S.s} to 6 Nov 2026. Daily closed balance; hover for values.`;
  const dv=document.getElementById('dd');dv.innerHTML='';const DH=170;dv.setAttribute('viewBox',`0 0 ${W} ${DH}`);
  const dmin=Math.min(-10,...ser.flatMap(s=>s.d.ddser)),ylo=Math.floor(dmin/10)*10,yd=v=>6+(v/ylo)*(DH-6-22);
  for(let v=0;v>=ylo;v-=10){el('line',{x1:L,x2:W-Rm,y1:yd(v),y2:yd(v),stroke:css('--rule')},dv);el('text',{x:L-8,y:yd(v)+4,'text-anchor':'end'},dv).textContent=v+'%';}

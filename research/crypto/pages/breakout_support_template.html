@@ -168,7 +168,7 @@ function draw(){
  const ends=ser.map(s=>({s,yv:y(s.d.bal[n-1])})).sort((a,b)=>a.yv-b.yv);let last=-99;
  if(Rm>100)for(const e of ends){const yy=Math.max(e.yv+4,last+15);last=yy;el('text',{x:Wd-Rm+6,y:yy,style:`fill:var(--ink);font-weight:${e.s.k==='win'?700:500}`},sv).textContent=`${e.s.k==='base'?'Now':'With filter'} ${money(e.s.d.bal[n-1])}`;}
  document.getElementById('legend').innerHTML=ser.map(s=>`<span><i style="background:${s.col}"></i>${s.l}</span>`).join('');
- document.getElementById('cap').textContent=`From $300, ${S.s} to Sep 2026, our 5 coins. Daily balance; hover for values.`;
+ document.getElementById('cap').textContent=`From $300, ${S.s} to 6 Nov 2026, our 5 coins. Daily balance; hover for values.`;
  const dv=document.getElementById('dd');dv.innerHTML='';const DH=160;dv.setAttribute('viewBox',`0 0 ${Wd} ${DH}`);
  const dmin=Math.min(-10,...ser.flatMap(s=>s.d.ddser)),ylo=Math.floor(dmin/10)*10,yd=v=>6+(v/ylo)*(DH-6-22);
  for(let v=0;v>=ylo;v-=10){el('line',{x1:L,x2:Wd-Rm,y1:yd(v),y2:yd(v),stroke:css('--rule')},dv);el('text',{x:L-8,y:yd(v)+4,'text-anchor':'end'},dv).textContent=v+'%';}

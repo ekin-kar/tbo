@@ -2,7 +2,7 @@
 
 **Layout (Oct 2026 cleanup):** research scripts are in `research/crypto/core/` (library), `research/crypto/pages/` (page generators + templates) and `research/crypto/studies/` (experiments); the bot's developer checks in `cryptobot/dev/`. Script names below are unchanged; see the top-level `README.md` for what is where.
 
-**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v2.8 (Oct 2026): + OI-low filter (no order while OI is in the lowest 20% of its 90 days), see the last entry.** **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
+**CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v3.0 (6 Nov 2026, live): + 16 h cooldown after a stop-out, exits lock +5R -> +2R / +8R -> +3.5R / stale stop to entry at 60 h, panic sleeve also on XRP DOGE AVAX LINK DOT LTC TRX (0.75x units pool, max 2 open); see the last section.** **v2.8 (Oct 2026): + OI-low filter (no order while OI is in the lowest 20% of its 90 days), see the last entry.** **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
 
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
 (keys, optional Telegram), risk from portfolio.json's ladder (configs' risk_pct 5 / 2.5 / 0.83 only a fallback; DOGE dropped, BNB + SOL added Oct 2026 on recent strength; size cap 8x, BTC 12x, leverage 20x, BTC 25x), shorts x0.5; step-by-step
@@ -351,3 +351,32 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
   costs a lot (6x: 2-yr typ end $8.1k vs $14.5k) for 1-4 points of drop: not adopted. Binance BTCUSDT min notional is $50
   (not $100). Deribit DVOL / federalreserve.gov blocked from the cloud; BVOL (same idea) was rejected earlier.
 
+
+## v2.9 / v3.0 research rounds (Nov 2026, data to 2026-11-06)
+- **v2.9** (`research/results/v29_REPORT.md`): live audit of 17 positions. The engine matches 16; stop R −1.10, entry slippage
+  +2.6 bps. U1–U4 and the S1–S4 sleeves all failed their gates.
+- **v3.0** (`research/results/v30_REPORT.md`, `studies/v30_deep_campaign.py`, engine `core/xengine30.py` + `core/v30lib.py`):
+  - **Protocol:** fixed-unit dev/oos, then plateau, then 40 phase copies plus nulls, then **drawdown-matched money**
+    (risk × k until dd90 ≤ base).
+  - **Scope:** 4,687 configs.
+  - **PASS:**
+    - C1 = 16h same-coin cooldown after a stop;
+    - C2 = BTC/ETH long exits: lock +5R→+2R, 2nd lock +8R→+3.5R, stale stop to 0 at 60h;
+    - C3 = alts: long channel 30, short channel 12, short EMA40;
+    - C4 = panic v2.7 on 5 coins + 7 DEV12 coins at 0.75 share, uncapped.
+  - **Package C1–C4:** x 1.33 / 1.54 / 1.21 (2020-23 / 2022-23 / 2024-26); bootstrap median $25.7k vs $18.95k; dd90 56% vs 65%.
+  - **Status:** DEPLOYED as TBO v3.0 (user decision, 6 Nov 2026): C1 + C2 (all coins, both sides; breakeven stays at
+    +1.5R, lock +5R -> +2R) + C4 with `max_extra_open` 2. C3 was skipped (grid edges, +1% money).
+    - Comparison: `studies/v30_deploy.py` -> `results/v30_deploy.csv`. Page definition from $300: 2022 $1.125M / 29.8%
+      (base $689k / 28.2%); 2024 $61.0k / 34.0% (base $50.3k / 36.1%); bootstrap median $23.4k vs $18.95k; dd90 56.7% vs 64.6%.
+    - Live code: `strategy.py` (stop_level, stale_moves, cooldown_after), `bot.py` (lock2, stale check once at 60 h,
+      cooldown with the held 4h order released at its end), `config_*.json`, `panic.py` (Sleeve.select, exit-hour rule),
+      `panic.json` (extra_coins, extra_share, max_extra_open).
+    - Research: `build_trades.py v30`, botsim TAG v30, `panic_sleeve.events` (extra coins by default; `extra_coins=()` = v2.7).
+    - Parity: see the cryptobot README, "Parity tests v3.0". Every remaining difference is in an old category.
+  - **Rejected:**
+    - veto (11/11 premise true, but luck-level gain);
+    - active exits; breadth sizing (causal gap only 0.56 → 0.85R);
+    - bigger shorts (money ok from 2022, but every variant is worse in 2020-23);
+    - spot / OI / premium / vol filters; N1–N3 sleeves.
+- `botsim.py` default trade list is now `v28nov` (= v28 + Oct–Nov 2026). The pages are rebuilt to 6 Nov 2026.

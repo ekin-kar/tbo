@@ -25,7 +25,7 @@ The full research log (every idea tested, what worked and what did not): [`HANDO
 ## Common commands (from the repo root)
 
 ```
-python research/crypto/core/build_trades.py v28         # rebuild the trade list every page uses (v2.8 rules)
+python research/crypto/core/build_trades.py v30         # rebuild the trade list every page uses (v3.0 rules, botsim's default)
 python research/crypto/pages/make_trades_html.py        # rebuild a page (any make_*.py)
 python research/crypto/core/three_months.py             # what 3 months / 2 years can look like
 python cryptobot/dev/test_bot_sim.py BTCUSDT 2024-01-01 2025-01-01   # the bot vs the backtest on a simulated exchange

@@ -13,6 +13,12 @@ COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 WT = {"BTCUSDT": 2.0, "ETHUSDT": 1.0, "BNBUSDT": 1 / 3, "SOLUSDT": 1 / 3, "ADAUSDT": 1 / 3}
 OUT = C.D.CACHE / "grid_v25.csv"
 EX = C.ROOT / "data" / "extra"
+EX2 = C.ROOT / "data" / "extra2"                       # coins outside the 12 (fetch_extend.py hold / oi_support.py)
+
+
+def _mfile(sym):
+    f = EX / f"{sym}_metrics_1h.csv.gz"
+    return f if f.exists() else EX2 / f"{sym}_metrics_1h.csv.gz"
 _D, _OI = {}, {}
 
 STOPS = [("atr", dict(sl_mode="atr", sl_atr=k)) for k in (0.75, 1.0, 1.5, 2.0)] + \
@@ -24,7 +30,7 @@ GRID = [dict(tf=tf, n=n, stop=si, be_R=be, hold_h=h) for tf, n, si, be, h in
 
 def oi(sym):
     if sym not in _OI:
-        g = pd.read_csv(EX / f"{sym}_metrics_1h.csv.gz", usecols=["create_time", "sum_open_interest_value"])
+        g = pd.read_csv(_mfile(sym), usecols=["create_time", "sum_open_interest_value"])
         t = pd.to_datetime(g.create_time).values.astype("datetime64[m]").astype(np.int64)
         o = np.argsort(t); v = g.sum_open_interest_value.to_numpy()[o]
         _OI[sym] = (t[o], pd.Series(np.where(v > 0, v, np.nan)).ffill().to_numpy())
@@ -47,7 +53,7 @@ def oi_low_skip(sym, tf, days=90, rank=0.2):
     half of them), at the last row before the order is placed (= cryptobot/strategy.oi_rank and studies/oi_support.py)."""
     key = ("low", sym, days)
     if key not in _OI:
-        g = pd.read_csv(EX / f"{sym}_metrics_1h.csv.gz", usecols=["create_time", "sum_open_interest_value"])
+        g = pd.read_csv(_mfile(sym), usecols=["create_time", "sum_open_interest_value"])
         t = pd.to_datetime(g.create_time).values.astype("datetime64[m]").astype(np.int64)
         o = np.argsort(t, kind="stable"); t, v = t[o], g.sum_open_interest_value.to_numpy()[o]
         keep = np.r_[t[1:] != t[:-1], True]; t, v = t[keep], v[keep]          # a duplicated hour: the later row

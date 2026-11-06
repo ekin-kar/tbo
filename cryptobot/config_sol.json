@@ -20,11 +20,18 @@
     "be_R": 1.5,
     "be_off": 0.0,
     "lock_R": 5.0,
-    "lock_to": 1.5,
+    "lock_to": 2.0,
     "max_ext": 4.0,
     "oi_lookback_h": 72,
     "oi_min_chg": -0.03,
     "oi_low_days": 90,
-    "oi_low_rank": 0.2
+    "oi_low_rank": 0.2,
+    "lock2_R": 8.0,
+    "lock2_to": 3.5,
+    "stale_h": 60,
+    "stale_thr": -0.3,
+    "stale_to": 0.0,
+    "cool_h": 16,
+    "cool_R": -0.5
   }
 }

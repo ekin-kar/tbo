@@ -179,6 +179,12 @@ if pk and ps:
             for n in (1, 2):
                 res(risk / 0.05 / n >= f["min_notional"], f"{sym} panic position with {n} coin(s) in the event: ${risk / 0.05 / n:.2f} vs Binance minimum ${f['min_notional']:g}",
                     warn=True)
+        sh = float(pcfg.get("extra_share", 0.75))                  # v3.0 extra coins: their own pool, at most max_extra_open open
+        for sym in pcfg.get("extra_coins", []):
+            f = y.exchange_info(sym)
+            for n in (1, 2):
+                res(risk * sh / 0.05 / n >= f["min_notional"], f"{sym} (extra coin, {sh:g}x units) panic position with {n} extra coin(s) in the event: "
+                    f"${risk * sh / 0.05 / n:.2f} vs Binance minimum ${f['min_notional']:g}", warn=True)
         try:
             y.open_algo_orders(); x.premium_klines("BTCUSDT", "1h", 5); x.open_interest_hist("BTCUSDT", period="5m", limit=5)
             res(True, "algo orders, premium index and 5-minute open interest reachable")

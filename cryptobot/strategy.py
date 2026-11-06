@@ -20,7 +20,14 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
   Trail exit : at a 4h close, a long is closed if close < highest high of the last trail_m candles
                - trail_atr x ATR (mirror for shorts).
   Breakeven  : once price has gone be_R x the stop distance in favour, the stop moves to entry + be_off x dist.
-  Profit lock: once price has gone lock_R x the stop distance in favour, the stop moves to entry + lock_to x dist (v2.6).
+  Profit lock: once price has gone lock_R x the stop distance in favour, the stop moves to entry + lock_to x dist (v2.6;
+               v3.0: +5R -> +2R), and a second step at lock2_R -> lock2_to (v3.0: +8R -> +3.5R).
+  Stale stop : (v3.0) exactly stale_h hours after the fill, a trade that never reached +be_R and is above stale_thr R
+               (at that minute's price) gets its stop moved to entry + stale_to x dist (0 = the entry; if the price is
+               below the entry the trade is closed at once).
+  Cooldown   : (v3.0) after a trade on this coin closed below cool_R (price R: (exit - entry) x side / dist, i.e. a
+               stop-out), no entry fills for cool_h hours from the exit minute; an order of a 4h close inside the
+               cooldown waits and is placed when the cooldown ends (until that candle's order expires).
   Time exit  : closed max_hold_h hours after the fill. No take profit.
 
 Indicators match research/engine/indicators.py (cTrader style): EMA seeded with the first value,
@@ -54,6 +61,13 @@ class Params:
     oi_min_chg: float = -0.03    # skip new orders when OI changed by this much or less over the lookback
     oi_low_days: int = 0         # OI-low filter: window in days of hourly rows; 0 = off
     oi_low_rank: float = 0.2     # skip new orders while OI ranks below this fraction of its window
+    lock2_R: float = 0.0         # v3.0 second profit lock: at +lock2_R the stop moves to +lock2_to (0 = off)
+    lock2_to: float = 0.0
+    stale_h: float = 0.0         # v3.0 stale stop: hours after the fill (0 = off)
+    stale_thr: float = -0.3      # ... applied if the trade is above this R then (and never reached +be_R)
+    stale_to: float = 0.0        # ... stop moves to entry + stale_to x dist
+    cool_h: float = 0.0          # v3.0 cooldown: hours without entry fills after a loss below cool_R (0 = off)
+    cool_R: float = -0.5
 
     def to_dict(self):
         return asdict(self)
@@ -129,6 +143,30 @@ def oi_rank(hist, order_ms, window_rows, min_rows):
 
 def oi_low_blocks(p: "Params", rank):
     return p.oi_low_days > 0 and rank is not None and rank < p.oi_low_rank
+
+
+def stop_level(p: "Params", side, entry, dist, be_done=False, lock_done=False, lock2_done=False, stale_done=False):
+    """The stop price for the stages reached so far (the most favourable of them; the initial stop if none)."""
+    lv = [entry - side * dist]
+    if be_done:
+        lv.append(entry + side * p.be_off * dist)
+    if stale_done:
+        lv.append(entry + side * p.stale_to * dist)
+    if lock_done:
+        lv.append(entry + side * p.lock_to * dist)
+    if lock2_done:
+        lv.append(entry + side * p.lock2_to * dist)
+    return max(lv) if side == 1 else min(lv)
+
+
+def stale_moves(p: "Params", side, entry, dist, price, be_done):
+    """At the stale moment: True if the stop moves to entry + stale_to x dist (never reached +be_R, above stale_thr R)."""
+    return p.stale_h > 0 and dist > 0 and not be_done and side * (price - entry) > p.stale_thr * dist
+
+
+def cooldown_after(p: "Params", side, entry, exit_px, dist):
+    """True if a trade that closed at exit_px starts the cooldown (price R below cool_R)."""
+    return p.cool_h > 0 and dist > 0 and side * (exit_px - entry) / dist < p.cool_R
 
 
 @dataclass

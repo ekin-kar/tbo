@@ -11,6 +11,8 @@ Loop (every `poll_s` seconds):
   * time exit after max_hold_h; if a position has no stop loss (e.g. after a restart) one is placed
   * open-risk cap (v2.5, portfolio.json): a coin's new trade is shrunk (or skipped) so that the risk of all open
     positions not yet at breakeven stays <= the cap; BTC is exempt (never shrunk) but its risk counts for the others
+  * v3.0: second profit lock (+8R -> stop +3.5R), stale stop (60 h after the fill, never at +1.5R and above -0.3R: stop
+    to the entry) and a 16 h cooldown after a loss (no entry fills; the 4h order waits and is placed when it ends)
 State (entry time, stop distance, order ids) is kept in state_<SYMBOL>.json next to the config, so a
 restart picks up where it left off; the exchange is always the source of truth for the position.
 """
@@ -31,7 +33,7 @@ from binance_futures import Futures, BinanceError      # noqa: E402
 from oi_history import OIHistory                       # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "2.8"
+VERSION = "3.0"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -78,7 +80,12 @@ class Bot:
         if self.state_path.exists():
             return json.loads(self.state_path.read_text())
         return dict(last_candle=0, entry_id=None, entry_side=0, sl_dist=0.0, sl_id=None, entry_ms=0,
-                    best=0.0, be_done=False, lock_done=False)
+                    best=0.0, be_done=False, lock_done=False, lock2_done=False, stale_done=False, cool_until=0)
+
+    def reset_trade(self):
+        """Forget the closed trade (the cooldown stays)."""
+        self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False, lock2_done=False,
+                       stale_done=False, stale_checked=False, sl_trig=0.0)
 
     def save(self):
         tmp = self.state_path.with_suffix(".tmp")
@@ -123,6 +130,10 @@ class Bot:
                 rows.append(f"At {self.P(entry_px + side * self.p.be_R * d)} (+{self.p.be_R:g}R) the stop moves to the entry")
             if self.p.lock_R > 0:
                 rows.append(f"At {self.P(entry_px + side * self.p.lock_R * d)} (+{self.p.lock_R:g}R) the stop locks +{self.p.lock_to:g}R")
+            if self.p.lock2_R > 0:
+                rows.append(f"At {self.P(entry_px + side * self.p.lock2_R * d)} (+{self.p.lock2_R:g}R) the stop locks +{self.p.lock2_to:g}R")
+            if self.p.stale_h > 0:
+                rows.append(f"Not at +{self.p.be_R:g}R after {self.p.stale_h:g} h (and above {self.p.stale_thr:g}R): stop to the entry")
             rows.append(f"Size {notify.esc(fmt(q, self.f['step']))} {self.coin} = {notify.usd(q * entry_px)} ({q * entry_px / eq:.1f}× the balance)")
             rows.append(f"Risk <b>{notify.usd(risk)}</b> = {risk / eq * 100:.2f}% of {notify.usd(eq)}")
             rows.append(f"Opened {notify.when(e_ms)} · time exit {notify.when(e_ms + self.p.max_hold_h * 3600_000)} ({notify.tz_label()})")
@@ -337,8 +348,26 @@ class Bot:
         return 0.0, note + ": no room"
 
     # ── actions ──
+    def start_cooldown(self, exit_px, exit_ms):
+        """v3.0: a trade that closed below cool_R (price R) starts cool_h hours without entry fills on this coin."""
+        side, entry, dist = self.st.get("entry_side") or 0, self.st.get("fill_px") or 0.0, self.st.get("sl_dist") or 0.0
+        if not (side and entry and S.cooldown_after(self.p, side, entry, exit_px, dist)):
+            return
+        until = exit_ms - exit_ms % 60_000 + int(round(self.p.cool_h * 60)) * 60_000
+        self.st["cool_until"] = max(int(self.st.get("cool_until") or 0), until)
+        log.info(f"COOLDOWN: loss {side * (exit_px - entry) / dist:+.2f}R (< {self.p.cool_R:g}R): no new {self.coin} entry until {utc(until)} UTC")
+        self.tg(f"⏸ <b>{self.coin} cooldown</b>\nAfter the loss no new {self.coin} trade until {notify.when(until)}"
+                f" ({self.p.cool_h:g} h, {notify.tz_label()})")
+
+    def cooling(self, now=None):
+        return (now or self.x.now_ms()) < int(self.st.get("cool_until") or 0)
+
     def close_position(self, amt, why, tg_why=None):
         side = "SELL" if amt > 0 else "BUY"
+        try:
+            exit_px, exit_ms = self.x.last_price(self.sym), self.x.now_ms()
+        except Exception:
+            exit_px, exit_ms = 0.0, self.x.now_ms()
         log.info(f"EXIT ({tg_why or why}): closing {abs(amt):g} {self.coin} at market")
         if not self.dry:
             self.x.market(self.sym, side, fmt(abs(amt), self.f["step"]), reduce_only=True,
@@ -347,7 +376,9 @@ class Bot:
                 time.sleep(1.5)                         # let the fill reach the trade history
         self.report_close(tg_why or why)
         self.cancel(self.st.get("sl_id"))
-        self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
+        if exit_px:
+            self.start_cooldown(exit_px, exit_ms)
+        self.reset_trade()
         self.save()
 
     def place_sl(self, amt, entry_px):
@@ -357,12 +388,10 @@ class Bot:
             k4, _ = self.candles()
             dist = self.p.sl_atr * S.atr([k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4], self.p.atr_n)[-1]
             self.st["sl_dist"] = dist
-        trig = entry_px - side * dist
-        if self.st.get("be_done"):                      # breakeven reached: stop at entry + be_off x dist
-            trig = entry_px + side * self.p.be_off * dist
-        if self.st.get("lock_done"):                    # profit lock reached: stop at entry + lock_to x dist
-            trig = entry_px + side * self.p.lock_to * dist
+        trig = S.stop_level(self.p, side, entry_px, dist, be_done=self.st.get("be_done"), lock_done=self.st.get("lock_done"),
+                            lock2_done=self.st.get("lock2_done"), stale_done=self.st.get("stale_done"))   # most favourable stage
         trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
+        self.st["sl_trig"] = trig
         log.info(f"STOP LOSS now at {self.P(trig)} (entry {self.P(entry_px)}, size {abs(amt):g} {self.coin})")
         if self.dry:
             return trig
@@ -427,6 +456,7 @@ class Bot:
             self.cancel(self.st["entry_id"])
             self.st["entry_id"] = None
         self.st.update(entry_trig=0.0, entry_qty=0.0)    # (also ends an entry waiting for room under the cap)
+        self.st.pop("cool_order", None)                 # (and an order waiting for the cooldown to end)
         for o in self.my_algo_orders():                 # stray entry orders (e.g. after a crash)
             if "_in_" in o["clientAlgoId"]:
                 self.cancel(o["algoId"])
@@ -469,8 +499,9 @@ class Bot:
             ep = self.st.get("fill_px") or entry_px
             d_ = self.st.get("sl_dist") or 0.0
             r_now = side_ * (c[-1] - ep) / d_ if d_ else 0.0
-            stage = "profit locked at +%gR" % self.p.lock_to if self.st.get("lock_done") else "stop at breakeven" if self.st.get("be_done") else "stop " + self.P(ep - side_ * d_)
-            risk_open = 0.0 if self.st.get("be_done") else abs(amt) * d_
+            stage = ("profit locked at +%gR" % self.p.lock2_to if self.st.get("lock2_done") else "profit locked at +%gR" % self.p.lock_to if self.st.get("lock_done")
+                     else "stop at breakeven" if self.st.get("be_done") or self.st.get("stale_done") else "stop " + self.P(ep - side_ * d_))
+            risk_open = 0.0 if self.st.get("be_done") or self.st.get("stale_done") else abs(amt) * d_
             status = f"● in a {'long' if side_ > 0 else 'short'} since {notify.when(self.st.get('entry_ms') or self.x.now_ms())} · {notify.num(r_now, 1, sign=True)}R now · {stage}"
         elif self.paused():
             status = "paused (PAUSE file): no new orders"
@@ -487,7 +518,7 @@ class Bot:
         if self.paused():
             log.info("PAUSE file present: no new entry orders (open positions are still managed)")
         if amt == 0 and not self.paused():
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
+            self.reset_trade()
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
                 if trig is None or blocked or low_blocked:
                     continue
@@ -495,6 +526,14 @@ class Bot:
                 if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
                     log.warning(f"invalid level {trig} / stop distance {dec.sl_dist}: no order")
                     continue
+                if self.cooling():                      # v3.0 cooldown after a loss: the order waits until it ends
+                    cu = int(self.st["cool_until"])
+                    self.st["cool_order"] = dict(side=side, trig=trig, sl_dist=dec.sl_dist, expire=close_ms + self.p.tf_min * 60_000)
+                    log.info(f"cooldown until {utc(cu)} UTC: {'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])} "
+                             f"placed then if this candle's order is still valid")
+                    status = (f"{'▲ buy' if side == 1 else '▼ sell'} stop {self.P(trig)} waits: cooldown after a loss until "
+                              f"{notify.when(cu)}" + (" (after this candle: no order)" if cu >= self.st["cool_order"]["expire"] else ""))
+                    break
                 try:
                     qty, note, no_room = self.size(dec.sl_dist, trig, side)
                 except Exception as e:                  # cap on but the account cannot be read: add no risk blind
@@ -593,24 +632,87 @@ class Bot:
                 amt, entry_px = self.x.position(self.sym)
             if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
                 self.check_breakeven(amt, entry_px)
+            if self.st.get("entry_ms") and self.p.stale_h > 0 and not self.st.get("stale_checked"):
+                at = self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + int(round(self.p.stale_h * 60)) * 60_000
+                if now >= at:
+                    self.check_stale(amt, entry_px)
             if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
                 self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)", f"time exit after {self.p.max_hold_h / 24:g} days")
         elif self.st.get("entry_ms"):
             why = "closed outside the bot (by hand?)"
             try:
                 if self.st.get("sl_id") and self.x.algo_order(algo_id=self.st["sl_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
-                    why = ("profit-lock stop (+%gR)" % self.p.lock_to if self.st.get("lock_done") else
-                           "breakeven stop" if self.st.get("be_done") else "stop loss")
+                    why = ("profit-lock stop (+%gR)" % self.p.lock2_to if self.st.get("lock2_done") else
+                           "profit-lock stop (+%gR)" % self.p.lock_to if self.st.get("lock_done") else
+                           "breakeven stop" if self.st.get("be_done") else "stale stop (at the entry)" if self.st.get("stale_done") else "stop loss")
             except Exception:
                 why = "stop loss or closed by hand"
             log.info(f"position closed: {why}")
             self.report_close(why)
             self.cancel(self.st.get("sl_id"))
-            self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False)
+            exit_ms = now - 60_000                      # the stop filled since the last poll (exact time if Binance says)
+            try:
+                tt = int(self.x.algo_order(algo_id=self.st["sl_id"]).get("triggerTime") or 0) if self.st.get("sl_id") else 0
+                if 0 < tt <= now:
+                    exit_ms = tt
+            except Exception:
+                pass
+            self.start_cooldown(self.st.get("sl_trig") or self.x.last_price(self.sym), exit_ms)
+            self.reset_trade()
             self.save()
+        elif self.st.get("cool_order"):
+            self.release_cooldown(now)
         elif self.st.get("entry_trig") and now - self.st.get("cap_seen_ms", 0) >= 60_000:
             self.st["cap_seen_ms"] = now
             self.resize_entry()
+
+    def release_cooldown(self, now):
+        """v3.0: the cooldown has ended inside the candle whose order was held back: place it now (at market if the price
+        is already past the level, as the backtest fills a waiting stop order at that minute's open)."""
+        co = self.st["cool_order"]
+        if now >= co["expire"]:
+            self.st.pop("cool_order", None); self.save()
+            return
+        if self.cooling(now) or self.paused():
+            return
+        self.st.pop("cool_order", None)
+        side, trig, dist = co["side"], co["trig"], co["sl_dist"]
+        try:
+            qty, note, no_room = self.size(dist, trig, side)
+        except Exception as e:
+            log.warning(f"open risk unavailable ({e}): no entry order after the cooldown this candle")
+            self.save()
+            return
+        self.st.update(sl_dist=dist, entry_side=side, entry_from=now)
+        if no_room:
+            log.info(f"cooldown over, but the open-risk cap is full: {'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])} waits for room")
+            self.st.update(entry_trig=trig, entry_qty=0.0); self.save()
+            return
+        if qty <= 0:
+            self.save()
+            return
+        log.info(f"COOLDOWN over: entry order {'BUY' if side == 1 else 'SELL'} {fmt(qty, self.f['step'])} stop {fmt(trig, self.f['tick'])}"
+                 + (f" ({note})" if note else ""))
+        if not self.dry:
+            self.place_entry(side, trig, qty)
+        self.save()
+
+    def check_stale(self, amt, entry_px):
+        """v3.0, once at stale_h after the fill: a trade that never reached +be_R and is above stale_thr R gets its stop at
+        entry + stale_to x dist (closed at market if the price is already below it)."""
+        self.st["stale_checked"] = True                  # (checked once, at that minute, as the backtest)
+        side, dist = (1 if amt > 0 else -1), self.st.get("sl_dist") or 0.0
+        px = self.x.last_price(self.sym)
+        if not S.stale_moves(self.p, side, entry_px, dist, px, self.st.get("be_done")):
+            self.save()
+            return
+        self.st["stale_done"] = True
+        log.info(f"STALE STOP: {self.p.stale_h:g} h without +{self.p.be_R:g}R ({side * (px - entry_px) / dist:+.2f}R now): stop moves to the entry")
+        self.cancel(self.st.get("sl_id")); self.st["sl_id"] = None
+        stop = self.place_sl(amt, entry_px)
+        if stop:
+            self.tg(f"⏳ <b>{self.coin} stale trade</b>\n{self.p.stale_h:g} h without reaching +{self.p.be_R:g}R: stop moved to the entry {self.P(stop)}")
+        self.save()
 
     def resize_entry(self):
         """Once a minute while an entry order waits: keep it inside the open-risk cap as the other coins fill, reach
@@ -684,7 +786,8 @@ class Bot:
         entry + lock_to x dist once it went lock_R x dist (profit lock, v2.6)."""
         be_left = self.p.be_R > 0 and not self.st.get("be_done")
         lock_left = self.p.lock_R > 0 and not self.st.get("lock_done")
-        if not (be_left or lock_left) or not self.st.get("sl_dist"):
+        lock2_left = self.p.lock2_R > 0 and not self.st.get("lock2_done")
+        if not (be_left or lock_left or lock2_left) or not self.st.get("sl_dist"):
             return
         side = 1 if amt > 0 else -1
         start = self.st.get("be_from") or (self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + 60_000)
@@ -704,6 +807,9 @@ class Bot:
         if lock_left and side * (best - entry_px) >= self.p.lock_R * self.st["sl_dist"]:
             log.info(f"PROFIT LOCK: price reached {self.P(best)} (+{self.p.lock_R:g}R): stop moves to +{self.p.lock_to:g}R")
             self.st["lock_done"] = True; moved = True
+        if lock2_left and side * (best - entry_px) >= self.p.lock2_R * self.st["sl_dist"]:
+            log.info(f"PROFIT LOCK 2: price reached {self.P(best)} (+{self.p.lock2_R:g}R): stop moves to +{self.p.lock2_to:g}R")
+            self.st["lock2_done"] = True; moved = True
         if moved:
             old = self.st.get("sl_id")
             self.cancel(old)
@@ -711,7 +817,10 @@ class Bot:
             stop = self.place_sl(amt, entry_px)
             if stop:
                 risk = self.st.get("risk_usdt") or abs(amt) * self.st["sl_dist"]
-                if self.st.get("lock_done") and lock_left:
+                if self.st.get("lock2_done") and lock2_left:
+                    self.tg(f"🔒 <b>{self.coin} profit locked higher</b>\nPrice reached {self.P(best)} (+{self.p.lock2_R:g}R) · "
+                            f"stop moved to {self.P(stop)} = +{self.p.lock2_to:g}R ({notify.usd(self.p.lock2_to * risk, sign=True)} at worst)")
+                elif self.st.get("lock_done") and lock_left:
                     self.tg(f"🔒 <b>{self.coin} profit locked</b>\nPrice reached {self.P(best)} (+{self.p.lock_R:g}R) · "
                             f"stop moved to {self.P(stop)} = +{self.p.lock_to:g}R ({notify.usd(self.p.lock_to * risk, sign=True)} at worst)")
                 else:
@@ -738,7 +847,8 @@ class Bot:
                  f"(shorts x{self.short_mult:g}) · cap {'exempt' if exempt else f'{self.cap_frac(eq) * 100:g}%'} · "
                  f"size up to {self.max_lev:g}x the balance")
         log.debug(f"{self.sym} on {self.x.base} | risk from {'the ladder in portfolio.json' if self.ladder_row(eq) else 'risk_pct'} | "
-                  f"profit lock +{self.p.lock_R}R -> +{self.p.lock_to}R | {self.p.to_dict()}")
+                  f"profit lock +{self.p.lock_R}R -> +{self.p.lock_to}R, +{self.p.lock2_R}R -> +{self.p.lock2_to}R | stale {self.p.stale_h} h | "
+                  f"cooldown {self.p.cool_h} h after < {self.p.cool_R}R | {self.p.to_dict()}")
         tf_ms = self.p.tf_min * 60_000
         last_sync = time.time()
         while True:

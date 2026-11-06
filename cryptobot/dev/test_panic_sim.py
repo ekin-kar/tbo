@@ -1,9 +1,11 @@
 """The live panic sleeve (panic.py) on a simulated exchange fed with history, vs the research (panic_sleeve.events).
-    python cryptobot/dev/test_panic_sim.py [start] [end]       # default 2022-01-01 .. 2026-10-01
+    python cryptobot/dev/test_panic_sim.py [start] [end]       # default 2022-01-01 .. 2026-11-07
 1. Signal parity: Sleeve.check_hour (the live data assembly: closed hourly bars, open interest at :55, premium) at every
-   research signal hour, the hours around them and 3,000 random hours -> the same coins must trigger.
-2. Trades: the sleeve's real order logic (market buy, take-profit / stop orders on the exchange, stop to entry,
-   12 h exit) on 1-minute prices; compared trade by trade with the research's hourly-bar simulation.
+   research signal hour of every coin (core + v3.0 extra coins), the hours around them and 3,000 random hours -> exactly
+   the same coins must trigger (research: panic_sleeve.candidates, before the one-trade-per-coin rule).
+2. Trades: one chronological run of the sleeve's real logic (Sleeve.select: core coins + at most max_extra_open extra
+   coins ranked by |doi| x |pz|; market buy, take-profit / stop orders on the exchange, stop to entry, 12 h exit) on
+   1-minute prices; compared trade by trade (coin, entry hour, units share) with panic_sleeve.events.
 Needs the research data (data/ 1m candles + data/extra open interest / premium)."""
 import sys, json, time, random
 from pathlib import Path
@@ -16,7 +18,10 @@ import common as C
 from binance_futures import BinanceError
 
 HOUR, MIN = 3_600_000, 60_000
-A, B_ = (sys.argv[1] if len(sys.argv) > 1 else "2022-01-01"), (sys.argv[2] if len(sys.argv) > 2 else "2026-10-01")
+A, B_ = (sys.argv[1] if len(sys.argv) > 1 else "2022-01-01"), (sys.argv[2] if len(sys.argv) > 2 else "2026-11-07")
+TICK = {"BTCUSDT": (0.1, 0.001), "ETHUSDT": (0.01, 0.001), "BNBUSDT": (0.01, 0.01), "SOLUSDT": (0.01, 0.01), "ADAUSDT": (0.0001, 1.0),
+        "XRPUSDT": (0.0001, 0.1), "DOGEUSDT": (0.00001, 1.0), "AVAXUSDT": (0.001, 1.0), "LINKUSDT": (0.001, 0.01),
+        "DOTUSDT": (0.001, 0.1), "LTCUSDT": (0.01, 0.001), "TRXUSDT": (0.00001, 1.0)}
 
 
 class Fake:
@@ -32,8 +37,7 @@ class Fake:
     # market data
     def now_ms(self): return self.now
     def exchange_info(self, s):
-        tick = {"BTCUSDT": 0.1, "ETHUSDT": 0.01, "BNBUSDT": 0.01, "SOLUSDT": 0.01, "ADAUSDT": 0.0001}[s]
-        step = {"BTCUSDT": 0.001, "ETHUSDT": 0.001, "BNBUSDT": 0.01, "SOLUSDT": 0.01, "ADAUSDT": 1.0}[s]
+        tick, step = TICK[s]
         return dict(tick=tick, step=step, min_qty=step, mkt_step=step, mkt_max=1e9, min_notional=5.0, status="TRADING")
     def klines(self, s, interval, limit, start_ms=None):
         if interval == "1h":
@@ -73,7 +77,7 @@ class Fake:
         if self.algo.get(algo_id, {}).get("status") == "NEW": self.algo[algo_id]["status"] = "CANCELED"
     def algo_order(self, algo_id=None, client_id=None):
         if algo_id not in self.algo: raise BinanceError(400, -2013, "no such order")
-        return {"algoStatus": self.algo[algo_id]["status"]}
+        return {"algoStatus": self.algo[algo_id]["status"], "triggerTime": self.algo[algo_id].get("triggerTime", 0)}
     def open_algo_orders(self, symbol=None): return [dict(algoId=i, **v) for i, v in self.algo.items() if v["status"] == "NEW"]
     def user_trades(self, s, limit=100, start_ms=None, end_ms=None): return [f for f in self.fills[s] if f["time"] >= (start_ms or 0)]
     def step_minute(self):
@@ -88,67 +92,79 @@ class Fake:
                 px = max(o["trig"], d["o"][j])
             else:
                 continue
-            q = self.pos[o["s"]]; self.pos[o["s"]] = 0.0; o["status"] = "FINISHED"
+            q = self.pos[o["s"]]; self.pos[o["s"]] = 0.0; o["status"] = "FINISHED"; o["triggerTime"] = self.now
             self.fills[o["s"]].append(dict(side="SELL", qty=q, price=px, time=self.now, realizedPnl=(px - self.entry[o["s"]]) * q, commission=0))
 
 
 def main():
-    cfg = PN.load_cfg(); coins = cfg["coins"]
-    ev = R.events(coins, start=A, end=B_)
+    cfg = PN.load_cfg(); core, extra = cfg["coins"], cfg.get("extra_coins", [])
+    coins = core + extra
+    kw = dict(extra_coins=extra, extra_share=cfg.get("extra_share", 0.75), max_extra_open=cfg.get("max_extra_open"))
+    ev = R.events(core, start=A, end=B_, **kw)
+    cand = pd.concat([R.candidates(s) for s in coins], ignore_index=True)
+    cand = cand[(cand.t >= A) & (cand.t < B_)]
     fx = Fake(coins)
     PN.Futures = lambda *a, **k: fx
     sl = PN.Sleeve(cfg); sl.st = {"trades": {}, "last_hour": 0}; sl.save = lambda: None; sl.tg = lambda *a: None
-    # 1. signal parity
-    sig_hours = sorted(set(int(t.value // 10**6) - HOUR for t in ev.t))           # the hour whose close triggered
+    # 1. signal parity against the raw research signals (no open trades in the probe)
+    want = {}
+    for r in cand.itertuples():
+        want.setdefault(int(r.t.value // 10**6) - HOUR, set()).add(r.sym)
+    sig_hours = sorted(want)
     rnd = random.Random(1); t0, t1 = pd.Timestamp(A).value // 10**6, pd.Timestamp(B_).value // 10**6
     probe = set(sig_hours) | {h + d * HOUR for h in sig_hours for d in (-2, -1, 1, 2)} | {t0 + rnd.randrange((t1 - t0) // HOUR) * HOUR for _ in range(3000)}
-    want = {}
-    for _, r in ev.iterrows(): want.setdefault(int(r.t.value // 10**6) - HOUR, set()).add(r.sym)
-    miss = extra = 0; checked = 0
+    miss = extra_ = checked = 0
     for h in sorted(probe):
         fx.now = h + HOUR + 31_000
         sl.st["trades"] = {}
         hits = sl.check_hour(h)
         if hits is None: continue
         got = {s for s, _ in hits}; exp = want.get(h, set()); checked += 1
-        # the research skips a coin while it is in a trade; the probe has no open trades, so only check expected <= got
-        miss += len(exp - got)
-        extra += len(got - exp) if h not in want and all(abs(h - w) > 14 * HOUR for w in want) else 0
-    print(f"signal parity: {checked} hours checked, research signals missed by the live code: {miss}, live signals far from any research signal: {extra}")
-    # 2. trades through the live order logic
-    res = []
+        miss += len(exp - got); extra_ += len(got - exp)
+    print(f"signal parity ({len(coins)} coins): {checked} hours checked, research signals missed by the live code: {miss}, live signals the research does not have: {extra_}")
+    # 2. one chronological run of the live logic
+    sl.st["trades"] = {}
+    opened = []
+    fx.now = sig_hours[0]
     for h in sig_hours:
-        if any(tr for tr in sl.st["trades"].values()):
-            pass
-        fx.now = h + HOUR                                  # the exchange clock at the hourly close
-        fx.now += 0                                       # market order fills at the next hour's open
+        target = h + HOUR
+        if target < fx.now:
+            continue
+        while fx.now < target:
+            if sl.st["trades"]:
+                fx.step_minute(); fx.now += MIN; sl.manage()
+            else:
+                fx.now = target
         hits = sl.check_hour(h)
-        if not hits: continue
-        hits = [(s, i) for s, i in hits if s not in sl.st["trades"]]
-        for s, info in hits:
-            sl.open_trade(s, info, len(hits), 10000.0, 3000.0)
-        end = fx.now + int(cfg["signal"]["hold_h"]) * HOUR + 2 * MIN
-        while fx.now < end and sl.st["trades"]:
-            fx.step_minute(); fx.now += MIN
-            sl.manage()
-        for s in list(sl.st["trades"]): sl.close(s, "test end")
-    # the sleeve's closed trades are reported through finish(); rebuild them from the fills
+        if not hits:
+            continue
+        for s, info, n, u in sl.select(hits):
+            sl.open_trade(s, info, n, 10000.0, 3000.0, units=u)
+            opened.append(dict(sym=s, t=pd.Timestamp(fx.now, unit="ms"), share=u / float(cfg.get("units", 3)) / n))
+    while sl.st["trades"]:
+        fx.step_minute(); fx.now += MIN; sl.manage()
+    res = []
     for s in coins:
         f = fx.fills[s]
         for b, x in zip(f[0::2], f[1::2]):
             res.append(dict(sym=s, t=pd.Timestamp(b["time"], unit="ms"), entry=b["price"], exit=x["price"], live_ret=x["price"] / b["price"] - 1,
                             held_h=(x["time"] - b["time"]) / HOUR))
-    L = pd.DataFrame(res)
+    Lv = pd.DataFrame(res).merge(pd.DataFrame(opened), on=["sym", "t"], how="left")
     cost = ev.sym.map(lambda s: 2 * (R.TAKER + R.SLIP.get(s, 0.0003)))
-    E = ev.assign(res_ret=ev.ret + cost)[["sym", "t", "entry", "exit", "res_ret", "why"]]
-    M = E.merge(L, on=["sym", "t"], how="outer", indicator=True)
+    E = ev.assign(res_ret=ev.ret + cost)[["sym", "t", "entry", "exit", "res_ret", "why", "w", "pool"]]
+    M = E.merge(Lv, on=["sym", "t"], how="outer", indicator=True)
     both = M[M._merge == "both"]
     same = (both.res_ret - both.live_ret).abs() < 0.002
-    print(f"trades: research {len(E)}, live {len(L)}, matched {len(both)} | same result (within 0.2%) {same.sum()} of {len(both)} | "
+    same_w = (both.w - both.share).abs() < 1e-9
+    print(f"trades: research {len(E)} ({int((E.pool == 'extra').sum())} extra-coin), live {len(Lv)}, matched (coin + entry hour) {len(both)} | "
+          f"same units share {int(same_w.sum())} of {len(both)} | same result (within 0.2%) {int(same.sum())} of {len(both)} | "
           f"avg return research {both.res_ret.mean() * 100:+.2f}% vs live {both.live_ret.mean() * 100:+.2f}% (before costs)")
+    only = M[M._merge != "both"]
+    if len(only):
+        print("only on one side:"); print(only[["sym", "t", "_merge", "pool"]].to_string(index=False))
     d = both[~same]
     if len(d):
-        print("differences (live exits on 1-minute prices, the research on hourly bars):")
+        print("result differences (live exits on 1-minute prices, the research on hourly bars):")
         print(d[["sym", "t", "why", "res_ret", "live_ret", "held_h"]].round({"res_ret": 4, "live_ret": 4, "held_h": 1}).to_string(index=False))
 
 

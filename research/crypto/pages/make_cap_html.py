@@ -8,7 +8,7 @@ import common as C
 import botsim as BS
 
 STARTS = {"2020": "2020-01-01", "2022": "2022-01-01", "2024": "2024-01-01"}
-END = "2026-10-01"
+END = "2026-11-07"
 LAD = [(r[0], r[1][0], r[1][1], r[1][2]) for r in BS.bot_policy()["rows"]]
 SETS = [("lad", "Ladder " + BS.label(BS.bot_policy()) + " (the bot)", None), ("now", "5% / 2.5% / 0.83%", (5, 2.5, 0.83)),
         ("b75", "7.5% / 2.5% / 0.83%", (7.5, 2.5, 0.83)), ("b75lo", "7.5% / 1.5% / 0.5%", (7.5, 1.5, 0.5))]

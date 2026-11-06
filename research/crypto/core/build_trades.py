@@ -4,8 +4,11 @@ v2.6 profit lock (+5R -> stop +1.5R) and the v2.8 OI-low filter (OI in the lowes
 exit_time, be_time, dir, R, hours) and cache/trade_prices_<tag>.pkl (entry, exit, sl_dist, reason).
     python build_trades.py check     # rebuild without the lock and compare with v24 (must be identical)
     python build_trades.py v26       # with the profit lock
-    python build_trades.py v28       # + the OI-low filter (the live rules since v2.8; botsim's default)"""
-import pickle, sys
+    python build_trades.py v28       # + the OI-low filter (the live rules v2.8)
+    python build_trades.py v30       # TBO v3.0 (live since Nov 2026; botsim's default): v2.8 + 16 h cooldown after a loss
+                                     # (< -0.5R) + exits lock +5R -> +2R, 2nd lock +8R -> +3.5R, stale stop to entry at 60 h
+                                     # (engine core/xengine30.py via v30lib.trades_v30, exact parity with v2.8 when off)"""
+import os, pickle, sys
 from multiprocessing import Pool
 import numpy as np, pandas as pd
 import common as C, families as F
@@ -13,11 +16,16 @@ import grid_v25 as G
 from wf2 import V21
 
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
+END = os.environ.get("TBO_END", "2026-11-07")          # data end (extended by fetch_extend.py); v28 used 2026-10-01
 
 
 def build(args):
     sym, tag = args
-    lock, low = tag != "check", tag == "v28"
+    if tag.startswith("v30"):
+        import v30lib as V
+        x = V.trades_v30(sym, start="2020-01-01", end=END).reset_index(drop=True)
+        return sym, x
+    lock, low = tag != "check", tag.startswith("v28")
     m = C.load(sym)
     C.SLIP = 0.0001 if sym in ("BTCUSDT", "ETHUSDT") else 0.0003
     kw = dict(V21, tf=240, n=20, be_R=1.5, hold_h=120, **G.STOPS[1][1])
@@ -27,7 +35,7 @@ def build(args):
         kw["skip_fn"] = lambda c, a, hi, lo, s: f72(c, a, hi, lo, s) | flow(c, a, hi, lo, s)
     if lock:
         kw.update(lock_R=5.0, lock_to=1.5)
-    x = C.between(F.channel_breakout(m, **kw), "2020-01-01", "2026-10-01").reset_index(drop=True)
+    x = C.between(F.channel_breakout(m, **kw), "2020-01-01", END).reset_index(drop=True)
     t = m["t"]; e = x.entry_time.values.astype("datetime64[m]").astype(np.int64); xm = x.exit_time.values.astype("datetime64[m]").astype(np.int64)
     be = []
     for k in range(len(x)):                                   # first full minute after the fill at +1.5R (before the exit)

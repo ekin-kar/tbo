@@ -22,14 +22,14 @@ POL = BS.bot_policy()
 
 
 def build(start):
-    h = BS.history(POL, start, "2026-10-01", START)
+    h = BS.history(POL, start, "2026-11-07", START)
     cv = h["events"].rename(columns={"bal": "equity"}); tk = h["trades"]
     tk = tk.sort_values("exit_time").copy()
     tk["kind"] = np.where(tk.R > 0.2, "win", np.where(tk.R < -0.2, "loss", "be"))
     daily = cv.equity.resample("1D").last().ffill()
     worst = cv.worst.resample("1D").min().ffill()
     first = pd.Timestamp(start)
-    months = pd.period_range(first.to_period("M"), "2026-09", freq="M")
+    months = pd.period_range(first.to_period("M"), "2026-11", freq="M")
     bal_end = cv.equity.resample("ME").last().reindex([m.to_timestamp("M") for m in months]).ffill().fillna(START).to_numpy()
     rows = []; prev = START; peak = START
     for m, end in zip(months, bal_end):
@@ -50,7 +50,7 @@ def build(start):
         wy = worst[worst.index.year == int(y)].to_numpy()       # same method as the overall figure: worst-case curve vs its own peak
         pk = np.maximum.accumulate(np.r_[ry[0]["start"], wy])[1:] if len(wy) else np.array([1.0])
         ddy = float(((wy / pk) - 1).min() * 100) if len(wy) else 0.0
-        years.append(dict(year=y + (" (to Sep)" if y == "2026" else ""), start=ry[0]["start"], end=ry[-1]["end"],
+        years.append(dict(year=y + (" (to 6 Nov)" if y == "2026" else ""), start=ry[0]["start"], end=ry[-1]["end"],
                           pct=round((ry[-1]["end"] / ry[0]["start"] - 1) * 100, 1), trades=int(len(t)),
                           best=max(r["pct"] for r in ry), worst=min(r["pct"] for r in ry), pos=sum(r["pct"] > 0 for r in ry), n=len(ry),
                           dd=round(ddy, 1)))

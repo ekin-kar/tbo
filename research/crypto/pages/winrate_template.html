@@ -74,7 +74,7 @@ function colour(e){const t=Math.max(-1,Math.min(1,e/EMAX)),A=toLab(css('--mid'))
 const fmtE=e=>(e>=0?'+':'−')+Math.abs(e).toFixed(2)+'R';
 function draw(){
  const segE=document.getElementById('per');
- segE.innerHTML=[['all','2020 – Sep 2026'],['2024','2024 – Sep 2026']].map(([k,t])=>`<button aria-pressed="${S.per===k}" data-k="${k}">${t}</button>`).join('');
+ segE.innerHTML=[['all','2020 – 6 Nov 2026'],['2024','2024 – 6 Nov 2026']].map(([k,t])=>`<button aria-pressed="${S.per===k}" data-k="${k}">${t}</button>`).join('');
  segE.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.per=b.dataset.k;draw();});
  const P=D[S.per],tot=P[P.length-1];
  document.getElementById('tiles').innerHTML=[[tot.win.toFixed(1)+'%','of trades win (all 5 coins)'],[tot.rr.toFixed(1)+' : 1','average win ÷ average loss'],
