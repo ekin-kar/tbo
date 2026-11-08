@@ -343,6 +343,8 @@ class Bot:
         for sym, (amt, entry) in sorted(pos.items()):
             side = 1 if amt > 0 else -1
             st = self.coin_state(sym)
+            if st is not None and st.get("manual"):     # the user's own trade on a bot coin: not in the cap
+                continue
             if filled_before and st is not None:
                 e_ms = st.get("entry_ms") or 0
                 if e_ms == 0 and st.get("entry_side"):
@@ -480,7 +482,7 @@ class Bot:
         close_ms = open_ms + self.p.tf_min * 60_000
         status = None                                   # the line for the 4h-check message
         # 1. trail exit
-        if (amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short):
+        if not self.st.get("manual") and ((amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short)):
             self.close_position(amt, "trail", "trail exit")
             amt = 0.0
         # 2. the previous entry order expires at this close
@@ -526,7 +528,9 @@ class Bot:
             if amt != 0:
                 log.info(f"the previous entry order filled just now ({amt}): no new order")
         risk_open = 0.0
-        if amt != 0:
+        if amt != 0 and self.st.get("manual"):
+            status = "no order · your own position on this coin (left alone)"
+        elif amt != 0:
             side_ = 1 if amt > 0 else -1
             ep = self.st.get("fill_px") or entry_px
             d_ = self.st.get("sl_dist") or 0.0
@@ -630,10 +634,45 @@ class Bot:
     def paused(self):
         return (HERE / "PAUSE").exists()
 
+    def manual_trade(self, amt):
+        """True while the position on this coin is the user's own: one that appeared with no entry order of the bot's
+        pending (e.g. a manual trade during the weekend pause). The bot leaves it alone (no stop, no cap trim, no exits)
+        and places no new orders on this coin until it is closed. A position adopted that way by an older version
+        (no entry level recorded) is released: the bot's stop on it is cancelled."""
+        if self.st.get("manual"):
+            return True
+        if self.st.get("entry_ms"):
+            if self.st.get("fill_lvl"):
+                return False                            # the bot's own trade
+            self.cancel(self.st.get("sl_id"))
+            self.reset_trade()
+            why = "adopted earlier without an entry order of the bot's: released, the bot's stop on it cancelled"
+        elif self.st.get("entry_id") or self.st.get("entry_trig"):
+            iso = getattr(self.x, "isolated_positions", None)
+            try:
+                mine = not (iso and self.sym in iso())
+            except Exception:
+                mine = True
+            if mine:
+                return False                            # the bot's entry order filled (the bots trade cross margin)
+            self.cancel(self.st.get("entry_id")); self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)
+            why = "isolated margin (the bots trade cross): the bot's waiting entry order cancelled"
+        else:
+            why = "no entry order of the bot's was pending"
+        self.st["manual"] = True; self.save()
+        log.info(f"{self.coin} position {amt:g} is not the bot's ({why}): left alone, no new orders on {self.coin} until it is closed")
+        self.tg(f"🖐 <b>{self.coin}: your own position, left alone</b>\n{notify.esc(why)}. The bot places no orders on "
+                f"{self.coin} until it is closed.")
+        return True
+
     def check_position(self):
         """Every poll: protect a new fill, time exit, clean up after a stop-out."""
         amt, entry_px = self.x.position(self.sym)
         now = self.x.now_ms()
+        if amt != 0 and self.manual_trade(amt):
+            return
+        if amt == 0 and self.st.get("manual"):
+            self.st["manual"] = False; self.save()     # the user's own trade is closed: the bot trades this coin again
         if amt != 0:
             if not self.st.get("entry_ms"):
                 fill_ms = now - 60_000                  # fallback: the fill happened since the last poll
