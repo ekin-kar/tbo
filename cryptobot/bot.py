@@ -905,7 +905,10 @@ class Bot:
                 raise SystemExit("Account is in Hedge mode; switch Binance Futures to One-way mode first.")
             # exchange leverage only sets the margin locked per position (cross margin); position size is still
             # capped at max_leverage x equity by size(). Higher here = less margin locked when all coins are open.
-            self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
+            try:
+                self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
+            except BinanceError as e:                   # e.g. an open isolated position (the user's own trade) blocks a change
+                log.warning(f"leverage not set ({e}); the bot keeps running with the current leverage")
         if self.oi_hist is not None:                   # first start: up to ~90 archive files (a few seconds per coin)
             try:
                 n = self.oi_hist.update(budget_s=300)
