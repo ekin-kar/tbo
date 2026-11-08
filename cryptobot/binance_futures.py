@@ -169,6 +169,9 @@ class Futures:
     def hedge_mode(self):
         return bool(self._req("GET", "/fapi/v1/positionSide/dual", signed=True)["dualSidePosition"])
 
+    def set_margin_type(self, symbol, margin_type="CROSSED"):
+        return self._req("POST", "/fapi/v1/marginType", dict(symbol=symbol, marginType=margin_type), signed=True)
+
     def set_leverage(self, symbol, leverage):
         return self._req("POST", "/fapi/v1/leverage", dict(symbol=symbol, leverage=int(leverage)), signed=True)
 

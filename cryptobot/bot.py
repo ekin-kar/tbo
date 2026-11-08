@@ -553,7 +553,12 @@ class Bot:
             status = "no order · price stretched far from the daily trend line"
         if self.paused():
             log.info("PAUSE file present: no new entry orders (open positions are still managed)")
-        if amt == 0 and not self.paused():
+        cross_ok = True
+        if amt == 0 and not self.paused() and not self.dry:
+            cross_ok = self.ensure_cross()
+            if not cross_ok:
+                status = f"no order · {self.coin} is on isolated margin and could not be switched back to cross"
+        if amt == 0 and not self.paused() and cross_ok:
             self.reset_trade()
             for side, trig in ((1, dec.long_trigger), (-1, dec.short_trigger)):
                 if trig is None or blocked or low_blocked:
@@ -634,6 +639,24 @@ class Bot:
     def paused(self):
         return (HERE / "PAUSE").exists()
 
+    def ensure_cross(self):
+        """Before a new entry order: the bots trade cross margin at their own leverage. After a manual isolated trade the
+        coin stays isolated on Binance: switch it back (only possible with no position and no open orders on it)."""
+        try:
+            sc = self.x.symbol_config(self.sym)
+        except Exception:
+            return True                                 # unreadable: carry on as before
+        if str(sc.get("marginType", "")).upper() not in ("ISOLATED",):
+            return True
+        try:
+            self.x.set_margin_type(self.sym, "CROSSED")
+            self.x.set_leverage(self.sym, int(self.cfg.get("exchange_leverage", max(1, math.ceil(self.max_lev)))))
+            log.info(f"{self.coin} switched back from isolated to cross margin at {self.cfg.get('exchange_leverage')}x")
+            return True
+        except BinanceError as e:
+            log.warning(f"{self.coin} is on isolated margin and could not be switched back to cross ({e}): no entry order")
+            return False
+
     def manual_trade(self, amt):
         """True while the position on this coin is the user's own: one that appeared with no entry order of the bot's
         pending (e.g. a manual trade during the weekend pause). The bot leaves it alone (no stop, no cap trim, no exits)
@@ -648,15 +671,7 @@ class Bot:
             self.reset_trade()
             why = "adopted earlier without an entry order of the bot's: released, the bot's stop on it cancelled"
         elif self.st.get("entry_id") or self.st.get("entry_trig"):
-            iso = getattr(self.x, "isolated_positions", None)
-            try:
-                mine = not (iso and self.sym in iso())
-            except Exception:
-                mine = True
-            if mine:
-                return False                            # the bot's entry order filled (the bots trade cross margin)
-            self.cancel(self.st.get("entry_id")); self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)
-            why = "isolated margin (the bots trade cross): the bot's waiting entry order cancelled"
+            return False                                # the bot's entry order filled
         else:
             why = "no entry order of the bot's was pending"
         self.st["manual"] = True; self.save()
