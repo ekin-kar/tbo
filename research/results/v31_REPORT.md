@@ -29,7 +29,7 @@ campaign `research/crypto/studies/v31_drawdown_and_sleeves.py` (Tracks 1-4, stag
 | Phase copies with x > 1 (2020-23 / 2024-26) | | 82.5% / 85% | 82.5% / 85% |
 | 2022 run | $1.125M, DD 26.0% | **$1.587M** | $1.614M |
 | 2024 run | $61.0k, DD 34.0% | **$68.4k, DD 33.1%** | $69.2k, DD 33.1% |
-| Oct 1 - Nov 6 2026 (from $300, worst drop) | 40.1% | **37.1%** | 36.4% |
+| Sep 15 - Nov 6 2026 (from $300, worst drop; see note in section 9) | 40.1% | **37.1%** | 36.4% |
 | 2-yr bootstrap median | $23.4k | **$27.2k** | $27.4k |
 | 2-yr bootstrap p10 | $4.87k | **$6.43k** | $6.45k |
 | 2-yr bootstrap dd90 | 56.7% | **52.5%** | 52.3% |
@@ -231,3 +231,76 @@ T5c_RESULT
 * Sleeve sizing assumes no cap on concurrent sleeve trades. HOLD_SMALL used an hourly-bar approximation (no 1m data);
   DEV12 and HOLD_BIG used the 1m engine.
 * Stop fills are modelled as in v3.0 (pessimistic fill minute). The live slippage on the tightened stops is unknown.
+
+
+## 9. v3.1b follow-up (`studies/v31b_surgical_followup.py`, results `v31b_*.csv` and `v31_v31b_*.csv`)
+
+**Correction to the sections above.** The "Oct-Nov 2026 drop" in the E4 money columns (`dd_fall26`: 40.1% base, 37.1%
+package) is computed from **Sep 15** to Nov 6, 2026, not Oct 1. From Oct 1, the v3.0 base falls 32.6% (worst drop
+33.6%); the risk table below uses Oct 1.
+
+Rules marked "on PKG" are scored against the v3.1 package (its own 41 phase copies and money base).
+PKG = 1,355 trades; 2024 $68,400 / 33.1%; bootstrap median $27,182, p10 $6,434, dd90 52.5%.
+
+1. **H3 partial scratch and T2a re-anchors on PKG.**
+   * The H3 passer is already listed in section 5 (not adopted). On PKG, 0 of 24 partial-scratch configs pass E1: it
+     fires on the same trades as the stop tighten.
+   * The 8 best T2a re-anchors on PKG all pass E1 / E2: x 1.02-1.04, 2024 $73-74k, median $28.5-29k, p10 $6.5-6.9k.
+     They fail E3 (dev phase copies 48-58%) and E4: the 2024 drop stays 33.1% and dd90 52.2-52.8%. They add return, not
+     drawdown protection.
+2. **Non-cycling cluster size-down / cap-tighten** (exact in one pass: the trade list never changes).
+   * Size-down, 180 configs per base: v3.0 18 E1 -> 0 E2; PKG 3 -> 0.
+   * Best: after 2 coins stop out within 24 h, size x0.35-0.65 for 16 h. On v3.0: dd90 56.7 -> 54.7%, Sep-Nov 2026
+     40.1 -> 37.6%. On PKG: dd90 52.5 -> 50.9%, 37.1 -> 34.6%. But the 2024 drop is unchanged, 5-7% of dev net is lost,
+     and there is no plateau.
+   * Cap-tighten (x0.65 / 0.75, 120 configs): the cap rarely binds (BTC is exempt and causes most clusters): x =
+     1.000 +- 0.003, 0 E1 on v3.0, 6 -> 0 on PKG. Harder squeezes lose money (x0.3: 2024 $42.9k, drop 36.6%).
+3. **Fast-fakeout defence** (T 1-4 h, 15m / 1h checks, never reached +0.2-0.4R, close < -0.45 .. -0.75R -> stop
+   -0.65 / -0.75 / -0.8R or take-profit at entry; 384 configs per base).
+   * v3.0: 37 E1 -> 0 E2. PKG: 17 -> 0. Out-of-sample medians are below 1 for every action and every T.
+   * Why (`v31b_3_fast_anatomy.csv`): 20% of the eventual >= 2R winners have not reached +0.25R after 1 h (31% not
+     +0.4R); slow starters look like fakeouts, dip, and the tightened stop cuts them.
+   * Oct 1 - Nov 6 2026 had 18 full stop-outs, 11 under 8 h and 7 under 4 h (October alone: 13, 6 under 8 h).
+4. **4h VOLC + OI on the core 5 vs DEV12** (`v31b_4_volc_stats.csv`, `v31b_4_volc_money.csv`).
+
+   | N10, 36 h | 2022-23 n / avg R / PF | 2024-26 n / avg R / PF |
+   |---|---|---|
+   | Core 5 | 60 / +0.32 / 1.67 | 56 / +0.25 / 1.49 |
+   | DEV12 | 157 / +0.31 / 1.64 | 155 / +0.20 / 1.37 |
+
+   * On PKG, 62% of the 192 sleeve variants pass E4 against v3.0.
+   * Against PKG itself, only **core 5 at 0.25 x BTC risk** passes (uncapped or capped): 2022 $1.61M, 2024 $74.1k with
+     the drop at 32.9% (PKG 33.1%), Sep-Nov 2026 35.8%, median $29.3k, p10 $7.59k, dd90 51.2%.
+   * DEV12 variants give more money and lower dd90 (50.1% with the 0.5 x cap gate) but a 2024 drop of 33.17-33.20%:
+     0.05-0.08 points above PKG.
+   * Counting VOLC inside the open-risk cap, or arming it only while open TBO risk < 0.5 x cap, changes little; the
+     gate gives the lowest dd90.
+5. **Iso-return / risk-scaled table** (`v31b_5_risk_table.csv` = VOLC DEV12 0.2 x; `v31b_5_risk_table_core5.csv` =
+   core 5 0.25 x). k scales every risk; "smooth" = BTC 5 / 4.2 / 2.2% (ETH 2/3 of BTC, alts as live), cap 1.0 x BTC.
+   Oct-Nov here = Oct 1 - Nov 6 2026 from $300.
+
+| Package | Ladder | k | 2022 | 2024 (DD) | Oct-Nov 26 (DD) | Losing months 2024 run (avg) | Boot median | p10 | dd90 |
+|---|---|---|---|---|---|---|---|---|---|
+| v3.0 | live | 1.00 | $1.125M | $61.0k (34.0%) | -32.6% (33.6%) | 12 / 35 (-7.3%) | $23.4k | $4.87k | 56.7% |
+| v3.0 | live | 0.80 | $381k | $30.1k (28.1%) | -26.8% (27.7%) | 12 (-5.8%) | $15.4k | $3.37k | 49.3% |
+| v3.1 PKG | live | 1.00 | $1.587M | $68.4k (33.1%) | -28.6% (30.4%) | 11 (-6.1%) | $27.2k | $6.43k | 52.5% |
+| v3.1 PKG | live | 0.90 | $784k | $54.1k (30.3%) | -26.1% (27.8%) | 11 (-5.5%) | $21.4k | $5.23k | 49.1% |
+| **v3.1b (VOLC DEV12 0.2)** | live | 1.00 | $2.005M | $83.6k (33.2%) | -26.0% (31.3%) | 10 (-6.7%) | $32.9k | $8.72k | 50.8% |
+| **v3.1b (VOLC DEV12 0.2)** | live | 0.95 | $1.420M | $66.7k (31.8%) | -24.8% (30.0%) | 10 (-6.4%) | $28.8k | $7.49k | 48.9% |
+| **v3.1b (VOLC DEV12 0.2)** | **live** | **0.90** | **$1.068M** | **$64.3k (30.3%)** | **-23.6% (28.6%)** | **10 (-6.1%)** | **$25.8k** | **$6.78k** | **47.1%** |
+| v3.1b (VOLC DEV12 0.2) | live | 0.85 | $919k | $51.0k (28.9%) | -22.4% (27.2%) | 10 (-5.7%) | $22.4k | $5.97k | 45.6% |
+| v3.1b (VOLC DEV12 0.2) | live | 0.80 | $621k | $41.7k (27.4%) | -21.2% (25.8%) | 10 (-5.4%) | $20.2k | $5.32k | 43.8% |
+| v3.1b (VOLC DEV12 0.2) | smooth | 1.00 | $1.029M | $47.6k (28.9%) | -21.8% (26.8%) | 10 (-5.8%) | $22.8k | $5.83k | 45.5% |
+| v3.1b (VOLC DEV12 0.2) | smooth | 0.90 | $590k | $36.0k (26.3%) | -19.8% (24.4%) | 10 (-5.3%) | $18.3k | $4.75k | 42.3% |
+| v3.1b (VOLC core5 0.25) | live | 0.95 | $1.227M | $72.6k (31.5%) | -25.9% (29.1%) | 11 (-5.6%) | $26.5k | $6.88k | 49.6% |
+| v3.1b (VOLC core5 0.25) | live | 0.90 | $1.043M | $58.2k (30.1%) | -24.7% (27.8%) | 11 (-5.3%) | $23.5k | $6.07k | 48.0% |
+
+* **Iso-return point.** v3.1b at k = 0.90 on the live ladder still beats v3.0 on 2022 / 2024 money, bootstrap median
+  and p10, with the 2024 drop at 30.3% (v3.0 34.0%) and dd90 at 47.1% (v3.0 56.7%).
+* **The brief's drawdown target** (2024 DD < 25-28%, dd90 < 42-45%) needs k = 0.80 on the live ladder or the smooth
+  ladder at k = 0.90-1.00.
+  * Wealth there is about 70-80% of v3.0 in 2024 and 78-98% of its bootstrap median: it does **not** fully match v3.0.
+  * At the same scaling, v3.0 itself is far worse (k = 0.80: $30.1k, median $15.4k, dd90 49.3%).
+* **Status of the VOLC sleeve.** It is in the iso-return package on the strength of section 6 and item 4 above. Its
+  own gate status is unchanged (near-pass: S6 missed by < 0.1 point of 2024 drawdown; found in a follow-up grid). The
+  same table without it is the v3.1 PKG rows.
