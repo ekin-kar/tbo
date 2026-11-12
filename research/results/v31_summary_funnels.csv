@@ -1,0 +1,37 @@
+track,kind,configs,g1,g2,g3,PASS,dd_matched_pass,g4
+T1b_failed_breakout,TBO rule,960,255,79,2,2,2.0,
+T1c_fb_variants,TBO rule,220,125,93,0,0,0.0,
+T1d_fb_scope,TBO rule,40,31,28,0,0,0.0,
+T1e_early_stale,TBO rule,432,139,81,0,0,0.0,
+T1f_stale_scope,TBO rule,32,17,16,2,0,1.0,
+T2a_reanchor,TBO rule,312,84,45,4,0,3.0,
+T2b_soft_ratchet,TBO rule,100,26,1,0,0,0.0,
+T3a_btc_trap,TBO rule,40,8,0,0,0,0.0,
+T3a_cluster_cooldown,TBO rule,160,77,38,0,0,0.0,
+T3b_stagger_block,TBO rule,12,2,0,0,0,0.0,
+T3b_stagger_size,TBO rule,24,6,0,0,0,0.0,
+T3c_dynamic_cap,TBO rule,11,1,0,0,0,0.0,
+T3d_loss_brake,TBO rule,72,21,17,0,0,0.0,
+T4a_validity,TBO rule,15,0,0,0,0,0.0,
+T4b_chop_ext,TBO rule,60,1,0,0,0,0.0,
+T4c_width_skip,TBO rule,18,2,0,0,0,0.0,
+T4d_width_size,TBO rule,36,4,2,0,0,0.0,
+T5_volc,sleeve,900,0,0,0,0,,0.0
+T5b_volc_oi_scratch,sleeve,150,3,0,0,0,,0.0
+T6_trap,sleeve,648,0,0,0,0,,0.0
+T6b_trap_oi,sleeve,324,0,0,0,0,,0.0
+T7a2_asia_box_oi,sleeve,108,0,0,0,0,,0.0
+T7a_asia_box,sleeve,108,0,0,0,0,,0.0
+T7b2_judas_prem,sleeve,64,0,0,0,0,,0.0
+T7b_judas,sleeve,64,0,0,0,0,,0.0
+T7c_funding,sleeve,288,0,0,0,0,,0.0
+T8_H1_mini_panic,sleeve,240,10,0,0,0,,0.0
+T8_H2_postflush_block,TBO rule,20,2,0,0,0,0.0,
+T8_H3_partial_scratch,TBO rule,96,60,51,3,1,1.0,
+T8_H4_regime_rule,TBO rule,50,41,39,0,0,0.0,
+T8_H5_chop_sizing,TBO rule,24,0,0,0,0,0.0,
+T8_H6_crowd_sizing,TBO rule,12,2,0,0,0,0.0,
+T8_H7_weekend,TBO rule,10,2,0,0,0,0.0,
+T8_H8_btc_cascade,TBO rule,5,4,4,1,1,1.0,
+T8_H9_fill_minute_size,TBO rule,36,15,9,0,0,0.0,
+final_combo,TBO rule,14,14,14,11,11,11.0,
