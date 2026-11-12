@@ -1,7 +1,8 @@
 # TBO: trend-breakout bot for Binance USD-M futures
 
 A 4-hour channel-breakout strategy (long and short) on BTC, ETH, BNB, SOL and ADA, plus a **panic sleeve** that buys
-forced-liquidation crashes on a Binance sub-account, with the research that built them.
+forced-liquidation crashes on a Binance sub-account and (v3.1, Nov 2026) a **VOLC sleeve** that trades short breakouts after
+quiet spells on the same five coins, with the research that built them.
 **Live settings, how they were chosen and how to run the bot: [`cryptobot/README.md`](cryptobot/README.md).**
 The full research log (every idea tested, what worked and what did not): [`HANDOFF.md`](HANDOFF.md).
 
@@ -9,7 +10,7 @@ The full research log (every idea tested, what worked and what did not): [`HANDO
 
 | Folder | What it is |
 |---|---|
-| `cryptobot/` | **The live bot.** `bot.py` (one coin), `run_all.py` (all coins + the panic sleeve + Telegram), `strategy.py`, `binance_futures.py`, `notify.py`; settings in `config_*.json` and `portfolio.json` (risk ladder, open-risk cap); **panic sleeve** `panic.py` + `panic_signal.py` (signal maths shared with the research), settings `panic.json`, sub-account key `PANIC_API_KEY` in `.env`; `check_setup.py` (pre-flight check), `report.py` (monthly results) |
+| `cryptobot/` | **The live bot.** `bot.py` (one coin), `run_all.py` (all coins + the panic and VOLC sleeves + Telegram); **VOLC sleeve** (v3.1) `volc.py` + `volc_signal.py` (shared with the research), settings `volc.json`; `strategy.py`, `binance_futures.py`, `notify.py`; settings in `config_*.json` and `portfolio.json` (risk ladder, open-risk cap); **panic sleeve** `panic.py` + `panic_signal.py` (signal maths shared with the research), settings `panic.json`, sub-account key `PANIC_API_KEY` in `.env`; `check_setup.py` (pre-flight check), `report.py` (monthly results) |
 | `cryptobot/` (Windows tools) | `TBO-VDS.bat` (watch / control my server), `tbo_install.bat` (set up and update servers: mine and other people's), `start-bots.bat` (run on this PC) |
 | `cryptobot/` (server side) | `vds_setup.sh` (installs / updates the bot on an Ubuntu server), `server_clean.sh` (weekly cleanup of old logs and caches), `tbo.service` (keeps the bot running) |
 | `cryptobot/dev/` | Developer checks, not needed to trade: the bot on a simulated exchange vs the backtest (`test_bot_sim.py`, `test_cap_sim.py`, `parity_detail.py`), the panic sleeve on a simulated exchange vs the research (`test_panic_sim.py`), the live-logic replay (`replay.py`), a one-order live test (`live_test.py`) |

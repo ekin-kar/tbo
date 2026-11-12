@@ -28,6 +28,13 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
   Cooldown   : (v3.0) after a trade on this coin closed below cool_R (price R: (exit - entry) x side / dist, i.e. a
                stop-out), no entry fills for cool_h hours from the exit minute; an order of a 4h close inside the
                cooldown waits and is placed when the cooldown ends (until that candle's order expires).
+  Failed     : (v3.1) from fb_h hours after the fill, at each hourly close (the open of a minute on the hour), while the
+  breakout     trade has never reached +be_R: if it has been +fb_mfe R in favour (1m highs / lows after the fill minute) and
+               the last 1m close is below fb_thr R, the stop moves to entry + fb_to x dist (once). A trade closed after
+               that starts the cooldown whatever its result (fb_cool).
+  Cascade    : (v3.1) when the casc_src coin's (BTC's) trade closes below casc_R (R net of fees and funding, as the research),
+               an open trade of this coin in the same direction that filled in that minute or earlier gets its stop
+               raised to entry + casc_to x dist (the most favourable stage still wins, so a trade at breakeven is untouched).
   Time exit  : closed max_hold_h hours after the fill. No take profit.
 
 Indicators match research/engine/indicators.py (cTrader style): EMA seeded with the first value,
@@ -68,6 +75,14 @@ class Params:
     stale_to: float = 0.0        # ... stop moves to entry + stale_to x dist
     cool_h: float = 0.0          # v3.0 cooldown: hours without entry fills after a loss below cool_R (0 = off)
     cool_R: float = -0.5
+    fb_h: float = 0.0            # v3.1 failed-breakout stop tighten: first check fb_h hours after the fill (0 = off)
+    fb_mfe: float = 0.9          # ... the trade has been at least +fb_mfe R in favour
+    fb_thr: float = -0.2         # ... and the last 1m close (on the hour) is below fb_thr R
+    fb_to: float = -0.5          # ... stop to entry + fb_to x dist
+    fb_cool: bool = True         # ... a trade closed after the tighten starts the cooldown whatever its result
+    casc_src: str = ""           # v3.1 cascade: the coin whose stop-outs tighten this coin's open trades ("" = off)
+    casc_R: float = -0.5         # ... when its trade closed below this R (net of costs)
+    casc_to: float = -0.25       # ... stop to entry + casc_to x dist
 
     def to_dict(self):
         return asdict(self)
@@ -145,9 +160,14 @@ def oi_low_blocks(p: "Params", rank):
     return p.oi_low_days > 0 and rank is not None and rank < p.oi_low_rank
 
 
-def stop_level(p: "Params", side, entry, dist, be_done=False, lock_done=False, lock2_done=False, stale_done=False):
+def stop_level(p: "Params", side, entry, dist, be_done=False, lock_done=False, lock2_done=False, stale_done=False,
+               fb_done=False, casc_done=False):
     """The stop price for the stages reached so far (the most favourable of them; the initial stop if none)."""
     lv = [entry - side * dist]
+    if fb_done:
+        lv.append(entry + side * p.fb_to * dist)
+    if casc_done:
+        lv.append(entry + side * p.casc_to * dist)
     if be_done:
         lv.append(entry + side * p.be_off * dist)
     if stale_done:
@@ -164,9 +184,27 @@ def stale_moves(p: "Params", side, entry, dist, price, be_done):
     return p.stale_h > 0 and dist > 0 and not be_done and side * (price - entry) > p.stale_thr * dist
 
 
-def cooldown_after(p: "Params", side, entry, exit_px, dist):
-    """True if a trade that closed at exit_px starts the cooldown (price R below cool_R)."""
-    return p.cool_h > 0 and dist > 0 and side * (exit_px - entry) / dist < p.cool_R
+def cooldown_after(p: "Params", side, entry, exit_px, dist, fb_done=False):
+    """True if a trade that closed at exit_px starts the cooldown (price R below cool_R; v3.1: or the failed-breakout
+    tighten fired during the trade and fb_cool is on)."""
+    if p.cool_h <= 0 or dist <= 0:
+        return False
+    return side * (exit_px - entry) / dist < p.cool_R or bool(fb_done and p.fb_cool and p.fb_h > 0)
+
+
+def fb_fires(p: "Params", side, entry, dist, best, last_close):
+    """v3.1 failed breakout, at one hourly check: best = the most favourable 1m high (long) / low (short) since the
+    minute after the fill, last_close = the close of the 1m candle just before the hour."""
+    if p.fb_h <= 0 or dist <= 0:
+        return False
+    return side * (best - entry) >= p.fb_mfe * dist and side * (last_close - entry) < p.fb_thr * dist
+
+
+def net_R(side, entry, exit_px, dist, hours, fee=0.0006, funding_8h=0.0001):
+    """A trade's R after fees (per side, on entry and exit) and funding, as the research's trade lists."""
+    if dist <= 0:
+        return 0.0
+    return (side * (exit_px - entry) - fee * (entry + exit_px) - funding_8h * hours / 8 * entry) / dist
 
 
 @dataclass

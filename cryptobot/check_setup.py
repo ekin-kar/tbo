@@ -205,4 +205,26 @@ if pk and ps:
         res(False, f"panic sleeve check failed: {e}")
 else:
     print("\nPANIC SLEEVE: off (no PANIC_API_KEY / PANIC_API_SECRET in .env)")
+try:                                                     # v3.1 VOLC sleeve (volc.py) on this main account
+    vcfg = json.loads((HERE / "volc.json").read_text())
+except (OSError, ValueError):
+    vcfg = {}
+if vcfg.get("enabled"):
+    print("\nVOLC SLEEVE (main account, volc.py)")
+    try:
+        btc = float(row["BTCUSDT"]) if row and "BTCUSDT" in row else float(json.loads((HERE / "config_btc.json").read_text())["risk_pct"])
+        share = float(vcfg.get("share", 0.25)); vrisk = eq * btc / 100 * share
+        print(f" risk per VOLC trade: {share:g} x the BTC risk {btc:g}% = {btc * share:.2f}% of ${eq:,.2f} = ${vrisk:.2f}; outside the open-risk cap")
+        for sym in vcfg.get("coins", []):
+            f = x.exchange_info(sym)
+            k4 = x.klines(sym, "4h", 200)
+            a = float(S.atr([k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4], 14)[-1])
+            px = k4[-1][4]
+            stp = max(f["step"], f["mkt_step"]); qty = round(int(vrisk / a / stp + 1e-9) * stp, 12)
+            res(qty >= f["min_qty"] and qty * px >= f["min_notional"], f"{sym} VOLC trade at today's 4h ATR (stop {a / px * 100:.2f}%): {qty:g} "
+                f"(${qty * px:,.0f} = {qty * px / max(bal, 1e-9):.1f}x the main balance) vs Binance minimum ${f['min_notional']:g}", warn=True)
+    except Exception as e:
+        res(False, f"VOLC sleeve check failed: {e}", warn=True)
+else:
+    print("\nVOLC SLEEVE: off (volc.json missing or \"enabled\": false)")
 print("RESULT:", "ready" if ok_all else "fix the FAIL lines first")

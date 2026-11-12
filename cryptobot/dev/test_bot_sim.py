@@ -33,6 +33,7 @@ class FakeFutures:
         self.j = 0
         self.pos = 0.0; self.entry = 0.0
         self.orders = {}                 # algoId -> dict
+        self.open_ids = set()            # ids of the orders still NEW (fast lookups on long runs)
         self.next_id = 1
         self.fills = []                  # (time, side, qty, price, kind)
         self.sym = sym
@@ -104,21 +105,36 @@ class FakeFutures:
     def set_leverage(self, *a):
         pass
 
-    def _fill(self, side, qty, px, kind):
+    def _fill(self, side, qty, px, kind, cid=None):
         d = 1 if side == "BUY" else -1
-        if self.pos == 0:
+        if self.pos == 0 or (self.pos > 0) != (d > 0) and qty > abs(self.pos):
             self.entry = px
+        elif (self.pos > 0) == (d > 0):                   # adding to a position: average entry
+            self.entry = (self.entry * abs(self.pos) + px * qty) / (abs(self.pos) + qty)
         self.pos = round(self.pos + d * qty, 6)
         if self.pos == 0:
             self.entry = 0.0
-        self.fills.append((int(self.m["t"][self.j]), d, qty, px, kind))
+        self.fills.append((int(self.m["t"][self.j]), d, qty, px, kind) if cid is None else (int(self.m["t"][self.j]), d, qty, px, kind, cid))
 
     def market(self, sym, side, qty, reduce_only=False, client_id=None):
         qty = float(qty)
         if reduce_only:
             qty = min(qty, abs(self.pos))
-        self._fill(side, qty, self.m["o"][self.j], "market")
+        self._fill(side, qty, self.m["o"][self.j], "market", client_id if self.tag_fills else None)
         return {}
+
+    tag_fills = False                                   # True: fills carry the order's client id (v3.1 test)
+
+    def take_profit_market(self, sym, side, trigger, client_id=None):
+        """closePosition TAKE_PROFIT_MARKET: fills at the trigger once the bar trades through it (the engine's rule)."""
+        trig = float(trigger); o = self.m["o"][self.j]
+        if (side == "SELL" and o >= trig) or (side == "BUY" and o <= trig):
+            raise BinanceError(400, -2021, "Order would immediately trigger.")
+        aid = self.next_id; self.next_id += 1
+        self.orders[aid] = dict(algoId=aid, clientAlgoId=client_id, side=side, trig=trig, symbol=self.sym, triggerPrice=str(trig),
+                                closePosition=True, qty=None, close=True, tp=True, algoStatus="NEW")
+        self.open_ids.add(aid)
+        return {"algoId": aid}
 
     def stop_market(self, sym, side, trigger, qty=None, close_position=False, client_id=None):
         trig = float(trigger); o = self.m["o"][self.j]
@@ -127,14 +143,15 @@ class FakeFutures:
         aid = self.next_id; self.next_id += 1
         self.orders[aid] = dict(algoId=aid, clientAlgoId=client_id, side=side, trig=trig, symbol=self.sym, triggerPrice=str(trig),
                                 closePosition=close_position, qty=None if qty is None else float(qty), close=close_position, algoStatus="NEW")
+        self.open_ids.add(aid)
         if close_position:
             self.sl_log.append((int(self.m["t"][self.j]), trig))
         return {"algoId": aid}
 
     def open_algo_orders(self, sym=None):
         if sym is None:
-            return [o for f in self.group for o in f.orders.values() if o["algoStatus"] == "NEW"]
-        return [o for o in self.orders.values() if o["algoStatus"] == "NEW"]
+            return [f.orders[i] for f in self.group for i in sorted(f.open_ids)]
+        return [self.orders[i] for i in sorted(self.open_ids)]
 
     def algo_order(self, algo_id=None, client_id=None):
         return self.orders[algo_id]
@@ -144,23 +161,33 @@ class FakeFutures:
         if o is None or o["algoStatus"] != "NEW":
             raise BinanceError(400, -2011, "Unknown order")
         o["algoStatus"] = "CANCELED"
+        self.open_ids.discard(algo_id)
 
     def process_bar(self):
         """Exchange side of 1m bar j: resting stops trigger on the bar's range."""
         o, h, l = self.m["o"][self.j], self.m["h"][self.j], self.m["l"][self.j]
-        for od in list(self.orders.values()):
+        for od in [self.orders[i] for i in sorted(self.open_ids)]:
             if od["algoStatus"] != "NEW":
+                continue
+            if od.get("tp"):                                # take-profit: SELL above / BUY below, filled at the trigger
+                hit = (od["side"] == "SELL" and h >= od["trig"]) or (od["side"] == "BUY" and l <= od["trig"])
+                if not hit:
+                    continue
+                od["algoStatus"] = "FINISHED"; self.open_ids.discard(od["algoId"])
+                if self.pos != 0:
+                    self._fill(od["side"], abs(self.pos), od["trig"], "tp", od["clientAlgoId"] if self.tag_fills else None)
                 continue
             hit = (od["side"] == "BUY" and h >= od["trig"]) or (od["side"] == "SELL" and l <= od["trig"])
             if not hit:
                 continue
             px = max(od["trig"], o) if od["side"] == "BUY" else min(od["trig"], o)
-            od["algoStatus"] = "FINISHED"
+            od["algoStatus"] = "FINISHED"; self.open_ids.discard(od["algoId"])
+            cid = od["clientAlgoId"] if self.tag_fills else None
             if od["close"]:
                 if self.pos != 0:
-                    self._fill(od["side"], abs(self.pos), px, "stop")
+                    self._fill(od["side"], abs(self.pos), px, "stop", cid)
             else:
-                self._fill(od["side"], od["qty"], px, "entry")
+                self._fill(od["side"], od["qty"], px, "entry", cid)
 
 
 class FakeOIHistory:
@@ -182,8 +209,10 @@ class FakeOIHistory:
 
 
 def params(sym):
-    """The coin's live strategy settings (config_xxx.json)."""
-    return S.Params(**json.load(open(HERE / f"config_{sym[:-4].lower()}.json"))["strategy"])
+    """The coin's live strategy settings (config_xxx.json) without the v3.1 rules (fb_h, casc_src): replay.py is the v3.0
+    logic; the v3.1 rules are checked by test_v31_sim.py against research/crypto/core/v31deploy.py."""
+    s = dict(json.load(open(HERE / f"config_{sym[:-4].lower()}.json"))["strategy"], fb_h=0, casc_src="")
+    return S.Params(**s)
 
 
 def run(sym="BTCUSDT", start="2024-01-01", end="2024-07-01"):

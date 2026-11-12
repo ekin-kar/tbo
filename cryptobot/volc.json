@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "coins": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"],
+  "share": 0.25,
+  "signal": {
+    "n": 10,
+    "sq": 0.6,
+    "oi_min": 0.0,
+    "ema_n": 50,
+    "er_n": 10,
+    "er_max": 0.25,
+    "mode": "hybrid",
+    "sl_atr": 1.0,
+    "tp_R": 1.5,
+    "hold_h": 36,
+    "excl_h": 12
+  },
+  "max_leverage": 6,
+  "poll_s": 5,
+  "dry_run_equity": 300
+}

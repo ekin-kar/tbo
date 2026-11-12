@@ -2,6 +2,11 @@
 
 **Layout (Oct 2026 cleanup):** research scripts are in `research/crypto/core/` (library), `research/crypto/pages/` (page generators + templates) and `research/crypto/studies/` (experiments); the bot's developer checks in `cryptobot/dev/`. Script names below are unchanged; see the top-level `README.md` for what is where.
 
+**v3.1 (13 Nov 2026, live): v3.0 + failed-breakout stop tighten (from 8 h, hourly closes: was +0.9R, never +1.5R, now < -0.2R
+-> stop -0.5R, cooldown after it) + BTC stop-out cascade (BTC trade closed < -0.5R net -> ETH / alts' same-direction stops to
+-0.25R) + VOLC sleeve on the core 5 (main account, 0.25 x BTC risk, outside the cap; one coin = one position with the trend
+bot) + every risk and cap of the ladder x 0.90. See the last section and `research/results/v31_REPORT.md`.**
+
 **CURRENT LIVE SETTINGS (from 12 Oct 2026, $300 start):** TBO v2.6 (4h n20 breakout, 1 ATR stop, BE +1.5R, lock +5R -> +1.5R, 120 h, OI filter, shorts x0.5) on BTC/ETH/BNB/SOL/ADA; risk ladder in cryptobot/portfolio.json **BTC 6 / ETH 4 / alts 0.83% under $1k, 5 / 3.3 / 0.83% to $10k, 2.5 / 1.7 / 0.42% above**, open-risk cap 1.1x the BTC risk (6.6 / 5.5 / 2.75%), BTC exempt but counted. **v3.0 (6 Nov 2026, live): + 16 h cooldown after a stop-out, exits lock +5R -> +2R / +8R -> +3.5R / stale stop to entry at 60 h, panic sleeve also on XRP DOGE AVAX LINK DOT LTC TRX (0.75x units pool, max 2 open); see the last section.** **v2.8 (Oct 2026): + OI-low filter (no order while OI is in the lowest 20% of its 90 days), see the last entry.** **v2.7 (Oct 2026): + panic sleeve** (`cryptobot/panic.py`, Binance sub-account, see the last section): long after a forced-liquidation flush (4 h: price <= -1.5x normal move, OI <= -12%, premium z <= -1), TP +3 ATR(1h), stop -4 ATR (max -20%) -> entry at +2 ATR, 12 h; 3 units/event; bot and sleeve size on main + sub. Older sections below describe how it got here (their ladder numbers are the old ones).
 
 **Live setup (v2.5 = v2.4 + risk ladder and open-risk cap in portfolio.json, see the v2.5 section at the end; v2.4 = v2.3 + open-interest filter: no new order while OI (USD) is down >= 3% vs 72 h earlier; bot fetches /futures/data/openInterestHist; parity bot vs replay 15 of 16 coin-half-years exact, DOGE 2022H2 differs by the backtest's pessimistic fill-minute stop):** `cryptobot/run_all.py` (all coins, restarts), `check_setup.py` (pre-flight, no orders), `.env`
@@ -380,3 +385,42 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
     - bigger shorts (money ok from 2022, but every variant is worse in 2020-23);
     - spot / OI / premium / vol filters; N1–N3 sleeves.
 - `botsim.py` default trade list is now `v28nov` (= v28 + Oct–Nov 2026). The pages are rebuilt to 6 Nov 2026.
+
+## v3.1 round and deployment (Nov 2026, data to 2026-11-06)
+- **Research** (`research/results/v31_REPORT.md`; engine `core/xengine31.py` = v3.0 exactly with its new controls off; campaign
+  `studies/v31_drawdown_and_sleeves.py`, `v31_sleeves.py`, `v31_final.py`, follow-up `v31b_surgical_followup.py`): 7,433 settings
+  in 8 tracks + the v3.1b follow-up, gates E1-E4 (sleeves S1-S6) fixed in advance.
+  - Passed: failed-breakout stop tighten (T 8 h, MFE 0.9R, close < -0.2R -> stop -0.5R) and the BTC cascade; together all 10
+    combinations pass.
+  - Near-pass: 4h VOLC + OI sleeve (fails its money gate by < 0.1 point of 2024 drop; found in a follow-up grid).
+  - Failed: take-profit-at-entry / market-close scratches, early dead-start stale rules, fill-time stop re-anchor, soft
+    ratchet, cluster cooldown (hard skip: not exact; non-cycling size-down: no plateau), dynamic cap, closed-loss brake,
+    order validity window (late fills are the BEST trades), chop max-ext, channel width, fast-fakeout defence (slow-start
+    winners look like fakeouts), every session / funding / trap-snapback sleeve, mini-panic tier.
+- **Deployed (user decision 13 Nov 2026):** TBO v3.1 (both rules) + Panic v3.0 + VOLC on BTC ETH BNB SOL ADA at 0.25 x the
+  BTC risk + every ladder risk and cap x 0.90.
+  - Live code: `strategy.py` (fb_* / casc_* settings, `fb_fires`, `net_R`, stop stages); `bot.py` v3.1 (`check_fb` replays
+    closed 1m candles like the engine; `record_close` / `check_cascade` through `state_BTCUSDT.json`; `volc_hold`: no orders,
+    no cap, no adoption while the VOLC sleeve holds the coin); `volc.py` + `volc_signal.py` + `volc.json`; `panic.py` records
+    its triggers (VOLC: no order in the 12 h after one); `run_all.py` starts / restarts `volc.py` and lists its trades in
+    /status; `check_setup.py` checks VOLC sizes.
+  - Research twin: `core/v31deploy.py` (TBO + cascade + VOLC with the same-coin hand-over, iterated to a fixed point) ->
+    `build_trades.py v31` (botsim's default `v31`; also `cache/volc_trades_v31.pkl`).
+  - VOLC as deployed is weaker than in the grid: +0.33R / +0.16R per trade 2022-23 / 2024-26 (PF 1.72 / 1.30, 115 trades), due
+    to taker take-profits, the live OI rule and a panic exclusion that only looks back.
+  - Money (`research/results/v31_deploy_money.csv`), from $300:
+
+    | | 2022 | 2024 | Bootstrap median / p10 / dd90 |
+    |---|---|---|---|
+    | v3.0 | $1.125M / 26.0% | $61.0k / 34.0% | $23.4k / $4.87k / 56.7% |
+    | v3.1 x 0.90 (deployed) | $978k / 22.3% | $54.1k / 30.1% | $22.7k / $5.75k / 48.3% |
+    | v3.1 x 0.95 | $1.146M / 23.4% | $67.2k / 31.6% | $25.7k / $6.44k / 49.9% |
+
+    Oct 1 - Nov 6 2026 from $300: v3.0 -32.6%, v3.1 x 0.90 -24.8%.
+- **Bug fixed** (since commit e69da14, "leave the user's own positions alone"): an entry that filled in the last seconds
+  before a 4h close was taken for a manual position (no stop loss) because `on_candle_close` cleared the entry order before
+  `check_position` saw the fill. `on_candle_close` now adopts such a fill first.
+- **Parity:** `cryptobot/dev/test_v31_sim.py` (5 bots + `volc.py` on one simulated account vs `v31deploy`): see `cryptobot/README.md`.
+- `botsim.py` default trade list is now `v31`. The trades / statistics / monthly / win-rate / cap / risk / panic pages are
+  rebuilt (the trend bot's pages show the trend bot alone, with the x 0.90 ladder). `breakout_support.html` is unchanged:
+  a v2.8 study page that needs that study's outputs.

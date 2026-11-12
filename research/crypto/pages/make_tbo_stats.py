@@ -1,6 +1,6 @@
 """Builds reports/tbo_statistics.html (TBO v2.8, BTC/ETH/BNB/SOL/ADA; sizing = the bot's risk ladder + open-risk cap, as
 botsim.py) and Python reference results (botsim) for checking the page's math (check_tbo_stats.py).
-Trades: botsim's list (v3.0: v2.8 + cooldown and exit curve, build_trades.py v30; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
+Trades: botsim's list (v3.1: v3.0 + failed-breakout stop and BTC cascade, with the VOLC sleeve's coin hand-over, build_trades.py v31; shorts sized at short_risk_mult), BTC/ETH slippage 0.01%, alts 0.03%."""
 import sys, pathlib; sys.path[:0] = [str(pathlib.Path(__file__).resolve().parents[1] / d) for d in ("core", "studies")]  # research/crypto layout
 import json, pickle
 import numpy as np, pandas as pd

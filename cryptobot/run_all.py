@@ -7,6 +7,7 @@ Runs one bot process per config (default: every config_*.json here) and restarts
 Stop with Ctrl+C (stops all bots; open positions keep their stop-loss on Binance).
 To stop NEW entries but keep managing open trades: create an empty file named PAUSE in this folder.
 The panic sleeve (panic.py, on a Binance sub-account) runs too when PANIC_API_KEY / PANIC_API_SECRET are in .env.
+The VOLC sleeve (volc.py, v3.1, on this main account next to the coin bots) runs when volc.json says "enabled": true.
 Telegram (if set in .env): one message when the bots start; /status in the chat (or the bot's / menu) answers with the
 current situation of every coin, live from Binance. The bots themselves send their trade events (opened, breakeven,
 profit lock, closed, cap cuts) and warnings. No message after the 4h checks.
@@ -20,7 +21,7 @@ import notify                                    # noqa: E402
 
 flags = [a for a in sys.argv[1:] if a.startswith("--")]
 cfgs = [a for a in sys.argv[1:] if not a.startswith("--")] or sorted(str(p.name) for p in HERE.glob("config_*.json"))
-procs, fails, lock = {}, {c: 0 for c in cfgs + ["panic"]}, threading.Lock()
+procs, fails, lock = {}, {c: 0 for c in cfgs + ["panic", "volc"]}, threading.Lock()
 notify.load_secrets_env(HERE)
 TESTNET, DRY = "--testnet" in flags, "--dry-run" in flags
 MODE = " <i>(dry run)</i>" if DRY else " <i>(testnet)</i>" if TESTNET else ""
@@ -37,7 +38,7 @@ COIN = {s: s[:-4] for s in SYMS}
 
 
 def pump(cfg, p):
-    tag = "PNC" if cfg == PANIC else cfg.replace("config_", "").replace(".json", "").upper()
+    tag = "PNC" if cfg == PANIC else "VLC" if cfg == VOLC else cfg.replace("config_", "").replace(".json", "").upper()
     for line in p.stdout:
         with lock:
             print(f"{time.strftime('%H:%M:%S')}  {tag:<4s} {line.rstrip()}", flush=True)
@@ -56,6 +57,14 @@ def publish_console(msg):
 
 
 PANIC = "panic"                                  # the panic sleeve's process name (panic.py, sub-account)
+VOLC = "volc"                                    # the VOLC sleeve's process name (volc.py, main account; v3.1)
+
+
+def volc_on():
+    try:
+        return bool(json.loads((HERE / "volc.json").read_text()).get("enabled"))
+    except (OSError, ValueError):
+        return False
 
 
 def panic_on():
@@ -64,7 +73,7 @@ def panic_on():
 
 
 def start(cfg):
-    cmd = [str(HERE / "panic.py")] if cfg == PANIC else [str(HERE / "bot.py"), str(HERE / cfg)]
+    cmd = [str(HERE / "panic.py")] if cfg == PANIC else [str(HERE / "volc.py")] if cfg == VOLC else [str(HERE / "bot.py"), str(HERE / cfg)]
     p = subprocess.Popen([sys.executable, "-u"] + cmd + flags, cwd=HERE,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     threading.Thread(target=pump, args=(cfg, p), daemon=True).start()
@@ -250,6 +259,7 @@ def status_message(title="📊 <b>Status</b>"):
     for blk in blocks:
         out += [""] + blk
     out += panic_lines(x, now)
+    out += volc_lines(x, now)
     if idle:
         out += ["", "<b>No order</b>"] + idle
     out += ["", f"Balance <b>{notify.usd(eq)}</b>" + (f" ({notify.usd(upnl, sign=True)} open)" if pos else "")]
@@ -284,11 +294,33 @@ def panic_lines(x, now):
     return out
 
 
+def volc_lines(x, now):
+    """The VOLC sleeve's open trades (state_volc.json); nothing when none is open."""
+    if not volc_on():
+        return []
+    try:
+        st = json.loads((HERE / f"state_volc{'_testnet' if TESTNET else ''}.json").read_text())
+        hold = int(json.loads((HERE / "volc.json").read_text()).get("signal", {}).get("hold_h", 36))
+    except (OSError, ValueError):
+        return []
+    out = []
+    for s_, tr in st.get("trades", {}).items():
+        price = x.last_price(s_); P = lambda v: notify.px(v, tick(s_)); side = tr["side"]
+        r = side * (price - tr["entry"]) / tr["dist"] if tr.get("dist") else 0.0
+        left = max(0, tr["entry_ms"] + hold * 3_600_000 - now)
+        out += ["", f"<b>{s_[:-4]} 🌀 VOLC {'long' if side > 0 else 'short'}</b> {notify.num(r, 2, sign=True)}R",
+                f"{IND}{P(tr['entry'])} → {P(price)}",
+                f"{IND}TP {P(tr['tp'])} · SL {P(tr['stop'])}",
+                f"{IND}closes in {notify.held(left)}"]
+    return out
+
+
 def startup_message():
     eq, _ = account()
     rows = [f"🟢 <b>TBO v{bot_version()} online</b>{MODE}",
             f"Balance <b>{notify.usd(eq)}</b>" if eq is not None else "Balance not readable right now",
             "⚡ Panic sleeve on (sub-account)" if panic_on() else "",
+            "🌀 VOLC sleeve on (main account)" if volc_on() else "",
             "/status for details"]
     rows = [r for r in rows if r]
     publish("\n".join(rows))
@@ -310,6 +342,8 @@ def main():
         start(by_sym[s_]); time.sleep(2)             # stagger start-up requests
     if panic_on():
         start(PANIC)                                 # the panic sleeve on the sub-account
+    if volc_on():
+        start(VOLC)                                  # the VOLC sleeve on the main account (v3.1)
     threading.Thread(target=startup_message, daemon=True).start()
     threading.Thread(target=notify.listen, daemon=True,
                      args=({"status": ("Current status of every coin", status_message)}, publish_console)).start()
@@ -321,8 +355,8 @@ def main():
                     fails[c] = fails[c] + 1 if time.time() - t0 < 300 else 1
                     wait = 5 if fails[c] == 1 else 60
                     print(f"{time.strftime('%H:%M:%S')}  {c}: bot stopped (exit code {p.returncode}); restarting in {wait} s", flush=True)
-                    name = "Panic sleeve" if c == PANIC else COIN.get(cfg_of(c)['strategy']['symbol'], c)
-                    notify.send(f"♻️ <b>{name}</b> {'' if c == PANIC else 'bot '}stopped (exit code {p.returncode}) · restarting in {wait} s")
+                    name = "Panic sleeve" if c == PANIC else "VOLC sleeve" if c == VOLC else COIN.get(cfg_of(c)['strategy']['symbol'], c)
+                    notify.send(f"♻️ <b>{name}</b> {'' if c in (PANIC, VOLC) else 'bot '}stopped (exit code {p.returncode}) · restarting in {wait} s")
                     time.sleep(wait); start(c)
     except KeyboardInterrupt:
         print("stopping all bots (stop-losses stay on Binance)", flush=True)

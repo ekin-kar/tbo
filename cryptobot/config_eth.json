@@ -1,5 +1,5 @@
 {
-  "risk_pct": 3.3,
+  "risk_pct": 2.97,
   "short_risk_mult": 0.5,
   "max_leverage": 8,
   "exchange_leverage": 20,
@@ -32,6 +32,14 @@
     "stale_thr": -0.3,
     "stale_to": 0.0,
     "cool_h": 16,
-    "cool_R": -0.5
+    "cool_R": -0.5,
+    "fb_h": 8,
+    "fb_mfe": 0.9,
+    "fb_thr": -0.2,
+    "fb_to": -0.5,
+    "fb_cool": true,
+    "casc_src": "BTCUSDT",
+    "casc_R": -0.5,
+    "casc_to": -0.25
   }
 }

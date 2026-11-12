@@ -5,7 +5,10 @@ exit_time, be_time, dir, R, hours) and cache/trade_prices_<tag>.pkl (entry, exit
     python build_trades.py check     # rebuild without the lock and compare with v24 (must be identical)
     python build_trades.py v26       # with the profit lock
     python build_trades.py v28       # + the OI-low filter (the live rules v2.8)
-    python build_trades.py v30       # TBO v3.0 (live since Nov 2026; botsim's default): v2.8 + 16 h cooldown after a loss
+    python build_trades.py v31       # TBO v3.1 (live from 13 Nov 2026; botsim's default): v3.0 + failed-breakout stop tighten,
+                                     # BTC stop-out cascade and the VOLC sleeve on the same coins (core/v31deploy.py, the
+                                     # research twin of cryptobot/); also writes cache/volc_trades_v31.pkl
+    python build_trades.py v30       # TBO v3.0 (live 6-12 Nov 2026): v2.8 + 16 h cooldown after a loss
                                      # (< -0.5R) + exits lock +5R -> +2R, 2nd lock +8R -> +3.5R, stale stop to entry at 60 h
                                      # (engine core/xengine30.py via v30lib.trades_v30, exact parity with v2.8 when off)"""
 import os, pickle, sys
@@ -49,8 +52,24 @@ def build(args):
     return sym, x
 
 
+def build_v31():
+    os.environ["BOT_TRADES"] = "v30"                 # (botsim is imported on the way, by the panic sleeve: not the list being built)
+    import v31deploy as D
+    T, V, it = D.build()
+    if it < 0:
+        raise SystemExit("v31deploy did not settle")
+    cols = ["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours"]
+    pickle.dump({(s, 0.0003): T[T.sym == s][cols].reset_index(drop=True) for s in COINS}, open(C.D.CACHE / "portfolio_trades_v31.pkl", "wb"))
+    T[["sym", "entry_time", "entry", "exit", "sl_dist", "reason"]].to_pickle(C.D.CACHE / "trade_prices_v31.pkl")
+    V.to_pickle(C.D.CACHE / "volc_trades_v31.pkl")
+    print("v31", len(T), "TBO trades;", {s: round(float(T[T.sym == s].R.sum()), 1) for s in COINS}, "| VOLC", len(V), "trades",
+          round(float(V.R.sum()), 1), "R")
+
+
 if __name__ == "__main__":
     tag = sys.argv[1] if len(sys.argv) > 1 else "check"
+    if tag == "v31":
+        build_v31(); raise SystemExit
     with Pool(3) as p:
         res = dict(p.map(build, [(s, tag) for s in COINS]))
     cols = ["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours"]

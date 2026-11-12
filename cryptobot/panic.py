@@ -405,7 +405,11 @@ class Sleeve:
                         if hits is None:
                             log.warning("hourly data incomplete 15 min after the close: hour skipped")
                             hits = []
-                        self.st["last_hour"] = last_open; self.save()
+                        self.st["last_hour"] = last_open
+                        if hits:                             # v3.1: trigger moments for the VOLC sleeve (no VOLC order 12 h after)
+                            tr = [t for t in self.st.get("triggers", []) if t[0] >= last_open + HOUR - 48 * HOUR]
+                            self.st["triggers"] = tr + [[last_open + HOUR, s] for s, _ in hits]
+                        self.save()
                         if hits and not late:
                             total, sub = self.total_equity()
                             picked = self.select(hits)

@@ -1,4 +1,4 @@
-# TBO v3.0: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve on 12 coins (Binance USD-M futures)
+# TBO v3.1: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve on 12 coins + VOLC sleeve (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -17,10 +17,12 @@
 | Profit lock (v2.6, v3.0) | Once price has gone **+5R** in favour, the stop moves to **+2R** (v2.6: +1.5R; `lock_R` / `lock_to`), and at **+8R** to **+3.5R** (`lock2_R` / `lock2_to`, v3.0). See "v3.0" below |
 | Stale stop (v3.0) | Exactly **60 hours** after the fill, a trade that never reached +1.5R and is above -0.3R gets its stop moved to the **entry** (closed at once if the price is below the entry) (`stale_h` / `stale_thr` / `stale_to`) |
 | Cooldown (v3.0) | After a trade on a coin closed below **-0.5R** (a stop-out), that coin takes **no new entry for 16 hours** (`cool_h` / `cool_R`); the 4h order of a close inside the cooldown waits and is placed when it ends (until that candle's order expires; at market if the price is already past the level, as the backtest) |
-| Exit | stop (initial, breakeven, lock, stale), or **120 hours (5 days)** after the fill. No take profit |
+| Failed-breakout stop (v3.1) | From **8 hours** after the fill, at every hourly close: a trade that has been **+0.9R** in favour but never +1.5R and is now **below -0.2R** gets its stop moved to **-0.5R** (once); the 16 h cooldown follows that trade whatever its result (`fb_h` / `fb_mfe` / `fb_thr` / `fb_to` / `fb_cool`) |
+| BTC cascade (v3.1) | When a **BTC** trade closes below **-0.5R** (after costs), every open ETH / BNB / SOL / ADA trade in the **same direction** that filled in that minute or earlier gets its stop raised to **-0.25R** (a trade already at breakeven or locked is untouched); read from BTC's state file within seconds (`casc_src` / `casc_R` / `casc_to`) |
+| Exit | stop (initial, failed-breakout, cascade, breakeven, lock, stale), or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
-| Risk ladder (Oct 2026) | `portfolio.json`: BTC 6% / ETH 4% / alts 0.83% under $1,000; 5% / 3.3% / 0.83% to $10,000; 2.5% / 1.7% / 0.42% above. See "Risk ladder" below |
-| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (6.6% of equity under $1,000, 5.5% to $10,000, 2.75% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
+| Risk ladder (v3.1 = v3.0 x 0.90) | `portfolio.json`: BTC 5.4% / ETH 3.6% / alts 0.747% under $1,000; 4.5% / 2.97% / 0.747% to $10,000; 2.25% / 1.53% / 0.378% above (v3.0: 6 / 4 / 0.83, 5 / 3.3 / 0.83, 2.5 / 1.7 / 0.42). See "v3.1" and "Risk ladder" below |
+| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (v3.1: 5.94% of equity under $1,000, 4.95% to $10,000, 2.475% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
@@ -46,6 +48,53 @@ Parity (`dev/test_oi_low.py`): live `strategy.oi_rank` vs the research's rank at
 The archive files are the same numbers the research used (max difference 2e-16). First start: ~90 files per coin (~30 s).
 With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
 (bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
+
+## v3.1 (13 Nov 2026): failed-breakout stop, BTC cascade, VOLC sleeve, risk x 0.90
+
+Research: `research/results/v31_REPORT.md` (7,433 settings, then the v3.1b follow-up), the live twin
+`research/crypto/core/v31deploy.py` (`build_trades.py v31`, botsim's default) and `research/results/v31_deploy_money.csv`.
+Adopted (user decision, 13 Nov 2026):
+1. **Failed-breakout stop tighten** (`bot.py` `check_fb`, `strategy.fb_fires`): see the table above. Replayed on closed 1m
+   candles exactly as the research engine (best excursion from the minute after the fill, the hour's last 1m close).
+2. **BTC stop-out cascade** (`bot.py` `record_close` / `check_cascade`): BTC's bot writes every closed trade's R (net of
+   fees and funding, `strategy.net_R`) into `state_BTCUSDT.json`; the other bots read it every poll. Oct 12 2026: ETH -1.15R
+   -> -0.40R, SOL -1.13R -> -0.60R; Nov 4 2026: SOL -1.11R -> -0.39R, ETH -1.10R -> -0.55R.
+3. **VOLC sleeve** (`volc.py`, `volc_signal.py`, `volc.json`; started by `run_all.py`): on BTC ETH BNB SOL ADA, at every
+   4h close: when the 4h ATR14 is below 0.6 x ATR100 (a quiet spell) and open interest is higher than 24 h earlier, stop
+   orders at the 10-candle 4h high (long) / low (short), in the daily trend's direction (both directions while the daily
+   efficiency ratio ER10 < 0.25); stop 1 x ATR14, take-profit +1.5R (TAKE_PROFIT_MARKET), closed after 36 h; no order in the
+   12 h after a panic-sleeve trigger (`panic.py` now records its triggers). Size: **0.25 x the ladder's BTC risk** per trade,
+   outside the open-risk cap. **Main account, one coin = one position:** the sleeve arms a coin only while the trend bot has
+   no trade on it and cancels its orders when the bot's entry fills; when a sleeve order fills, the bot's waiting entry
+   order on that coin is cancelled and the bot places no order there until the sleeve's trade is closed (state
+   `volc_hold`; about 5 trend-bot entries in 6 years were blocked this way). The bot never adopts or caps a sleeve position.
+   Why the main account: a VOLC trade's position is about 1.4x the whole balance (median; 2.7x at the 90th percentile, up to
+   5 open), too big for a sub-account limited to 5x leverage.
+4. **Every risk and cap x 0.90** (`portfolio.json`; the panic and VOLC sleeves follow the ladder's BTC risk, so they scale
+   too).
+
+| From $300 (research account, 1,000 two-year journeys from 2022) | v3.0 | **v3.1 as deployed (x 0.90)** | v3.1 at x 0.95 | v3.1 at x 1.00 |
+|---|---|---|---|---|
+| 2022 start | $1.125M, drop 26.0% | $978k, drop 22.3% | $1.146M, drop 23.4% | $1.494M, drop 24.6% |
+| 2024 start | $61.0k, drop 34.0% | $54.1k, drop 30.1% | $67.2k, drop 31.6% | $68.4k, drop 33.0% |
+| 1 Oct - 6 Nov 2026 (from $300) | -32.6% (drop 33.6%) | -24.8% (drop 27.8%) | -26.0% | -27.2% |
+| Losing months of the 2024 run (average) | 12 of 35 (-7.3%) | 11 (-5.8%) | 11 (-6.1%) | 11 (-6.4%) |
+| Bootstrap median / 1-in-10 low / 1-in-10 drop | $23.4k / $4.87k / 56.7% | $22.7k / $5.75k / 48.3% | $25.7k / $6.44k / 49.9% | $29.1k / $7.13k / 51.8% |
+
+At x 0.90 the drops are much smaller but the 2022 / 2024 runs and the bootstrap median end a little below v3.0; x 0.95
+beats v3.0 on all three with most of the drop cut. To change it: multiply the ladder rows of `portfolio.json` (read at every
+order, no restart). The VOLC sleeve as deployed (taker take-profits, the live OI rule, panic exclusion only after a trigger)
+earns less than in the research grid: +0.33R / +0.16R per trade in 2022-23 / 2024-26 (PF 1.72 / 1.30, 115 trades) vs
++0.32R / +0.25R. It is the least proven part: the research found it in a follow-up grid and it failed its own money gate
+by a hair; watch it.
+
+**Updating a server to v3.1:** on this PC run `tbo_install.bat` -> **1 Update my bot** (it pulls `main`, sends the bot
+folder without keys / state / logs, runs `vds_setup.sh` and restarts the service), then **2 Check my setup**: the new
+"VOLC SLEEVE" lines show the sleeve's size per coin against Binance's minimums. No new key is needed (the sleeve uses the
+main account's key). Open trades carry on: their stop, breakeven and lock stages are kept, and the failed-breakout check
+starts on them from their fill. The sleeve places its first orders at the next 4h close. To run without the sleeve:
+`"enabled": false` in `volc.json` and restart. `TBO-VDS.bat` shows the live output: the sleeve's lines are tagged `VLC`,
+and /status lists its open trades under 🌀.
 
 ## v3.0 (Nov 2026): cooldown, exit curve, panic sleeve on 12 coins
 
@@ -256,6 +305,39 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 - `portfolio.json` is read every time: an edit applies without a restart. Delete it (or set 0) to turn the cap off.
 
 ## Parity tests
+
+**v3.1 (13 Nov 2026): `dev/test_v31_sim.py <start> <end>`.** The five coin bots (`bot.py`) and the VOLC sleeve
+(`volc.py`) run together on ONE simulated account fed with 1m history (cap off, so every trade the rules allow is taken).
+Their trades are compared with the research twin `research/crypto/core/v31deploy.py` (`build_trades.py v31`): the
+failed-breakout stop, the BTC cascade through BTC's state file, the cooldown after both, and the VOLC / trend-bot
+hand-over on the same coin. Results: same entry minute, then same exit minute.
+
+| Year | TBO trend bots (entry / exit minute) | VOLC sleeve |
+|---|---|---|
+| 2021 | 255 / 254 of 261 | (no setups) |
+| 2022 | 146 / 143 of 147 | 35 of 36 |
+| 2023 | 222 / 214 of 225 | 26 of 26 |
+| 2024 | 214 / 210 of 215 | 18 of 18 |
+| 2025 | 169 / 167 of 169 | 25 of 25 |
+| 2026 to 6 Nov | 138 / 138 of 139 | 10 of 10 |
+
+Entry prices are within 0.11%. Every difference is in an old category: one-minute entry shifts from tick rounding and
+SOL's minute-data gaps (2021: 6, 2023: 3), the backtest's stop inside the fill minute (the bot places its stop seconds
+after the fill), and the trade still open at the end of the data. The Oct 12 and Nov 4 2026 cascades are identical.
+
+Two problems were found and fixed by this test:
+- **Fill just before a 4h close** (since the "your own trades" change, commit e69da14): an entry that filled in the last
+  poll before a 4h close was taken for a manual position, so the bot placed **no stop loss** on it. Live this is rare (the
+  window is one 5-second poll) but dangerous. `on_candle_close` now adopts such a fill first.
+- **Both orders on a coin trigger in the same minute** (trend bot and VOLC): the trend bot keeps the coin and `volc.py`
+  closes its own part at once (as the research's fixed point).
+
+`dev/test_bot_sim.py` (one bot vs `replay.py`) checks the v3.0 core with the v3.1 rules switched off.
+- `dev/test_cap_sim.py 2024-01-01 2026-11-06` with the v3.1 ladder (x 0.90): at $10,000 509 entries, 59 shrunk by the cap,
+  BTC 121/121 full size; at `CAPSIM_EQ=500` 462 entries, 67 shrunk, BTC 113/121 full (Binance's 0.001 BTC step); **0 entries
+  off the rule** at both balances.
+- `dev/test_panic_sim.py` (with the trigger record for VOLC): 0 missed / 0 extra signals in 3,449 hours, trades 208/208,
+  207/208 the same result (the known ADA 2024-04-12 take-profit rounding).
 
 **v3.0 (Nov 2026), all re-run on the v3.0 configs:**
 - `dev/replay.py <coin> 2020-09-01 2026-11-07` (live decision code with the v3.0 rules) vs `research/crypto/core/v30lib.trades_v30`

@@ -13,6 +13,11 @@ Loop (every `poll_s` seconds):
     positions not yet at breakeven stays <= the cap; BTC is exempt (never shrunk) but its risk counts for the others
   * v3.0: second profit lock (+8R -> stop +3.5R), stale stop (60 h after the fill, never at +1.5R and above -0.3R: stop
     to the entry) and a 16 h cooldown after a loss (no entry fills; the 4h order waits and is placed when it ends)
+  * v3.1: failed-breakout stop tighten (from 8 h after the fill, at each hourly close: been +0.9R but never +1.5R and
+    now below -0.2R -> stop to -0.5R; the cooldown follows whatever the result), BTC stop-out cascade (BTC's trade closed
+    below -0.5R -> the other coins' open same-direction trades get their stop raised to -0.25R; read from BTC's state
+    file) and the VOLC sleeve (volc.py) on the same account: while it holds this coin the bot places no order on it and
+    leaves its position alone (state_volc.json)
 State (entry time, stop distance, order ids) is kept in state_<SYMBOL>.json next to the config, so a
 restart picks up where it left off; the exchange is always the source of truth for the position.
 """
@@ -33,7 +38,7 @@ from binance_futures import Futures, BinanceError      # noqa: E402
 from oi_history import OIHistory                       # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "3.0"
+VERSION = "3.1"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
 N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
 log = logging.getLogger("tbo")
@@ -83,9 +88,10 @@ class Bot:
                     best=0.0, be_done=False, lock_done=False, lock2_done=False, stale_done=False, cool_until=0)
 
     def reset_trade(self):
-        """Forget the closed trade (the cooldown stays)."""
+        """Forget the closed trade (the cooldown and the last_close record stay)."""
         self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False, lock2_done=False,
-                       stale_done=False, stale_checked=False, sl_trig=0.0)
+                       stale_done=False, stale_checked=False, sl_trig=0.0, fb_done=False, fb_be=False, fb_from=0, fb_best=0.0,
+                       fb_close=None, casc_done=False, casc_seen=0)
 
     def save(self):
         tmp = self.state_path.with_suffix(".tmp")
@@ -134,6 +140,10 @@ class Bot:
                 rows.append(f"At {self.P(entry_px + side * self.p.lock2_R * d)} (+{self.p.lock2_R:g}R) the stop locks +{self.p.lock2_to:g}R")
             if self.p.stale_h > 0:
                 rows.append(f"Not at +{self.p.be_R:g}R after {self.p.stale_h:g} h (and above {self.p.stale_thr:g}R): stop to the entry")
+            if self.p.fb_h > 0:
+                rows.append(f"From {self.p.fb_h:g} h: if it was +{self.p.fb_mfe:g}R but falls below {self.p.fb_thr:g}R (hourly close), stop to {self.p.fb_to:g}R")
+            if self.p.casc_src:
+                rows.append(f"If a {self.p.casc_src[:-4]} trade in the same direction is stopped out, stop to {self.p.casc_to:g}R")
             rows.append(f"Size {notify.esc(fmt(q, self.f['step']))} {self.coin} = {notify.usd(q * entry_px)} ({q * entry_px / eq:.1f}× the balance)")
             rows.append(f"Risk <b>{notify.usd(risk)}</b> = {risk / eq * 100:.2f}% of {notify.usd(eq)}")
             rows.append(f"Opened {notify.when(e_ms)} · time exit {notify.when(e_ms + self.p.max_hold_h * 3600_000)} ({notify.tz_label()})")
@@ -320,12 +330,60 @@ class Bot:
         except (OSError, ValueError):
             return None
 
+    # ── v3.1: the VOLC sleeve on the same account (volc.py, state_volc.json) ──
+    def volc_state(self):
+        try:
+            return json.loads((self.dir / f"state_volc{self.suffix}.json").read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def volc_fill(self, sym=None):
+        """True if the position on this coin is the VOLC sleeve's: its trade is recorded, or one of its entry orders on
+        this coin has just triggered (volc.py records the trade within seconds)."""
+        sym = sym or self.sym
+        vs = self.volc_state()
+        if sym in vs.get("trades", {}):
+            return True
+        if self.st.get("entry_id") and not self.dry:      # both orders triggered in the same moment: the trend bot keeps the
+            try:                                          # coin and the sleeve closes its own part (volc.py)
+                if self.x.algo_order(algo_id=self.st["entry_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                    return False
+            except BinanceError:
+                pass
+        for aid in (vs.get("orders", {}).get(sym) or {}).values():
+            if not aid or self.dry:
+                continue
+            try:
+                if self.x.algo_order(algo_id=aid).get("algoStatus") in ("TRIGGERED", "FINISHED"):
+                    return True
+            except BinanceError:
+                pass
+        return False
+
+    def drop_entry_order(self):
+        """Cancel this bot's waiting entry order (the coin is the VOLC sleeve's for now)."""
+        if self.st.get("entry_id"):
+            self.cancel(self.st["entry_id"])
+        self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)
+        self.st.pop("cool_order", None)
+
+    def record_close(self, exit_px, exit_ms):
+        """v3.1: the closed trade's R (net of costs, as the research) for the cascade of the other coins' bots."""
+        side, entry, dist = self.st.get("entry_side") or 0, self.st.get("fill_px") or 0.0, self.st.get("sl_dist") or 0.0
+        if not (side and entry and dist and exit_px):
+            return
+        fee = float(self.cfg.get("fee_side", 0.0006 if self.sym in ("BTCUSDT", "ETHUSDT") else 0.0008))
+        hours = max(0.0, (exit_ms - (self.st.get("entry_ms") or exit_ms)) / 3_600_000)
+        R = S.net_R(side, entry, exit_px, dist, hours, fee)
+        self.st["last_close"] = dict(ms=int(exit_ms), side=side, R=round(R, 4))
+
     def open_risk(self, filled_before=None):
         """USDT lost if every OTHER open position not yet at breakeven hit its stop now (every symbol on the account).
         filled_before (ms): count only positions that filled before it (the first to fill keeps its size); an exempt
         coin (BTC) also counts when it filled in the same minute (BTC goes first, as in the research simulation)."""
         pos = self.x.positions()
         exempt = set(self.portfolio().get("cap_exempt", []))
+        volc = set(self.volc_state().get("trades", {}))
         pos.pop(self.sym, None)
         for s in self.manual_positions():              # the user's own isolated trades: not in the cap
             pos.pop(s, None)
@@ -344,6 +402,8 @@ class Bot:
             side = 1 if amt > 0 else -1
             st = self.coin_state(sym)
             if st is not None and st.get("manual"):     # the user's own trade on a bot coin: not in the cap
+                continue
+            if (st is not None and st.get("volc_hold")) or sym in volc:   # the VOLC sleeve's trade: outside the cap
                 continue
             if filled_before and st is not None:
                 e_ms = st.get("entry_ms") or 0
@@ -385,11 +445,12 @@ class Bot:
     def start_cooldown(self, exit_px, exit_ms):
         """v3.0: a trade that closed below cool_R (price R) starts cool_h hours without entry fills on this coin."""
         side, entry, dist = self.st.get("entry_side") or 0, self.st.get("fill_px") or 0.0, self.st.get("sl_dist") or 0.0
-        if not (side and entry and S.cooldown_after(self.p, side, entry, exit_px, dist)):
+        if not (side and entry and S.cooldown_after(self.p, side, entry, exit_px, dist, fb_done=self.st.get("fb_done"))):
             return
         until = exit_ms - exit_ms % 60_000 + int(round(self.p.cool_h * 60)) * 60_000
         self.st["cool_until"] = max(int(self.st.get("cool_until") or 0), until)
-        log.info(f"COOLDOWN: loss {side * (exit_px - entry) / dist:+.2f}R (< {self.p.cool_R:g}R): no new {self.coin} entry until {utc(until)} UTC")
+        why = "after the failed-breakout stop" if self.st.get("fb_done") and side * (exit_px - entry) / dist >= self.p.cool_R else f"(< {self.p.cool_R:g}R)"
+        log.info(f"COOLDOWN: closed at {side * (exit_px - entry) / dist:+.2f}R {why}: no new {self.coin} entry until {utc(until)} UTC")
         self.tg(f"⏸ <b>{self.coin} cooldown</b>\nAfter the loss no new {self.coin} trade until {notify.when(until)}"
                 f" ({self.p.cool_h:g} h, {notify.tz_label()})")
 
@@ -411,6 +472,7 @@ class Bot:
         self.report_close(tg_why or why)
         self.cancel(self.st.get("sl_id"))
         if exit_px:
+            self.record_close(exit_px, exit_ms)
             self.start_cooldown(exit_px, exit_ms)
         self.reset_trade()
         self.save()
@@ -423,7 +485,8 @@ class Bot:
             dist = self.p.sl_atr * S.atr([k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4], self.p.atr_n)[-1]
             self.st["sl_dist"] = dist
         trig = S.stop_level(self.p, side, entry_px, dist, be_done=self.st.get("be_done"), lock_done=self.st.get("lock_done"),
-                            lock2_done=self.st.get("lock2_done"), stale_done=self.st.get("stale_done"))   # most favourable stage
+                            lock2_done=self.st.get("lock2_done"), stale_done=self.st.get("stale_done"),
+                            fb_done=self.st.get("fb_done"), casc_done=self.st.get("casc_done"))   # most favourable stage
         trig = floor_step(trig, self.f["tick"]) if side == 1 else ceil_step(trig, self.f["tick"])
         self.st["sl_trig"] = trig
         log.info(f"STOP LOSS now at {self.P(trig)} (entry {self.P(entry_px)}, size {abs(amt):g} {self.coin})")
@@ -476,13 +539,18 @@ class Bot:
         weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
         dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday, [k[2] for k in k1], [k[3] for k in k1])
         amt, entry_px = self.x.position(self.sym)
+        if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual") and not self.st.get("volc_hold") and not self.dry:
+            # a fill in the last seconds before this close (or found after a restart): adopt it (stop loss!) while the entry
+            # order is still on record; clearing the order first made the bot take its own trade for a manual one
+            self.check_position()
+            amt, entry_px = self.x.position(self.sym)
         log.debug(f"4h close {utc(open_ms + 4 * 3600_000)}: close {self.P(c[-1])}  ATR {self.P(dec.atr)}  trend "
                  f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"
                  f"{'  (weekend: no new orders)' if self.p.no_weekend and weekday >= 5 else ''}  position {amt}")
         close_ms = open_ms + self.p.tf_min * 60_000
         status = None                                   # the line for the 4h-check message
         # 1. trail exit
-        if not self.st.get("manual") and ((amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short)):
+        if not self.st.get("manual") and not self.st.get("volc_hold") and ((amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short)):
             self.close_position(amt, "trail", "trail exit")
             amt = 0.0
         # 2. the previous entry order expires at this close
@@ -528,7 +596,9 @@ class Bot:
             if amt != 0:
                 log.info(f"the previous entry order filled just now ({amt}): no new order")
         risk_open = 0.0
-        if amt != 0 and self.st.get("manual"):
+        if amt != 0 and self.st.get("volc_hold"):
+            status = "no order · the VOLC sleeve holds this coin"
+        elif amt != 0 and self.st.get("manual"):
             status = "no order · your own position on this coin (left alone)"
         elif amt != 0:
             side_ = 1 if amt > 0 else -1
@@ -684,6 +754,17 @@ class Bot:
         """Every poll: protect a new fill, time exit, clean up after a stop-out."""
         amt, entry_px = self.x.position(self.sym)
         now = self.x.now_ms()
+        if amt == 0 and self.st.get("volc_hold"):
+            self.st["volc_hold"] = False; self.save()   # the VOLC trade is over: orders again from the next 4h close
+            return
+        if amt != 0 and (self.st.get("volc_hold") or (not self.st.get("entry_ms") and not self.st.get("manual") and self.volc_fill())):
+            if not self.st.get("volc_hold"):
+                log.info(f"{self.coin}: the VOLC sleeve's trade ({amt:g}): no orders on {self.coin} until it is closed")
+                self.st["volc_hold"] = True
+            if self.st.get("entry_id") or self.st.get("entry_trig") or self.st.get("cool_order"):
+                self.drop_entry_order()
+            self.save()
+            return
         if amt != 0 and self.manual_trade(amt):
             return
         if amt == 0 and self.st.get("manual"):
@@ -705,7 +786,8 @@ class Bot:
                 risk = abs(amt) * (self.st.get("sl_dist") or 0)
                 self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
                 self.st["cap_check"] = self.cap_frac() > 0
-                self.st.update(fill_px=entry_px, fill_lvl=lvl, fill_qty=abs(amt), risk_usdt=risk, entry_side=side, announce=True)
+                self.st.update(fill_px=entry_px, fill_lvl=lvl, fill_qty=abs(amt), risk_usdt=risk, entry_side=side, announce=True,
+                               fb_from=fill_ms - fill_ms % 60_000 + 60_000, casc_seen=fill_ms - fill_ms % 60_000 - 1)
                 log.info(f"FILLED {'long' if side > 0 else 'short'} {abs(amt):g} {self.coin} @ {self.P(entry_px)}{slip}, risk {risk:.2f} USDT")
                 self.save()
             if not self.sl_alive():
@@ -718,6 +800,10 @@ class Bot:
                 amt, entry_px = self.x.position(self.sym)
             if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
                 self.check_breakeven(amt, entry_px)
+            if self.st.get("entry_ms"):
+                self.check_fb(amt, entry_px)
+            if self.st.get("entry_ms"):
+                self.check_cascade(amt)
             if self.st.get("entry_ms") and self.p.stale_h > 0 and not self.st.get("stale_checked"):
                 at = self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + int(round(self.p.stale_h * 60)) * 60_000
                 if now >= at:
@@ -730,7 +816,9 @@ class Bot:
                 if self.st.get("sl_id") and self.x.algo_order(algo_id=self.st["sl_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
                     why = ("profit-lock stop (+%gR)" % self.p.lock2_to if self.st.get("lock2_done") else
                            "profit-lock stop (+%gR)" % self.p.lock_to if self.st.get("lock_done") else
-                           "breakeven stop" if self.st.get("be_done") else "stale stop (at the entry)" if self.st.get("stale_done") else "stop loss")
+                           "breakeven stop" if self.st.get("be_done") else "stale stop (at the entry)" if self.st.get("stale_done") else
+                           "cascade stop (%gR)" % self.p.casc_to if self.st.get("casc_done") else
+                           "failed-breakout stop (%gR)" % self.p.fb_to if self.st.get("fb_done") else "stop loss")
             except Exception:
                 why = "stop loss or closed by hand"
             log.info(f"position closed: {why}")
@@ -743,7 +831,9 @@ class Bot:
                     exit_ms = tt
             except Exception:
                 pass
-            self.start_cooldown(self.st.get("sl_trig") or self.x.last_price(self.sym), exit_ms)
+            exit_px = self.st.get("sl_trig") or self.x.last_price(self.sym)
+            self.record_close(exit_px, exit_ms)
+            self.start_cooldown(exit_px, exit_ms)
             self.reset_trade()
             self.save()
         elif self.st.get("cool_order"):
@@ -866,6 +956,80 @@ class Bot:
                 f"risk {notify.usd(want)} → {notify.usd(keep * self.st['sl_dist'])}")
         self.x.market(self.sym, "SELL" if amt > 0 else "BUY", fmt(cut, self.f["step"]), reduce_only=True,
                       client_id=self.cid("cap"))
+
+    def check_fb(self, amt, entry_px):
+        """v3.1 failed-breakout stop tighten, replayed on CLOSED 1m candles exactly as the research engine: at the open of
+        each minute on the hour, from fb_h hours after the fill minute, the best excursion so far (1m highs / lows from the
+        minute after the fill) and the previous 1m close decide; disabled once the trade has been +be_R."""
+        if self.p.fb_h <= 0 or self.st.get("fb_done") or self.st.get("fb_be") or not self.st.get("sl_dist"):
+            return
+        side, dist = (1 if amt > 0 else -1), self.st["sl_dist"]
+        entry = self.st.get("fill_px") or entry_px
+        e_min = self.st["entry_ms"] - self.st["entry_ms"] % 60_000
+        first = e_min + int(round(self.p.fb_h * 60)) * 60_000
+        now = self.x.now_ms()
+        if now < first - 6 * 3600_000:                  # nothing to decide for hours: read the candles later
+            return
+        start = self.st.get("fb_from") or e_min + 60_000
+        best = self.st.get("fb_best") or entry
+        last = self.st.get("fb_close")
+        fired = False
+        bars = [k for k in self.x.klines(self.sym, "1m", 1000, start_ms=start) if k[0] >= start and k[0] + 60_000 <= now]
+        nxt = start
+        for k in bars:
+            t = k[0]
+            if t % 3600_000 == 0 and t >= first and last is not None and S.fb_fires(self.p, side, entry, dist, best, last):
+                fired = True; break
+            best = max(best, k[2]) if side == 1 else min(best, k[3])
+            last = k[4]; nxt = t + 60_000
+            if side * (best - entry) >= self.p.be_R * dist:
+                self.st["fb_be"] = True; break
+        if not fired and not self.st.get("fb_be") and nxt % 3600_000 == 0 and first <= nxt <= now and last is not None:
+            fired = S.fb_fires(self.p, side, entry, dist, best, last)       # the hour that has just begun
+        self.st.update(fb_from=nxt, fb_best=best, fb_close=last)
+        if not fired:
+            self.save()
+            return
+        self.st["fb_done"] = True
+        log.info(f"FAILED BREAKOUT: was +{side * (best - entry) / dist:.2f}R, hourly close {side * (last - entry) / dist:+.2f}R: "
+                 f"stop moves to {self.p.fb_to:g}R")
+        self.cancel(self.st.get("sl_id")); self.st["sl_id"] = None
+        stop = self.place_sl(amt, entry_px)
+        if stop:
+            self.tg(f"✂️ <b>{self.coin} failed breakout</b>\nIt was +{side * (best - entry) / dist:.2f}R and is back at "
+                    f"{side * (last - entry) / dist:+.2f}R: stop moved to {self.P(stop)} ({self.p.fb_to:g}R)")
+        self.save()
+
+    def check_cascade(self, amt):
+        """v3.1 cascade: BTC's bot records each closed trade (last_close in its state file); a stop-out below casc_R in this
+        trade's direction, at or after this trade's fill minute, raises this trade's stop to entry + casc_to x dist."""
+        src = self.p.casc_src
+        if not src or src == self.sym or self.st.get("casc_done"):
+            return
+        lc = (self.coin_state(src) or {}).get("last_close")
+        if not lc or int(lc.get("ms", 0)) <= int(self.st.get("casc_seen") or 0):
+            return
+        self.st["casc_seen"] = int(lc["ms"])
+        side = 1 if amt > 0 else -1
+        e_min = self.st["entry_ms"] - self.st["entry_ms"] % 60_000
+        if float(lc.get("R", 0)) >= self.p.casc_R or int(lc.get("side", 0)) != side or e_min > int(lc["ms"]):
+            self.save()
+            return
+        self.st["casc_done"] = True
+        log.info(f"CASCADE: {src[:-4]} {'long' if side > 0 else 'short'} stopped out ({float(lc['R']):+.2f}R): stop moves to {self.p.casc_to:g}R")
+        if S.stop_level(self.p, side, self.st.get("fill_px") or 0.0, self.st["sl_dist"], **{k: self.st.get(k) for k in (
+                "be_done", "lock_done", "lock2_done", "stale_done", "fb_done")}) == S.stop_level(
+                self.p, side, self.st.get("fill_px") or 0.0, self.st["sl_dist"], casc_done=True, **{k: self.st.get(k) for k in (
+                "be_done", "lock_done", "lock2_done", "stale_done", "fb_done")}):
+            self.save()                                 # an earlier stage already holds the stop higher
+            return
+        _, entry_px = self.x.position(self.sym)
+        self.cancel(self.st.get("sl_id")); self.st["sl_id"] = None
+        stop = self.place_sl(amt, entry_px)
+        if stop:
+            self.tg(f"🔗 <b>{self.coin} cascade</b>\n{src[:-4]}'s {'long' if side > 0 else 'short'} was stopped out: stop moved to "
+                    f"{self.P(stop)} ({self.p.casc_to:g}R)")
+        self.save()
 
     def check_breakeven(self, amt, entry_px):
         """Move the stop to entry (+ be_off) once a 1m candle after the fill went be_R x dist in favour, and to
