@@ -416,7 +416,7 @@ entries, breakeven moves and the 5-day exit until it is back.
    Futures wallet with the BNB fee discount on (10% off fees).
 2. **API key:** API Management -> create a key (system generated). Tick **Enable Futures**. **Do NOT enable
    withdrawals.** Restrict it to your server's IP address (on a home PC: your home IP, if it is fixed).
-3. **Install** (Python 3.10+): `git clone` this repo (branch `claude/sweet-meitner-lubkf9`), then
+3. **Install** (Python 3.10+): `git clone` this repo (branch `main`), then
    `pip install -r cryptobot/requirements.txt`.
 4. **Keys:** copy `cryptobot/.env.example` to `.env` in the private-files folder (`TBO_SECRETS_DIR`, default
    `~/tbo-secrets`, on Windows `%USERPROFILE%\tbo-secrets`; see the top-level README) and paste the key and secret. Optional: Telegram
