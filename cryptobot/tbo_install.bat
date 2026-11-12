@@ -1,23 +1,41 @@
 @echo off
 rem TBO installer (Windows): installs and updates the bot on Ubuntu servers (VDS / VPS) from this PC.
-rem   MY SERVER     : your own server (its IP is asked once and kept in my_server.txt)
-rem   OTHER PEOPLE  : friends' servers (name + IP kept in servers.txt); each one trades with his OWN Binance keys
+rem   MY SERVER     : your own server (its IP is asked once and kept in my_server.txt in TBO_SECRETS_DIR)
+rem   OTHER PEOPLE  : friends' servers (name + IP kept in servers.txt in TBO_SECRETS_DIR); each one trades with his OWN Binance keys
 rem The first contact with a server asks its root password once; after that this PC logs in with its SSH key.
 rem Updates: git pull on this PC, then the code is sent to the server (no GitHub access on friends' servers);
 rem the server's .env, state files and logs are never touched. A server that has a git checkout pulls by itself.
 setlocal EnableExtensions EnableDelayedExpansion
 title TBO installer
 cd /d "%~dp0"
-set "LIST=%~dp0servers.txt"
-set "MINE=%~dp0my_server.txt"
-set "KEY=%USERPROFILE%\.ssh\id_ed25519"
-set "SSHO=-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
-rem the SSH key kept in the (private) repo: copied to this PC's .ssh folder (Windows ssh refuses keys with loose file rights)
-if exist "%~dp0secrets\tbo_key" (
-  if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
-  copy /y "%~dp0secrets\tbo_key" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
-  set "SSHO=%SSHO% -i "%USERPROFILE%\.ssh\tbo_repo_key""
+rem Private files live OUTSIDE the repo, in the folder TBO_SECRETS_DIR (default %USERPROFILE%\tbo-secrets):
+rem   tbo_key = the servers' SSH private key, my_server.txt = my server's IP, servers.txt = other people's servers
+if not defined TBO_SECRETS_DIR set "TBO_SECRETS_DIR=%USERPROFILE%\tbo-secrets"
+if not exist "!TBO_SECRETS_DIR!\" (
+  echo.
+  echo   ERROR: the secrets folder was not found: !TBO_SECRETS_DIR!
+  echo   Create it and put tbo_key in it, or set TBO_SECRETS_DIR to the folder that has your private files.
+  echo   See "Private files" in README.md.
+  echo.
+  pause
+  exit /b 1
 )
+set "MINE=!TBO_SECRETS_DIR!\my_server.txt"
+set "REPOKEY=!TBO_SECRETS_DIR!\tbo_key"
+if not exist "!REPOKEY!" (
+  echo.
+  echo   ERROR: SSH key not found: !REPOKEY!
+  echo   Put the servers' SSH private key there as tbo_key, or set TBO_SECRETS_DIR. See "Private files" in README.md.
+  echo.
+  pause
+  exit /b 1
+)
+rem the SSH key is copied to this PC's .ssh folder (Windows ssh refuses keys with loose file rights)
+if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
+copy /y "!REPOKEY!" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
+set "LIST=!TBO_SECRETS_DIR!\servers.txt"
+set "KEY=%USERPROFILE%\.ssh\id_ed25519"
+set "SSHO=-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15 -i "%USERPROFILE%\.ssh\tbo_repo_key""
 
 if /i "%~1"=="update-mine" (
   set "MYIP="
@@ -66,6 +84,8 @@ goto main
 rem ── my server's IP (asked once) ──
 :myip
 if not defined MYIP (
+  echo   my_server.txt not found: !MINE!
+  echo   Type your server's IP once; it is saved there.
   set /p "MYIP=  Your own server's IP address: "
   if "!MYIP!"=="" exit /b 1
   >"%MINE%" echo !MYIP!
@@ -96,6 +116,7 @@ if exist "%LIST%" for /f "usebackq tokens=1,2" %%a in ("%LIST%") do (
   echo    !n!  %%a  ^(%%b^)
 )
 if !n!==0 (
+  if not exist "!LIST!" echo   servers.txt not found: !LIST!
   echo   No servers yet: use 4 to set one up.
   exit /b 1
 )
@@ -236,6 +257,8 @@ exit /b
 :updateall
 call :pkg || exit /b
 set "PKGDONE=1"
+if not exist "!MINE!" echo   my_server.txt not found: !MINE!  ^(skipping my server^)
+if not exist "!LIST!" echo   servers.txt not found: !LIST!  ^(skipping other people's servers^)
 if exist "%MINE%" (
   set /p MYIP=<"%MINE%"
   set "IP=!MYIP!" & set "NAME=my server"

@@ -22,6 +22,20 @@ The full research log (every idea tested, what worked and what did not): [`HANDO
 | `data/` | Binance 1-minute candles 2020-2026 (parquet) and extra Binance data (`data/extra/`: open interest, funding, ...) |
 | `cache/` | Rebuilt automatically (not in git) |
 
+## Private files (outside the repo)
+
+Keys and server details are never stored in this repo. The scripts read them from the folder named by the environment
+variable `TBO_SECRETS_DIR`, by default `%USERPROFILE%\tbo-secrets` on Windows and `~/tbo-secrets` on Linux:
+
+| File | Used by |
+|---|---|
+| `tbo_key` | `tbo_install.bat`, `TBO-VDS.bat` (SSH private key for the servers; required) |
+| `my_server.txt` | `tbo_install.bat`, `TBO-VDS.bat` (asked once and saved here if missing) |
+| `servers.txt` | `tbo_install.bat` (other people's servers; created when you add one) |
+| `.env` | the bot and its tools (`run_all.py`, `bot.py`, `panic.py`, `check_setup.py`, `report.py`); template: `cryptobot/.env.example` |
+
+On a server set up by `vds_setup.sh` the bot keeps its own `.env` in its bot folder; it is used when the secrets folder has none.
+
 ## Common commands (from the repo root)
 
 ```

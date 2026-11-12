@@ -8,3 +8,10 @@ cryptobot/PAUSE
 cryptobot/trial_results/
 cryptobot/oi_*.json
 data/extra2/
+# private files: keep them in TBO_SECRETS_DIR (outside the repo), never in it
+secrets/
+servers.txt
+my_server.txt
+.env
+# Binance account exports (your own trade history) stay out of git
+Binance-*.csv

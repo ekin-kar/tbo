@@ -14,7 +14,7 @@ import notify, strategy as S                                    # noqa: E402
 from binance_futures import Futures, BinanceError               # noqa: E402
 from oi_history import OIHistory                                # noqa: E402
 
-notify.load_env(HERE / ".env")
+ENV_FILE = notify.load_secrets_env(HERE)
 testnet = "--testnet" in sys.argv
 ok_all = True
 
@@ -29,7 +29,7 @@ def res(ok, msg, warn=False):
 cfgs = [json.loads(p.read_text()) for p in sorted(HERE.glob("config_*.json"))]
 key, sec = os.environ.get("BINANCE_API_KEY", ""), os.environ.get("BINANCE_API_SECRET", "")
 print(f"TBO pre-flight check ({'TESTNET' if testnet else 'LIVE'}), configs: {[c['strategy']['symbol'] for c in cfgs]}")
-res(bool(key and sec), "API key and secret found (.env or environment)")
+res(bool(key and sec), f"API key and secret found ({ENV_FILE or 'environment only: no .env in ' + str(notify.secrets_dir())})")
 base = cfgs[0].get("base_url") if cfgs else None
 try:
     x = Futures(key, sec, testnet=testnet, base_url=base)

@@ -1,5 +1,6 @@
 """Telegram messages and .env loading (no extra packages).
-.env next to the configs:  BINANCE_API_KEY=...  BINANCE_API_SECRET=...  TELEGRAM_TOKEN=...  TELEGRAM_CHAT_ID=...
+.env in TBO_SECRETS_DIR (outside the repo; default ~/tbo-secrets, on Windows %USERPROFILE%\tbo-secrets), or for
+servers set up by vds_setup.sh next to the configs:  BINANCE_API_KEY=...  BINANCE_API_SECRET=...  TELEGRAM_TOKEN=...  TELEGRAM_CHAT_ID=...
 Optional: TELEGRAM_UTC_OFFSET=3 shows times in UTC+3 (default: the computer's own time zone).
 
 The bots send their own trade events (opened, breakeven, profit lock, closed, cap cuts) and warnings; run_all.py sends
@@ -7,9 +8,11 @@ one start-up message and answers /status (listen()). Messages use Telegram's HTM
 import html
 import logging
 import os
+import sys
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import requests
 
@@ -24,6 +27,25 @@ def load_env(path):
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
     except FileNotFoundError:
         pass
+
+
+def secrets_dir():
+    """The private-files folder outside the repo: $TBO_SECRETS_DIR, else ~/tbo-secrets (%USERPROFILE%\tbo-secrets)."""
+    d = os.environ.get("TBO_SECRETS_DIR")
+    return Path(d).expanduser() if d else Path.home() / "tbo-secrets"
+
+
+def load_secrets_env(bot_dir):
+    """Load .env from the secrets folder; a server set up by vds_setup.sh keeps its .env in the bot folder
+    (bot_dir), which is used when the secrets folder has none. Returns the file loaded, or None."""
+    for p in (secrets_dir() / ".env", Path(bot_dir) / ".env"):
+        if p.is_file():
+            load_env(p)
+            return p
+    print(f"WARNING: no .env file found. Looked in {secrets_dir() / '.env'} and {Path(bot_dir) / '.env'}. "
+          "Put .env in the secrets folder (or set TBO_SECRETS_DIR); only keys already in the environment are used.",
+          file=sys.stderr)
+    return None
 
 
 def enabled():

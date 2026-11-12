@@ -396,7 +396,7 @@ for the 3 months (changing settings mid-way makes the result impossible to judge
 ## GO LIVE: step by step (v2.6)
 
 **Easiest: `tbo_install.bat` (Windows, in this folder).** Two sections. *My server*: update my bot, check it, or set
-it up from scratch (its IP is asked once and kept in `my_server.txt`). *Other people's servers*: set up a new person's
+it up from scratch (its IP is asked once and kept in `my_server.txt` in the private-files folder, see the top-level README). *Other people's servers*: set up a new person's
 server (fresh Ubuntu 22.04/24.04; asks the root password once, then logs in with this PC's SSH key; asks that person's
 own Binance key / secret and Telegram token / chat id; installs everything with `vds_setup.sh`; reminds you to add the
 server's IP to his API key; runs `check_setup.py`; starts the bot as a service that survives logouts and reboots),
@@ -418,7 +418,8 @@ entries, breakeven moves and the 5-day exit until it is back.
    withdrawals.** Restrict it to your server's IP address (on a home PC: your home IP, if it is fixed).
 3. **Install** (Python 3.10+): `git clone` this repo (branch `claude/sweet-meitner-lubkf9`), then
    `pip install -r cryptobot/requirements.txt`.
-4. **Keys:** copy `cryptobot/.env.example` to `cryptobot/.env` and paste the key and secret. Optional: Telegram
+4. **Keys:** copy `cryptobot/.env.example` to `.env` in the private-files folder (`TBO_SECRETS_DIR`, default
+   `~/tbo-secrets`, on Windows `%USERPROFILE%\tbo-secrets`; see the top-level README) and paste the key and secret. Optional: Telegram
    token + chat id for phone messages (`TELEGRAM_UTC_OFFSET=3` shows times in UTC+3; default: the computer's time zone).
    What arrives (run with `run_all.py`): one short **start-up** message (version and balance);
    **/status** whenever you send it in the chat (or tap it in the bot's / menu), in lines short enough for a phone: every coin as it is now (in a

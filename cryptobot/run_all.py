@@ -21,7 +21,7 @@ import notify                                    # noqa: E402
 flags = [a for a in sys.argv[1:] if a.startswith("--")]
 cfgs = [a for a in sys.argv[1:] if not a.startswith("--")] or sorted(str(p.name) for p in HERE.glob("config_*.json"))
 procs, fails, lock = {}, {c: 0 for c in cfgs + ["panic"]}, threading.Lock()
-notify.load_env(HERE / ".env")
+notify.load_secrets_env(HERE)
 TESTNET, DRY = "--testnet" in flags, "--dry-run" in flags
 MODE = " <i>(dry run)</i>" if DRY else " <i>(testnet)</i>" if TESTNET else ""
 TF_MS = 4 * 3600_000

@@ -102,7 +102,7 @@ def main():
     ap.add_argument("--days", type=int, default=90)
     ap.add_argument("--testnet", action="store_true")
     a = ap.parse_args()
-    notify.load_env(HERE / ".env")
+    notify.load_secrets_env(HERE)
     x = Futures(os.environ.get("BINANCE_API_KEY", ""), os.environ.get("BINANCE_API_SECRET", ""), testnet=a.testnet)
     syms = [json.loads(p.read_text())["strategy"]["symbol"] for p in sorted(HERE.glob("config_*.json"))]
     end = x.now_ms(); start = end - a.days * DAY

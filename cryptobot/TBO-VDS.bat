@@ -1,25 +1,46 @@
 @echo off
 rem Day-to-day control of the bot on MY server (watch, status, restart, update, stop / start).
-rem The server's IP is kept in my_server.txt next to this file (shared with tbo_install.bat; asked once if missing).
+rem The server's IP is kept in my_server.txt in TBO_SECRETS_DIR, outside the repo (shared with tbo_install.bat;
+rem asked once if missing). The SSH key tbo_key is read from the same folder.
 setlocal EnableExtensions EnableDelayedExpansion
 title TBO bot on the VDS
 cd /d "%~dp0"
-set "MINE=%~dp0my_server.txt"
+rem Private files live OUTSIDE the repo, in the folder TBO_SECRETS_DIR (default %USERPROFILE%\tbo-secrets):
+rem   tbo_key = the servers' SSH private key, my_server.txt = my server's IP, servers.txt = other people's servers
+if not defined TBO_SECRETS_DIR set "TBO_SECRETS_DIR=%USERPROFILE%\tbo-secrets"
+if not exist "!TBO_SECRETS_DIR!\" (
+  echo.
+  echo   ERROR: the secrets folder was not found: !TBO_SECRETS_DIR!
+  echo   Create it and put tbo_key in it, or set TBO_SECRETS_DIR to the folder that has your private files.
+  echo   See "Private files" in README.md.
+  echo.
+  pause
+  exit /b 1
+)
+set "MINE=!TBO_SECRETS_DIR!\my_server.txt"
+set "REPOKEY=!TBO_SECRETS_DIR!\tbo_key"
+if not exist "!REPOKEY!" (
+  echo.
+  echo   ERROR: SSH key not found: !REPOKEY!
+  echo   Put the servers' SSH private key there as tbo_key, or set TBO_SECRETS_DIR. See "Private files" in README.md.
+  echo.
+  pause
+  exit /b 1
+)
+rem the SSH key is copied to this PC's .ssh folder (Windows ssh refuses keys with loose file rights)
+if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
+copy /y "!REPOKEY!" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
+set "SSHI=-i "%USERPROFILE%\.ssh\tbo_repo_key""
 set "MYIP="
 if exist "%MINE%" set /p MYIP=<"%MINE%"
 if not defined MYIP (
+  echo   my_server.txt not found: !MINE!
+  echo   Type your server's IP once; it is saved there.
   set /p "MYIP=  Your server's IP address: "
   if "!MYIP!"=="" exit /b
   >"%MINE%" echo !MYIP!
 )
 set "HOST=root@!MYIP!"
-rem the SSH key kept in the (private) repo: copied to this PC's .ssh folder and used
-set "SSHI="
-if exist "%~dp0secrets\tbo_key" (
-  if not exist "%USERPROFILE%\.ssh" mkdir "%USERPROFILE%\.ssh"
-  copy /y "%~dp0secrets\tbo_key" "%USERPROFILE%\.ssh\tbo_repo_key" >nul
-  set "SSHI=-i "%USERPROFILE%\.ssh\tbo_repo_key""
-)
 :menu
 cls
 echo.

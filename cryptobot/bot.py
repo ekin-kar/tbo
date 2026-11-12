@@ -970,7 +970,7 @@ def main():
     a = ap.parse_args()
     path = Path(a.config).resolve()
     cfg = json.loads(path.read_text())
-    notify.load_env(path.parent / ".env")
+    notify.load_secrets_env(path.parent)
     logdir = path.parent / "logs"; logdir.mkdir(exist_ok=True)
     sym = cfg["strategy"]["symbol"]
     lg = logging.getLogger("tbo"); lg.setLevel(logging.DEBUG); lg.propagate = False

@@ -16,7 +16,7 @@ import notify                                                   # noqa: E402
 from binance_futures import Futures, BinanceError               # noqa: E402
 from bot import floor_step, ceil_step, fmt                      # noqa: E402
 
-notify.load_env(HERE / ".env")
+notify.load_secrets_env(HERE)
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 SYM = (args[0] if args else "DOGEUSDT").upper()
 FILL, TESTNET = "--fill" in sys.argv, "--testnet" in sys.argv

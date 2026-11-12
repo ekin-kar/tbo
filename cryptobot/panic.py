@@ -430,7 +430,7 @@ def main():
     ap.add_argument("--testnet", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
-    notify.load_env(HERE / ".env")
+    notify.load_secrets_env(HERE)
     logdir = HERE / "logs"; logdir.mkdir(exist_ok=True)
     lg = logging.getLogger("panic"); lg.setLevel(logging.DEBUG); lg.propagate = False
     con = logging.StreamHandler(sys.stdout); con.setLevel(logging.INFO); con.setFormatter(logging.Formatter("%(message)s"))
