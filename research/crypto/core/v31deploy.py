@@ -4,11 +4,12 @@
          -0.5R, the cooldown after the trade whatever its result) + BTC stop-out cascade (BTC's trade closed below -0.5R
          net -> ETH / alts' open same-direction trades: stop -0.25R at the next minute). Engine core/xengine31.py.
   VOLC   cryptobot/volc_signal.py (the live code) on 4h candles from the 1m data; stop orders valid one 4h candle, stop
-         1 ATR14, take-profit 1.5R (TAKE_PROFIT_MARKET: taker fee), 36 h; no order in the 12 h after a panic trigger (past
-         only, as live); core 5 coins.
-  Same coin, one position (Binance one-way mode), as live: a VOLC trade blocks the coin's TBO fills from its fill minute
-  to the first 4h close after its exit, and a TBO trade blocks VOLC fills the same way. The two lists depend on each other
-  (and the cascade on BTC's list): iterated until neither changes.
+         1 ATR14, take-profit 1.5R as a reduce-only post-only LIMIT placed 0.01% inside the target (maker fee; it fills
+         when the price touches the target = trades 0.01% through the limit, at the limit price), 36 h; no order in the
+         12 h after a panic trigger (past only, as live); core 5.
+  Same coin, one position (Binance one-way mode), TBO first, as live: TBO trades as if VOLC did not exist; VOLC fills are
+  blocked from a TBO fill to the first 4h close after its exit, and a VOLC trade still open when a TBO order fills on its
+  coin is closed at market at the next minute's open (volc.py hands the coin over).
 Money: TBO rows + Panic v3.0 rows + VOLC rows (coin 6, share 0.25 x the ladder's BTC risk), botsim sizing with the
 portfolio.json in force (v3.1: the v3.0 ladder x 0.90)."""
 import os, sys
@@ -28,6 +29,7 @@ VOLC_SHARE = 0.25
 VOLC_P = dict(VS.DEFAULTS)
 TF = 240
 MIN = W.MIN
+TP_PAD = 0.0001                                                    # limit take-profit 0.01% inside the target (live: volc.py)
 SLIP = {"BTCUSDT": 0.0001, "ETHUSDT": 0.0001}
 
 
@@ -130,8 +132,9 @@ def volc_orders(sym, p=None):
 _VO = {}
 
 
-def volc_coin(sym, block=None, start="2020-01-01", end=END, p=None):
-    """One coin's VOLC trades on the 1m engine. block: intervals with no fills (TBO holds the coin)."""
+def volc_coin(sym, block=None, start="2020-01-01", end=END, p=None, kick=None):
+    """One coin's VOLC trades on the 1m engine. block: intervals with no fills (TBO holds the coin); kick: minutes at
+    which an open VOLC trade is closed at the open (the minute after a TBO fill on the coin)."""
     p = dict(VOLC_P, **(p or {}))
     key = (sym, tuple(sorted(p.items())))
     if key not in _VO:
@@ -148,19 +151,26 @@ def volc_coin(sym, block=None, start="2020-01-01", end=END, p=None):
     exp = np.zeros(shp, np.int64)
     slot = np.where(od.dir.to_numpy() > 0, 0, 1)
     kind[inv, slot] = C.E.STOP; dirn[inv, slot] = od.dir.to_numpy(np.int64); price[inv, slot] = od.price.to_numpy(float)
-    sl[inv, slot] = od.dist.to_numpy(float); tp[inv, slot] = od.tp_R.to_numpy(float) * od.dist.to_numpy(float); exp[inv, slot] = TF
+    sl[inv, slot] = od.dist.to_numpy(float); exp[inv, slot] = TF
+    tp[inv, slot] = od.tp_R.to_numpy(float) * od.dist.to_numpy(float)                 # the target: a touch fills the limit
     ones, zeros = np.ones(n, np.bool_), np.zeros(n, np.bool_)
     free = ~_mask(t, block) if block is not None and len(block) else ones
+    xk = zeros.copy()
+    if kick is not None and len(kick):
+        q = np.searchsorted(t, np.asarray(kick, np.int64)); xk[q[q < n]] = True
     pa = W.exit31(be_R=0.0, lock_R=0.0, lock_to=0.0, lock2_R=0.0, lock2_to=0.0, stale_h=0)
     hold = int(p["hold_h"] * 60)
-    res = X31.sim31(t, m["o"], m["h"], m["l"], m["c"], optr, kind, dirn, price, sl, tp, exp, ones, ones, zeros, zeros, zeros,
+    res = X31.sim31(t, m["o"], m["h"], m["l"], m["c"], optr, kind, dirn, price, sl, tp, exp, ones, ones, zeros, xk, xk,
                     np.zeros(n), hold, hold, pa, pa, free, free, zeros, zeros, 0.0, 0, -0.5, 0, 0.0, np.zeros(n), ones)
     e_idx, x_idx, dirs, e_px, x_px, dist, reason, *_ = res
     tr = pd.DataFrame({"entry_time": C.D.to_datetime(t[e_idx]), "exit_time": C.D.to_datetime(t[x_idx]), "dir": dirs, "entry": e_px,
                        "exit": x_px, "sl_dist": dist, "reason": [C.E.REASONS[r] for r in reason]})
-    fee = C.TAKER + SLIP.get(sym, 0.0003)                          # every fill taker (stop entry, stop / TP market exits)
+    tpm = tr.reason.to_numpy() == "TP"                            # the limit (0.01% inside the target) fills at its price
+    tr.loc[tpm, "exit"] = tr.entry[tpm] + tr.dir[tpm] * (float(p["tp_R"]) * tr.sl_dist[tpm] - TP_PAD * tr.entry[tpm])
+    fee = C.TAKER + SLIP.get(sym, 0.0003)                          # stop entry, stop / time / hand-over exits: taker
+    f_out = np.where(tpm, C.MAKER, fee)                            # take-profit limit: maker
     hours = (tr.exit_time - tr.entry_time).dt.total_seconds() / 3600
-    tr["R"] = ((tr.exit - tr.entry) * tr.dir - fee * (tr.entry + tr.exit) - C.FUNDING_8H * hours / 8 * tr.entry) / tr.sl_dist
+    tr["R"] = ((tr.exit - tr.entry) * tr.dir - fee * tr.entry - f_out * tr.exit - C.FUNDING_8H * hours / 8 * tr.entry) / tr.sl_dist
     tr["hours"] = hours; tr["sym"] = sym
     return tr[(tr.entry_time >= start) & (tr.entry_time < end) & (tr.reason != "END")].reset_index(drop=True)
 
@@ -171,22 +181,14 @@ def _keys(X):
 
 
 def build(max_it=10, log=print, volc_p=None):
-    """(TBO trades, VOLC trades, iterations). Starts from TBO without VOLC, then alternates until both lists are stable."""
-    V = pd.DataFrame(columns=["sym", "entry_time", "exit_time", "dir", "R"])
-    T = None
-    for it in range(1, max_it + 1):
-        vb = blocks_from(V) if len(V) else {}
-        btc = tbo_coin("BTCUSDT", vb.get("BTCUSDT"))
-        T_new = pd.concat([btc] + [tbo_coin(s, vb.get(s), btc) for s in COINS[1:]], ignore_index=True)
-        tb = blocks_from(T_new)
-        V_new = pd.concat([volc_coin(s, tb.get(s), p=volc_p) for s in COINS], ignore_index=True)
-        stable = T is not None and _keys(T_new) == _keys(T) and _keys(V_new) == _keys(V)
-        log(f"v31deploy iteration {it}: TBO {len(T_new)} trades ({T_new.R.sum():.1f}R), VOLC {len(V_new)} trades ({V_new.R.sum():.1f}R)"
-            + (" -> stable" if stable else ""))
-        T, V = T_new, V_new
-        if stable:
-            return T, V, it
-    return T, V, -1
+    """(TBO trades, VOLC trades, 1). TBO first (as if VOLC did not exist), then VOLC around it."""
+    btc = tbo_coin("BTCUSDT")
+    T = pd.concat([btc] + [tbo_coin(s, None, btc) for s in COINS[1:]], ignore_index=True)
+    tb = blocks_from(T)
+    kicks = {s: g.entry_time.values.astype("datetime64[m]").astype(np.int64) + 1 for s, g in T.groupby("sym")}
+    V = pd.concat([volc_coin(s, tb.get(s), p=volc_p, kick=kicks.get(s)) for s in COINS], ignore_index=True)
+    log(f"v31deploy: TBO {len(T)} trades ({T.R.sum():.1f}R), VOLC {len(V)} trades ({V.R.sum():.1f}R; {int((V.reason == 'SIGNAL').sum())} handed over to TBO)")
+    return T, V, 1
 
 
 def volc_rows(V, share=VOLC_SHARE):

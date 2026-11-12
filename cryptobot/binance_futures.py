@@ -203,6 +203,20 @@ class Futures:
             algoType="CONDITIONAL", symbol=symbol, side=side, type="TAKE_PROFIT_MARKET", triggerPrice=trigger,
             closePosition="true", workingType="CONTRACT_PRICE", clientAlgoId=client_id), signed=True)
 
+    def limit_order(self, symbol, side, qty, price, reduce_only=True, post_only=True, client_id=None):
+        """A plain LIMIT order (v3.1 VOLC take-profit): reduce-only, post-only (GTX: rejected with -5022 instead of
+        filling at once as a taker if the price is already past it) or GTC."""
+        return self._req("POST", "/fapi/v1/order", dict(symbol=symbol, side=side, type="LIMIT", quantity=qty, price=price,
+                                                         timeInForce="GTX" if post_only else "GTC",
+                                                         reduceOnly="true" if reduce_only else None, newClientOrderId=client_id),
+                         signed=True)
+
+    def get_order(self, symbol, order_id):
+        return self._req("GET", "/fapi/v1/order", dict(symbol=symbol, orderId=order_id), signed=True)
+
+    def cancel_order(self, symbol, order_id):
+        return self._req("DELETE", "/fapi/v1/order", dict(symbol=symbol, orderId=order_id), signed=True)
+
     def open_algo_orders(self, symbol=None):
         """Open conditional orders of one symbol, or of every symbol when symbol is None."""
         r = self._req("GET", "/fapi/v1/openAlgoOrders", dict(symbol=symbol), signed=True)

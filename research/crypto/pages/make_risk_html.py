@@ -1,6 +1,7 @@
 """reports/risk_comparison.html (+ plan_ladder_plus50.html preset): $300 over 24 months with different risk profiles
 (the bot's risk ladder and flat risks, all with the open-risk cap, BTC exempt) and monthly deposits, simulated from random
-4-week blocks of the bot's real v2.4 trades (BTC ETH BNB SOL ADA, shorts x0.5). Sizing: botsim.py (= the bot)."""
+4-week blocks of the real v3.1 trades: the whole system (TBO on BTC ETH BNB SOL ADA, shorts x0.5, + the panic and VOLC
+sleeves at their live sizes relative to the BTC risk). Sizing: botsim.py (= the bot), full_policy."""
 import sys, pathlib; sys.path[:0] = [str(pathlib.Path(__file__).resolve().parents[1] / d) for d in ("core", "studies")]  # research/crypto layout
 import json
 from multiprocessing import Pool
@@ -19,11 +20,11 @@ MON = BS.MON
 
 def journey(args):
     seed, src = args
-    x = BS.journey_trades(seed, *SRCS[src], months=MONTHS)
+    x = BS.journey_trades(seed, *SRCS[src], months=MONTHS, full=True)
     out = {}
     for key, pol, _ in PROFILES:                 # same market path for every profile and deposit (fair comparison)
         for dep in DEPS:
-            r = BS.run(x, pol, START, end=MONTHS * MON, deposit=dep, levels=LEVELS, keep="months")
+            r = BS.run(x, BS.full_policy(pol), START, end=MONTHS * MON, deposit=dep, levels=LEVELS, keep="months")
             mb = (r["months"] + [r["final"]] * MONTHS)[:MONTHS - 1] + [r["final"]]
             out[(key, dep)] = dict(bal=[START] + mb, dd=r["dd"] / 100, low=r["low"], invested=r["invested"],
                                    reach={L: (None if r["reach"][L] is None else r["reach"][L] / MON) for L in LEVELS})

@@ -6,16 +6,16 @@ account next to the trend bots. Settings in volc.json; started by run_all.py whe
     python volc.py --testnet
     python volc.py --dry-run    # no orders: logs what it would do
 
-One coin, one position (Binance one-way mode), so the sleeve and the trend bot never hold the same coin together:
+One coin, one position (Binance one-way mode); the trend bot always has priority:
   * at each 4h close the sleeve places its stop orders on a coin only while the trend bot has no position there
     (and cancels them as soon as the trend bot's entry fills);
-  * when a sleeve order fills, the trend bot's waiting entry order on that coin is cancelled (by the sleeve here and by
-    the bot itself, which sees the trade in state_volc.json) and the bot places no order on that coin until the sleeve's
-    trade is closed (research/crypto/core/v31deploy.py simulates exactly this);
+  * the trend bot keeps placing its own orders while the sleeve holds a coin; when one fills (its order merges with the
+    sleeve's position), the sleeve cancels its stop and take-profit and trades exactly its own quantity back at market,
+    leaving the trend bot's position as if the sleeve had not been there (research/crypto/core/v31deploy.py: the same);
   * the sleeve's trades are outside the open-risk cap (the bots skip them), sized at `share` x the ladder's BTC risk on
     the balance the bots size on (main + panic sub-account).
-Exits on Binance: stop loss (closePosition STOP_MARKET) and take-profit (TAKE_PROFIT_MARKET), both on the last price;
-closed at market hold_h hours after the fill.
+Exits on Binance: stop loss (closePosition STOP_MARKET, last price) and take-profit (a reduce-only post-only LIMIT order:
+maker fee); closed at market hold_h hours after the fill.
 State in state_volc.json (the exchange is the source of truth for positions).
 """
 import argparse
@@ -144,7 +144,9 @@ class Sleeve:
     def tbo_filled(self, sym):
         """The trend bot's entry order on this coin has triggered (its state file names it)."""
         st = self.json_file(f"state_{sym}")
-        if st.get("entry_ms") and not st.get("volc_hold"):
+        if st.get("entry_ms"):
+            return True
+        if st.get("mk_ms") and self.now() - int(st["mk_ms"]) < 120_000:     # a market entry (price already past its level)
             return True
         return self.status(st.get("entry_id")) in ("TRIGGERED", "FINISHED")
 
@@ -175,19 +177,6 @@ class Sleeve:
         for aid in (self.st["orders"].pop(sym, {}) or {}).values():
             self.cancel(aid)
         self.st["pending"].pop(sym, None)
-
-    def cancel_tbo_entry(self, sym):
-        """The trend bot's waiting entry order on this coin (it would add to the sleeve's position in one-way mode)."""
-        if self.dry:
-            return
-        try:
-            for o in self.x.open_algo_orders(sym):
-                cid = str(o.get("clientAlgoId", ""))
-                if cid.startswith("tbo_") and "_in_" in cid:
-                    self.cancel(o["algoId"])
-                    log.info(f"{sym[:-4]}: the trend bot's entry order {o.get('triggerPrice')} cancelled (the sleeve holds {sym[:-4]})")
-        except BinanceError as e:
-            log.warning(f"{sym}: open orders unreadable ({e})")
 
     # ── 4h close: new orders ──
     def data(self, sym, close_ms):
@@ -292,8 +281,8 @@ class Sleeve:
                 side = 1 if "long" in trig or (self.st["pending"].get(sym) or {}).get("side") == 1 else -1
                 log.warning(f"{sym[:-4]}: the trend bot's order filled together with the sleeve's: the sleeve's {q:g} is closed at market")
                 self.cancel_entries(sym)
-                if q > 0 and not self.dry:
-                    self.x.market(sym, "SELL" if side == 1 else "BUY", fmt(q, self.f[sym]["step"]), reduce_only=True, client_id=self.cid("x", sym))
+                if q > 0 and not self.dry:                # (not reduce-only: the bot may have gone the other way)
+                    self.x.market(sym, "SELL" if side == 1 else "BUY", fmt(q, self.f[sym]["step"]), client_id=self.cid("x", sym))
                 continue
             fill_ms = now - 60_000                       # fallback: the fill happened since the last poll
             if ours[0]:
@@ -313,14 +302,14 @@ class Sleeve:
         for aid in (self.st["orders"].pop(sym, {}) or {}).values():
             self.cancel(aid)                            # the other side's order
         self.st["pending"].pop(sym, None)
-        self.cancel_tbo_entry(sym)
         side = 1 if amt > 0 else -1
         dist = float(pend.get("dist") or 0.0)
         f = self.f[sym]
         tr = dict(entry_ms=max(int(pend.get("placed") or 0), int(fill_ms)), entry=entry, qty=abs(amt), side=side,
-                  dist=dist, stop=entry - side * dist, tp=entry + side * float(pend.get("tp_R", self.p["tp_R"])) * dist, sl_id=None, tp_id=None)
+                  dist=dist, stop=entry - side * dist, tp=entry + side * float(pend.get("tp_R", self.p["tp_R"])) * dist, sl_id=None, tp_oid=None)
         tr["stop"] = floor_step(tr["stop"], f["tick"]) if side == 1 else ceil_step(tr["stop"], f["tick"])
-        tr["tp"] = ceil_step(tr["tp"], f["tick"]) if side == 1 else floor_step(tr["tp"], f["tick"])
+        tr["tp"] -= side * float(self.cfg.get("tp_inside", 0.0001)) * entry    # the limit sits 0.01% inside the target: a touch
+        tr["tp"] = floor_step(tr["tp"], f["tick"]) if side == 1 else ceil_step(tr["tp"], f["tick"])   # of the target fills it
         self.st["trades"][sym] = tr
         self.save()
         log.info(f"VOLC FILLED {'long' if side > 0 else 'short'} {abs(amt):g} {sym[:-4]} @ {self.P(sym, entry)} | stop {self.P(sym, tr['stop'])} | "
@@ -344,33 +333,69 @@ class Sleeve:
         try:
             if not tr.get("sl_id"):
                 tr["sl_id"] = self.x.stop_market(sym, xs, fmt(tr["stop"], f["tick"]), close_position=True, client_id=self.cid("sl", sym))["algoId"]
-            if not tr.get("tp_id"):
-                tr["tp_id"] = self.x.take_profit_market(sym, xs, fmt(tr["tp"], f["tick"]), client_id=self.cid("tp", sym))["algoId"]
         except BinanceError as e:
             if e.code == -2021:
-                self.close(sym, "exit level already passed"); return
+                self.close(sym, "stop already passed"); return
             raise
+        if not tr.get("tp_oid"):
+            amt = abs(self.x.position(sym)[0])
+            try:
+                tr["tp_oid"] = self.x.limit_order(sym, xs, fmt(min(tr["qty"], amt), f["step"]), fmt(tr["tp"], f["tick"]), reduce_only=True,
+                                                  post_only=True, client_id=self.cid("tp", sym))["orderId"]
+            except BinanceError as e:
+                if e.code == -5022:                      # post-only would fill at once: the price is already past the take-profit
+                    self.close(sym, "take profit (price already past it)"); return
+                raise
         self.save()
 
     def manage_trade(self, sym, now):
         tr = self.st["trades"][sym]
         amt = tr["qty"] * tr["side"] if self.dry else self.x.position(sym)[0]
+        tps = self.tp_status(sym, tr)
         if amt == 0:
-            why = "take profit" if self.status(tr.get("tp_id")) in ("TRIGGERED", "FINISHED") else "stop"
-            self.finish(sym, why); return
-        if abs(amt) > tr["qty"] + 1e-9 + max(self.f[sym]["step"], self.f[sym]["mkt_step"]) or amt * tr["side"] < 0:
-            log.warning(f"{sym[:-4]}: position {amt:g} is not the sleeve's {tr['qty']:g} alone (the trend bot filled at the same time): "
-                        f"the sleeve's part is closed")
-            self.tg(f"⚠️ <b>{sym[:-4]} VOLC</b> the trend bot's order filled at the same moment: the sleeve's part is closed at market")
-            self.close(sym, "conflict with the trend bot", qty=tr["qty"]); return
+            self.finish(sym, "take profit" if tps == "FILLED" else "stop"); return
+        step = max(self.f[sym]["step"], self.f[sym]["mkt_step"])
+        if not self.dry and (abs(amt) > tr["qty"] + 1e-9 + step or amt * tr["side"] < 0 or self.tbo_filled(sym)):
+            self.hand_over(sym, amt); return              # the trend bot's order filled: it gets the coin
+        if tps == "PARTIALLY_FILLED" or (tps == "FILLED" and amt != 0):
+            tr["qty"] = abs(amt)                          # (partly filled take-profit: the rest keeps its stop)
         if now >= tr["entry_ms"] - tr["entry_ms"] % 60_000 + int(self.p["hold_h"]) * HOUR:
             self.close(sym, f"time exit ({int(self.p['hold_h'])} h)"); return
         if not self.dry:
-            for k in ("sl_id", "tp_id"):
-                if not tr.get(k) or self.status(tr[k]) not in ("NEW", "TRIGGERING", "TRIGGERED", "FINISHED"):
-                    tr[k] = None
-            if not tr.get("sl_id") or not tr.get("tp_id"):
+            if not tr.get("sl_id") or self.status(tr["sl_id"]) not in ("NEW", "TRIGGERING", "TRIGGERED", "FINISHED"):
+                tr["sl_id"] = None
+            if tps in ("CANCELED", "EXPIRED", "REJECTED", None):
+                tr["tp_oid"] = None
+            if not tr.get("sl_id") or not tr.get("tp_oid"):
                 self.place_exits(sym)
+
+    def tp_status(self, sym, tr):
+        if self.dry or not tr.get("tp_oid"):
+            return None
+        try:
+            return self.x.get_order(sym, tr["tp_oid"]).get("status")
+        except BinanceError:
+            return None
+
+    def cancel_tp(self, sym, tr):
+        if tr.get("tp_oid") and not self.dry:
+            try:
+                self.x.cancel_order(sym, tr["tp_oid"])
+            except BinanceError:
+                pass
+
+    def hand_over(self, sym, amt):
+        """The trend bot's entry filled on top of the sleeve's position: the sleeve's stop and take-profit go, and its own
+        quantity is traded back at market (not reduce-only: if the trend bot went the other way, the position has already
+        flipped and the sleeve's exit adds to the bot's side), so the bot is left with exactly its own order's size."""
+        tr = self.st["trades"][sym]
+        self.cancel(tr.get("sl_id")); tr["sl_id"] = None
+        self.cancel_tp(sym, tr); tr["tp_oid"] = None
+        q = tr["qty"]
+        log.info(f"{sym[:-4]}: the trend bot's trade started on this coin (position now {amt:g}): the sleeve's {q:g} goes back at market")
+        if q > 0:
+            self.x.market(sym, "SELL" if tr["side"] == 1 else "BUY", fmt(q, self.f[sym]["step"]), client_id=self.cid("x", sym))
+        self.finish(sym, "the trend bot took the coin", px=self.x.last_price(sym))
 
     def close(self, sym, why, qty=None):
         tr = self.st["trades"].get(sym)
@@ -384,12 +409,12 @@ class Sleeve:
                               client_id=self.cid("x", sym))
         self.finish(sym, why)
 
-    def finish(self, sym, why):
+    def finish(self, sym, why, px=None):
         tr = self.st["trades"].pop(sym, None)
         if tr is None:
             return
-        self.cancel(tr.get("sl_id")); self.cancel(tr.get("tp_id")); self.save()
-        px = self.exit_price(sym, tr)
+        self.cancel(tr.get("sl_id")); self.cancel_tp(sym, tr); self.save()
+        px = px or self.exit_price(sym, tr)
         R = (px - tr["entry"]) * tr["side"] / tr["dist"] if tr["dist"] else 0.0
         log.info(f"VOLC CLOSED {sym[:-4]}: {why} | exit {self.P(sym, px)} | {R:+.2f}R before fees")
         self.tg(f"{'✅' if R > 0 else '❌'} <b>{sym[:-4]} VOLC closed · {notify.num(R, 2, sign=True)}R</b>\nExit {self.P(sym, px)} · {notify.esc(why)}")

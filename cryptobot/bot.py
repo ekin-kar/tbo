@@ -16,8 +16,9 @@ Loop (every `poll_s` seconds):
   * v3.1: failed-breakout stop tighten (from 8 h after the fill, at each hourly close: been +0.9R but never +1.5R and
     now below -0.2R -> stop to -0.5R; the cooldown follows whatever the result), BTC stop-out cascade (BTC's trade closed
     below -0.5R -> the other coins' open same-direction trades get their stop raised to -0.25R; read from BTC's state
-    file) and the VOLC sleeve (volc.py) on the same account: while it holds this coin the bot places no order on it and
-    leaves its position alone (state_volc.json)
+    file) and the VOLC sleeve (volc.py) on the same account: while it holds this coin the bot carries on as if flat (its
+    orders stay; the sleeve's position is not adopted or capped); if the bot's order fills on top of it, volc.py trades
+    its own part back within seconds and the bot then takes over with its own fill price (state_volc.json)
 State (entry time, stop distance, order ids) is kept in state_<SYMBOL>.json next to the config, so a
 restart picks up where it left off; the exchange is always the source of truth for the position.
 """
@@ -91,7 +92,7 @@ class Bot:
         """Forget the closed trade (the cooldown and the last_close record stay)."""
         self.st.update(sl_id=None, entry_side=0, entry_ms=0, best=0.0, be_done=False, lock_done=False, lock2_done=False,
                        stale_done=False, stale_checked=False, sl_trig=0.0, fb_done=False, fb_be=False, fb_from=0, fb_best=0.0,
-                       fb_close=None, casc_done=False, casc_seen=0)
+                       fb_close=None, casc_done=False, casc_seen=0, own_px=False, mk_ms=0)
 
     def save(self):
         tmp = self.state_path.with_suffix(".tmp")
@@ -337,35 +338,56 @@ class Bot:
         except (OSError, ValueError):
             return {}
 
-    def volc_fill(self, sym=None):
-        """True if the position on this coin is the VOLC sleeve's: its trade is recorded, or one of its entry orders on
-        this coin has just triggered (volc.py records the trade within seconds)."""
-        sym = sym or self.sym
+    def volc_owner(self):
+        """None, "volc" (the position on this coin is the VOLC sleeve's: its trade is recorded, or one of its entry orders
+        has just triggered) or "handover" (this bot's order has filled on top of it: volc.py is trading its part back)."""
         vs = self.volc_state()
-        if sym in vs.get("trades", {}):
-            return True
-        if self.st.get("entry_id") and not self.dry:      # both orders triggered in the same moment: the trend bot keeps the
-            try:                                          # coin and the sleeve closes its own part (volc.py)
-                if self.x.algo_order(algo_id=self.st["entry_id"]).get("algoStatus") in ("TRIGGERED", "FINISHED"):
-                    return False
-            except BinanceError:
-                pass
-        for aid in (vs.get("orders", {}).get(sym) or {}).values():
-            if not aid or self.dry:
-                continue
-            try:
-                if self.x.algo_order(algo_id=aid).get("algoStatus") in ("TRIGGERED", "FINISHED"):
-                    return True
-            except BinanceError:
-                pass
-        return False
+        volc = self.sym in vs.get("trades", {})
+        if not volc and not self.dry:
+            for aid in (vs.get("orders", {}).get(self.sym) or {}).values():
+                if aid and self.algo_status(aid) in ("TRIGGERED", "FINISHED"):
+                    volc = True; break
+        if not volc:
+            return None
+        return "handover" if self.own_order_filled() else "volc"
 
-    def drop_entry_order(self):
-        """Cancel this bot's waiting entry order (the coin is the VOLC sleeve's for now)."""
-        if self.st.get("entry_id"):
-            self.cancel(self.st["entry_id"])
-        self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)
-        self.st.pop("cool_order", None)
+    def algo_status(self, aid):
+        try:
+            return self.x.algo_order(algo_id=aid).get("algoStatus")
+        except BinanceError:
+            return None
+
+    def own_order_filled(self):
+        if self.dry:
+            return False
+        if self.st.get("entry_id") and self.algo_status(self.st["entry_id"]) in ("TRIGGERED", "FINISHED"):
+            return True
+        mk = int(self.st.get("mk_ms") or 0)
+        return bool(mk) and self.x.now_ms() - mk < 120_000
+
+    def own_fill_price(self, fallback):
+        """This bot's own fill price (after a hand-over the position's average entry mixes in the sleeve's trades)."""
+        try:
+            o = self.x.algo_order(algo_id=self.st["entry_id"]) if self.st.get("entry_id") else {}
+            p = float(o.get("actualPrice") or 0)
+            if p > 0:
+                return p
+            if o.get("actualOrderId"):
+                p = float(self.x.get_order(self.sym, o["actualOrderId"]).get("avgPrice") or 0)
+                if p > 0:
+                    return p
+        except Exception as e:
+            log.info(f"own fill price unreadable ({e}): the order level is used")
+        return float(self.st.get("entry_trig") or 0) or fallback
+
+    def own_position(self):
+        """(amount, entry) of this bot's own trade: 0 while the position on the coin is the VOLC sleeve's."""
+        amt, entry = self.x.position(self.sym)
+        if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual") and self.volc_owner() == "volc":
+            return 0.0, 0.0
+        if self.st.get("entry_ms") and self.st.get("own_px") and self.st.get("fill_px"):
+            entry = self.st["fill_px"]
+        return amt, entry
 
     def record_close(self, exit_px, exit_ms):
         """v3.1: the closed trade's R (net of costs, as the research) for the cascade of the other coins' bots."""
@@ -403,7 +425,7 @@ class Bot:
             st = self.coin_state(sym)
             if st is not None and st.get("manual"):     # the user's own trade on a bot coin: not in the cap
                 continue
-            if (st is not None and st.get("volc_hold")) or sym in volc:   # the VOLC sleeve's trade: outside the cap
+            if sym in volc and not (st or {}).get("entry_ms"):   # the VOLC sleeve's trade: outside the cap
                 continue
             if filled_before and st is not None:
                 e_ms = st.get("entry_ms") or 0
@@ -517,6 +539,7 @@ class Bot:
         last = self.x.last_price(self.sym)
         if (side == 1 and last >= trig) or (side == -1 and last <= trig):
             log.info(f"price {last} already beyond the level: market entry (as the backtest fills at the open)")
+            self.st["mk_ms"] = self.x.now_ms()
             self.x.market(self.sym, bs, q, client_id=self.cid("mk"))
             return True
         try:
@@ -526,6 +549,7 @@ class Bot:
             if e.code != -2021:
                 raise
             log.info("price already beyond the level: market entry (as the backtest fills at the open)")
+            self.st["mk_ms"] = self.x.now_ms()
             self.x.market(self.sym, bs, q, client_id=self.cid("mk"))
             return True
         return False
@@ -538,19 +562,19 @@ class Bot:
         h, l, c = [k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4]
         weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
         dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday, [k[2] for k in k1], [k[3] for k in k1])
-        amt, entry_px = self.x.position(self.sym)
-        if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual") and not self.st.get("volc_hold") and not self.dry:
+        amt, entry_px = self.own_position()
+        if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual") and not self.dry:
             # a fill in the last seconds before this close (or found after a restart): adopt it (stop loss!) while the entry
             # order is still on record; clearing the order first made the bot take its own trade for a manual one
             self.check_position()
-            amt, entry_px = self.x.position(self.sym)
+            amt, entry_px = self.own_position()
         log.debug(f"4h close {utc(open_ms + 4 * 3600_000)}: close {self.P(c[-1])}  ATR {self.P(dec.atr)}  trend "
                  f"{'up' if dec.trend > 0 else 'down' if dec.trend < 0 else 'none'}"
                  f"{'  (weekend: no new orders)' if self.p.no_weekend and weekday >= 5 else ''}  position {amt}")
         close_ms = open_ms + self.p.tf_min * 60_000
         status = None                                   # the line for the 4h-check message
         # 1. trail exit
-        if not self.st.get("manual") and not self.st.get("volc_hold") and ((amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short)):
+        if not self.st.get("manual") and self.st.get("entry_ms") and ((amt > 0 and dec.exit_long) or (amt < 0 and dec.exit_short)):
             self.close_position(amt, "trail", "trail exit")
             amt = 0.0
         # 2. the previous entry order expires at this close
@@ -592,13 +616,11 @@ class Bot:
                           + (f" (< {self.p.oi_low_rank * 100:.0f}%: no new entry order)" if low_blocked else ""))
         # 3. new entry order while flat (re-read: the old entry order may have filled in the meantime)
         if amt == 0 and not self.dry:
-            amt, _ = self.x.position(self.sym)
+            amt, _ = self.own_position()
             if amt != 0:
                 log.info(f"the previous entry order filled just now ({amt}): no new order")
         risk_open = 0.0
-        if amt != 0 and self.st.get("volc_hold"):
-            status = "no order · the VOLC sleeve holds this coin"
-        elif amt != 0 and self.st.get("manual"):
+        if amt != 0 and self.st.get("manual"):
             status = "no order · your own position on this coin (left alone)"
         elif amt != 0:
             side_ = 1 if amt > 0 else -1
@@ -754,17 +776,19 @@ class Bot:
         """Every poll: protect a new fill, time exit, clean up after a stop-out."""
         amt, entry_px = self.x.position(self.sym)
         now = self.x.now_ms()
-        if amt == 0 and self.st.get("volc_hold"):
-            self.st["volc_hold"] = False; self.save()   # the VOLC trade is over: orders again from the next 4h close
-            return
-        if amt != 0 and (self.st.get("volc_hold") or (not self.st.get("entry_ms") and not self.st.get("manual") and self.volc_fill())):
-            if not self.st.get("volc_hold"):
-                log.info(f"{self.coin}: the VOLC sleeve's trade ({amt:g}): no orders on {self.coin} until it is closed")
-                self.st["volc_hold"] = True
-            if self.st.get("entry_id") or self.st.get("entry_trig") or self.st.get("cool_order"):
-                self.drop_entry_order()
-            self.save()
-            return
+        self.st.pop("volc_hold", None)                  # (the first v3.1 build's flag: no longer used)
+        if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual"):
+            owner = self.volc_owner()
+            if owner == "volc":
+                amt = 0.0                               # the VOLC sleeve's trade: this bot carries on as if flat
+            elif owner == "handover":                   # this bot's order filled on top of it: volc.py trades its part back
+                self.st["ho"] = True
+                since = self.st.setdefault("ho_since", now)
+                if now - since < 60_000:
+                    return
+                log.warning(f"{self.coin}: the VOLC sleeve has not handed the coin over after 60 s: the whole position is taken over")
+        elif self.st.get("entry_ms") and self.st.get("own_px") and self.st.get("fill_px"):
+            entry_px = self.st["fill_px"]
         if amt != 0 and self.manual_trade(amt):
             return
         if amt == 0 and self.st.get("manual"):
@@ -784,6 +808,11 @@ class Bot:
                 lvl, side = self.st.get("entry_trig") or 0.0, (1 if amt > 0 else -1)
                 slip = f", level {self.P(lvl)}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""
                 risk = abs(amt) * (self.st.get("sl_dist") or 0)
+                if self.st.pop("ho", None):            # after a hand-over: the bot's own fill price, not the mixed average
+                    entry_px = self.own_fill_price(entry_px)
+                    self.st["own_px"] = True
+                    slip = f", level {self.P(lvl)} (taken over from the VOLC sleeve)" if lvl else ""
+                self.st.pop("ho_since", None)
                 self.st.update(entry_id=None, entry_trig=0.0, entry_qty=0.0)   # the entry order has triggered
                 self.st["cap_check"] = self.cap_frac() > 0
                 self.st.update(fill_px=entry_px, fill_lvl=lvl, fill_qty=abs(amt), risk_usdt=risk, entry_side=side, announce=True,
@@ -808,7 +837,8 @@ class Bot:
                 at = self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + int(round(self.p.stale_h * 60)) * 60_000
                 if now >= at:
                     self.check_stale(amt, entry_px)
-            if self.st.get("entry_ms") and now - self.st["entry_ms"] >= self.p.max_hold_h * 3600_000:
+            if self.st.get("entry_ms") and now >= self.st["entry_ms"] - self.st["entry_ms"] % 60_000 + self.p.max_hold_h * 3600_000:
+                # (counted from the fill MINUTE, as the research engine and the stale check)
                 self.close_position(amt, f"time ({self.p.max_hold_h:.0f}h)", f"time exit after {self.p.max_hold_h / 24:g} days")
         elif self.st.get("entry_ms"):
             why = "closed outside the bot (by hand?)"
@@ -913,7 +943,7 @@ class Bot:
         log.info(f"CAP: entry order {fmt(old, self.f['step'])} -> {fmt(qty, self.f['step'])} ({note})")
         if self.st.get("entry_id"):
             self.cancel(self.st["entry_id"])
-            amt, _ = self.x.position(self.sym)
+            amt, _ = self.own_position()
             if amt != 0:                                # it filled just before the cancel: the fill check takes over
                 log.info("the entry order filled before the change")
                 return

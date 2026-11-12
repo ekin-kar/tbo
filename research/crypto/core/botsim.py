@@ -92,7 +92,7 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
         e, xx, be, d, R, c = x[i]; c = int(c)
         if kind == 1:
             fr, rk, cap = row_at(pol, eq)
-            amt = eq * rk[c] / 100 * pol["mult"] * (pol["smult"] if d < 0 else 1.0)
+            amt = eq * rk[c] / 100 * pol["mult"] * (pol["smult"] if d < 0 and c < 5 else 1.0)   # (sleeves: no short factor)
             if full is not None:
                 full[i] = (amt, eq)
             if cap > 0 and c not in pol["exempt"]:
@@ -126,15 +126,48 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
                 months=mbal, skipped=skipped)
 
 
+# ── the full v3.1 system: TBO + panic sleeve (coin 5) + VOLC sleeve (coin 6), as live ─────────────────────────────
+VOLC_SHARE, PANIC_UNITS = 0.25, 3.0
+_SL = {}
+
+
+def sleeve_rows():
+    """Panic v3.0 (5 core + 7 extra coins, max 2 extra open) and the VOLC sleeve's trades (cache/volc_trades_<TAG>.pkl, from
+    build_trades.py v31) as rows (entry, exit, be = entry, dir, R, coin 5 / 6): sized outside the open-risk cap."""
+    if "r" not in _SL:
+        import panic_sleeve as PSL
+        rows = [PSL.sleeve_rows(PSL.events())]
+        f = C.D.CACHE / f"volc_trades_{TAG}.pkl"
+        if f.exists():
+            V = pd.read_pickle(f)
+            m = lambda col: V[col].values.astype("datetime64[m]").astype(np.int64)
+            rows.append(np.c_[m("entry_time"), m("exit_time"), m("entry_time"), V.dir.values, V.R.values, np.full(len(V), 6)])
+        _SL["r"] = np.concatenate(rows).astype(float)
+    return _SL["r"]
+
+
+def full_policy(pol):
+    """pol + the panic sleeve (PANIC_UNITS / 6 of the row's BTC risk per 5% move) and VOLC (VOLC_SHARE x the BTC risk)."""
+    return dict(pol, rows=[(f, list(rk[:5]) + [rk[0] * PANIC_UNITS / 6, rk[0] * VOLC_SHARE], cap) for f, rk, cap in pol["rows"]],
+                exempt=set(pol["exempt"]) | {5, 6})
+
+
+def window_full(a, b):
+    """TBO rows of the window first (same order as window(), so history()'s trade table still lines up), sleeves after."""
+    xb, t0, t1 = window(a, b)
+    S = sleeve_rows()
+    return np.r_[xb, S[(S[:, 0] >= t0) & (S[:, 0] < t1)]], t0, t1, len(xb)
+
+
 def window(a, b):
     t0, t1 = pd.Timestamp(a).value // MIN, pd.Timestamp(b).value // MIN
     return TR[(TR[:, 0] >= t0) & (TR[:, 0] < t1)], t0, t1
 
 
-def journey_trades(seed, a="2022-01-01", b="2026-11-07", months=24):
+def journey_trades(seed, a="2022-01-01", b="2026-11-07", months=24, full=False):
     """Random 4-week blocks of the real trades glued into one path starting at t=0 (blocks start on a 4h boundary)."""
     r = np.random.default_rng(seed)
-    pool, t0, t1 = window(a, b)
+    pool, t0, t1 = window_full(a, b)[:3] if full else window(a, b)
     rows = []
     for k in range(int(np.ceil(months * MON / BLK))):
         u = t0 + r.integers(0, (t1 - BLK - t0) // 240) * 240
@@ -143,9 +176,13 @@ def journey_trades(seed, a="2022-01-01", b="2026-11-07", months=24):
     return np.concatenate(rows)
 
 
-def history(pol, a, b, eq0=200.0):
-    """Real history a..b: dict with daily balance / worst-case drawdown series, the taken trades with $ results."""
-    x, t0, t1 = window(a, b)
+def history(pol, a, b, eq0=200.0, full=False):
+    """Real history a..b: dict with daily balance / worst-case drawdown series, the taken trades with $ results.
+    full: the whole v3.1 system (pol = the bot's policy; the panic and VOLC sleeves are added, their trades are not listed)."""
+    if full:
+        x, t0, t1, nb = window_full(a, b); pol = full_policy(pol)
+    else:
+        x, t0, t1 = window(a, b); nb = len(x)
     r = run(x, pol, eq0, keep="events")
     ev = pd.DataFrame(r["events"], columns=["t", "bal", "worst"])
     ev["t"] = pd.to_datetime(ev.t * MIN)
@@ -156,6 +193,6 @@ def history(pol, a, b, eq0=200.0):
     ddd = (wst / np.maximum.accumulate(np.maximum(wst.values, 1e-9)) - 1) * 100
     r2 = run(x, pol, eq0, keep="trades")
     sel = T[(T.entry_time >= a) & (T.entry_time < b)].reset_index(drop=True)
-    tk = sel.loc[sorted(r2["amts"])].copy()
+    tk = sel.loc[sorted(i for i in r2["amts"] if i < nb)].copy()
     tk["risk_usd"] = [r2["amts"][i] for i in tk.index]; tk["pnl"] = tk.risk_usd * tk.R
     return dict(r=r, bal=bal, dd=ddd, events=ev, trades=tk)

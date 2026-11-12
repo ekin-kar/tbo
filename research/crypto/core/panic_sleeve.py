@@ -122,19 +122,27 @@ def sleeve_rows(ev):
 
 
 def policy(units=UNITS, pol=None):
+    """The bot's policy + this sleeve (coin 5) + the v3.1 VOLC sleeve (coin 6, botsim.VOLC_SHARE x the BTC risk)."""
     p = pol or B.bot_policy()
-    return dict(p, rows=[(f, rk + [rk[0] * units / 6], cap) for f, rk, cap in p["rows"]], exempt=set(p["exempt"]) | {5})
+    return dict(p, rows=[(f, list(rk[:5]) + [rk[0] * units / 6, rk[0] * B.VOLC_SHARE], cap) for f, rk, cap in p["rows"]],
+                exempt=set(p["exempt"]) | {5, 6})
+
+
+def volc_rows():
+    """v3.1: the VOLC sleeve's rows (coin 6) from botsim, part of 'the bot' on the panic page."""
+    S = B.sleeve_rows()
+    return S[S[:, 5] == 6]
 
 
 def combined_TR(ev):
-    X = np.r_[B.TR, sleeve_rows(ev)] if len(ev) else B.TR.copy()
+    X = np.r_[B.TR, volc_rows()] if ev is None or not len(ev) else np.r_[B.TR, volc_rows(), sleeve_rows(ev)]
     return X[np.lexsort((X[:, 5], X[:, 0]))]
 
 
 def run(a="2022-01-01", b="2026-11-07", ev=None, units=UNITS, eq0=300.0, keep=None):
     """The bot alone (ev None) or bot + sleeve from eq0 between a and b; botsim result dict."""
-    X = combined_TR(ev) if ev is not None else B.TR
-    pol = policy(units) if ev is not None else B.bot_policy()
+    X = combined_TR(ev)                                            # v3.1: 'the bot' = TBO + the VOLC sleeve
+    pol = policy(units)
     t0, t1 = pd.Timestamp(a).value // 60_000_000_000, pd.Timestamp(b).value // 60_000_000_000
     x = X[(X[:, 0] >= t0) & (X[:, 0] < t1)].copy(); x[:, :3] -= t0
     return B.run(x, pol, eq0, keep=keep)

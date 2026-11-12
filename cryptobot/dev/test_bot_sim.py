@@ -148,6 +148,26 @@ class FakeFutures:
             self.sl_log.append((int(self.m["t"][self.j]), trig))
         return {"algoId": aid}
 
+    LIMIT_PAD = 0.0001                                  # a limit order fills once the price trades 0.01% through it
+
+    def limit_order(self, sym, side, qty, price, reduce_only=True, post_only=True, client_id=None):
+        px = float(price); o = self.m["o"][self.j]
+        if post_only and ((side == "SELL" and o >= px) or (side == "BUY" and o <= px)):
+            raise BinanceError(400, -5022, "Post Only order will be rejected.")
+        oid = self.next_id; self.next_id += 1
+        self.lims = getattr(self, "lims", {})
+        self.lims[oid] = dict(orderId=oid, clientOrderId=client_id, side=side, price=px, qty=float(qty), reduce=reduce_only, status="NEW")
+        return {"orderId": oid}
+
+    def get_order(self, sym, order_id):
+        return getattr(self, "lims", {}).get(order_id, {"status": "UNKNOWN"})
+
+    def cancel_order(self, sym, order_id):
+        od = getattr(self, "lims", {}).get(order_id)
+        if od is None or od["status"] != "NEW":
+            raise BinanceError(400, -2011, "Unknown order")
+        od["status"] = "CANCELED"
+
     def open_algo_orders(self, sym=None):
         if sym is None:
             return [f.orders[i] for f in self.group for i in sorted(f.open_ids)]
@@ -166,6 +186,17 @@ class FakeFutures:
     def process_bar(self):
         """Exchange side of 1m bar j: resting stops trigger on the bar's range."""
         o, h, l = self.m["o"][self.j], self.m["h"][self.j], self.m["l"][self.j]
+        self._bar_algos(o, h, l)
+        for od in [v for v in getattr(self, "lims", {}).values() if v["status"] == "NEW"]:
+            hit = (od["side"] == "SELL" and h >= od["price"] * (1 + self.LIMIT_PAD)) or (od["side"] == "BUY" and l <= od["price"] * (1 - self.LIMIT_PAD))
+            if not hit or (od["reduce"] and self.pos == 0):
+                continue
+            od["status"] = "FILLED"
+            q = min(od["qty"], abs(self.pos)) if od["reduce"] else od["qty"]
+            self._fill(od["side"], q, od["price"], "tp", od["clientOrderId"] if self.tag_fills else None)
+
+    def _bar_algos(self, o, h, l):
+        """The conditional (algo) orders of this bar: the stops trigger on the bar's range."""
         for od in [self.orders[i] for i in sorted(self.open_ids)]:
             if od["algoStatus"] != "NEW":
                 continue
@@ -182,6 +213,7 @@ class FakeFutures:
                 continue
             px = max(od["trig"], o) if od["side"] == "BUY" else min(od["trig"], o)
             od["algoStatus"] = "FINISHED"; self.open_ids.discard(od["algoId"])
+            od["triggerTime"] = int(self.m["t"][self.j]) * 60_000 + 30_000; od["actualPrice"] = str(px)
             cid = od["clientAlgoId"] if self.tag_fills else None
             if od["close"]:
                 if self.pos != 0:

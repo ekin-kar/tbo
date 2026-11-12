@@ -1,11 +1,11 @@
 {
-  "open_risk_cap_pct": 4.95,
+  "open_risk_cap_pct": 5.225,
   "cap_exempt": ["BTCUSDT"],
   "cap_min_fraction": 0.25,
-  "risk_scale_note": "v3.1 (Nov 2026): every risk and cap of the v3.0 ladder x 0.90 (research/results/v31_REPORT.md section 9)",
+  "risk_scale_note": "v3.1 (13 Nov 2026): every risk and cap of the v3.0 ladder x 0.95 (research/results/v31_deploy_money.csv)",
   "risk_ladder": [
-    {"from_usdt": 0, "BTCUSDT": 5.4, "ETHUSDT": 3.6, "BNBUSDT": 0.747, "SOLUSDT": 0.747, "ADAUSDT": 0.747, "cap_pct": 5.94},
-    {"from_usdt": 1000, "BTCUSDT": 4.5, "ETHUSDT": 2.97, "BNBUSDT": 0.747, "SOLUSDT": 0.747, "ADAUSDT": 0.747, "cap_pct": 4.95},
-    {"from_usdt": 10000, "BTCUSDT": 2.25, "ETHUSDT": 1.53, "BNBUSDT": 0.378, "SOLUSDT": 0.378, "ADAUSDT": 0.378, "cap_pct": 2.475}
+    {"from_usdt": 0, "BTCUSDT": 5.7, "ETHUSDT": 3.8, "BNBUSDT": 0.7885, "SOLUSDT": 0.7885, "ADAUSDT": 0.7885, "cap_pct": 6.27},
+    {"from_usdt": 1000, "BTCUSDT": 4.75, "ETHUSDT": 3.135, "BNBUSDT": 0.7885, "SOLUSDT": 0.7885, "ADAUSDT": 0.7885, "cap_pct": 5.225},
+    {"from_usdt": 10000, "BTCUSDT": 2.375, "ETHUSDT": 1.615, "BNBUSDT": 0.399, "SOLUSDT": 0.399, "ADAUSDT": 0.399, "cap_pct": 2.6125}
   ]
 }
