@@ -195,9 +195,14 @@ def parity():
 # ── money ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 @njit(cache=True)
 def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs, smult, cap_short, minf, gm, extra,
-             hfrac, btc_uw, btc_k, br_days, br_x, br_m, r_btc, br_reset, fixed, capm, cap_sl, sl_gate):
+             hfrac, btc_uw, btc_k, br_days, br_x, br_m, r_btc, br_reset, fixed, capm, cap_sl, sl_gate, cap_base, lcap):
+    """cap_base (v3.2b): the open-risk cap counts each TBO trade at its un-scaled base risk (row risk x short mult), the
+    size multipliers (mult, loss brake) act after the cap -> a size-down never frees cap room for other coins and a boost
+    never eats the alts' room. False = the live / v3.1 rule (the cap counts the actual, scaled risk).
+    lcap: per-row max risk as a fraction of the sizing balance (sleeve leverage cap = lev x stop distance / entry; 0 = none)."""
     n = len(d)
     amt = np.zeros(n); camt = np.zeros(n); isopen = np.zeros(n, np.bool_); counted = np.zeros(n, np.bool_)
+    oamt = np.zeros(n); osum = 0.0                                   # actual open risk of the counted trades (drawdown)
     eq = eq0; pk = eq0; dd = 0.0; csum = 0.0; skipped = 0; bsum = 0.0; dda = 0.0
     # closed-loss brake: ring of (time, units)
     cl_t = np.zeros(n); cl_u = np.zeros(n); ncl = 0; head = 0; wsum = 0.0; armed = False
@@ -215,6 +220,8 @@ def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs,
                     r = rr
             if c >= 5:
                 a = es * risk[r, 0] * extra[c] / 100 * gm * mult[i]
+                if lcap[i] > 0 and a > es * lcap[i]:
+                    a = es * lcap[i]
                 if cap_sl[c] and a > 0:                                 # sleeve inside the open-risk cap (v3.1b)
                     capd = capv[r] / 100 * gm * es * capm[i]
                     if sl_gate > 0 and csum >= sl_gate * capd:
@@ -224,16 +231,20 @@ def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs,
                         if a > room:
                             a = room if room > minf * a else 0.0
                     if a > 0:
-                        amt[i] = a; camt[i] = a; isopen[i] = True; counted[i] = True; csum += a
+                        amt[i] = a; camt[i] = a; isopen[i] = True; counted[i] = True; csum += a; oamt[i] = a; osum += a
                     else:
                         skipped += 1
                 elif a > 0:
                     amt[i] = a; isopen[i] = True; counted[i] = False
-                p_t[q] = tq; p_eq[q] = eq; p_w[q] = eq - csum
+                p_t[q] = tq; p_eq[q] = eq; p_w[q] = eq - osum
                 continue
             sm = smult[c] if d[i] < 0 else 1.0
             bm = br_m if armed else 1.0
             a = es * risk[r, c] / 100 * gm * sm * mult[i] * bm
+            scl = 1.0
+            if cap_base:
+                scl = mult[i] * bm
+                a = es * risk[r, c] / 100 * gm * sm if scl > 0 else 0.0
             capx = capv[r]
             if d[i] < 0 and cap_short:
                 capx = capv[r] * smult[0]
@@ -244,23 +255,23 @@ def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs,
                 if a > room:
                     a = room if room > minf * a else 0.0
             if a > 0:
-                amt[i] = a; camt[i] = a; isopen[i] = True; counted[i] = True; csum += a
+                amt[i] = a * scl; camt[i] = a; isopen[i] = True; counted[i] = True; csum += a; oamt[i] = a * scl; osum += a * scl
                 if c == 0:
                     bsum += a
             else:
                 skipped += 1
         elif kd == 0:
             if isopen[i] and counted[i]:
-                counted[i] = False; csum -= camt[i]
+                counted[i] = False; csum -= camt[i]; osum -= oamt[i]
                 if c == 0:
                     bsum -= camt[i]
-                camt[i] = 0.0
+                camt[i] = 0.0; oamt[i] = 0.0
             if c < 5 and isopen[i] and br_reset == 0:
                 armed = False
         elif kd == 3:
             if isopen[i] and counted[i] and hfrac < 1.0:
                 nw = camt[i] * hfrac
-                csum -= camt[i] - nw
+                csum -= camt[i] - nw; osum -= oamt[i] * (1.0 - hfrac); oamt[i] *= hfrac
                 if c == 0:
                     bsum -= camt[i] - nw
                 camt[i] = nw
@@ -269,10 +280,10 @@ def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs,
                 pnl = amt[i] * R[i]
                 eq += pnl; isopen[i] = False
                 if counted[i]:
-                    counted[i] = False; csum -= camt[i]
+                    counted[i] = False; csum -= camt[i]; osum -= oamt[i]
                     if c == 0:
                         bsum -= camt[i]
-                    camt[i] = 0.0
+                    camt[i] = 0.0; oamt[i] = 0.0
                 if br_days > 0:
                     if (c >= 5 and R[i] > 0 and br_reset == 0) or (c < 5 and R[i] > 0 and br_reset == 1):
                         armed = False
@@ -285,7 +296,7 @@ def _money31(ev_t, ev_k, ev_i, d, R, coin, mult, eq0, thr, risk, capv, exl, exs,
                         cl_t[ncl] = tq; cl_u[ncl] = u; ncl += 1; wsum += u
                         if u < 0 and wsum <= -br_x:
                             armed = True
-        w = eq - csum
+        w = eq - osum
         if w > pk:
             pk = w
         if pk > 0 and (pk - w) / pk > dd:
@@ -305,6 +316,7 @@ def money31(x, pol, eq0=300.0, hfrac=1.0, btc_k=1.0, brake=None, fixed=False, ca
     half = x[:, 7] if x.shape[1] > 7 else x[:, 2]
     buw = x[:, 8] if x.shape[1] > 8 else np.zeros(n)
     capm = x[:, 9] if x.shape[1] > 9 else np.ones(n)
+    lcap = x[:, 10] if x.shape[1] > 10 else np.zeros(n)
     csl = np.zeros(16, np.bool_)
     for c_ in cap_sleeves:
         csl[int(c_)] = True
@@ -325,7 +337,7 @@ def money31(x, pol, eq0=300.0, hfrac=1.0, btc_k=1.0, brake=None, fixed=False, ca
     rb = a[1][:, 0].copy()
     f, dd, sk, dda, pt, pe, pw = _money31(t[order], kind[order], ii[order], x[:, 3], x[:, 4], x[:, 5].astype(np.int64), mult, eq0, *a,
                                           float(hfrac), buw, float(btc_k), float(bd), float(bx), float(bm), rb, int(brs), bool(fixed),
-                                          capm, csl, float(sl_gate))
+                                          capm, csl, float(sl_gate), pol.get("cap_basis") == "base", lcap)
     out = dict(final=f, dd=dd, skipped=sk, dd_abs=dda)
     if path:
         out["path"] = (pt, pe, pw)
@@ -341,9 +353,10 @@ def window(A, a, b=END):
 
 
 def pad(A, ncol):
-    """Rows padded to ncol columns (mult 1, half = be, btc_uw 0, capm 1)."""
+    """Rows padded to ncol columns (mult 1, half = be, btc_uw 0, capm 1, lcap 0)."""
     A = np.asarray(A, float)
-    d = {6: lambda B: np.ones(len(B)), 7: lambda B: B[:, 2], 8: lambda B: np.zeros(len(B)), 9: lambda B: np.ones(len(B))}
+    d = {6: lambda B: np.ones(len(B)), 7: lambda B: B[:, 2], 8: lambda B: np.zeros(len(B)), 9: lambda B: np.ones(len(B)),
+         10: lambda B: np.zeros(len(B))}
     while A.shape[1] < ncol:
         A = np.c_[A, d[A.shape[1]](A)]
     return A
