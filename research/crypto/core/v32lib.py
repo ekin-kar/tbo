@@ -37,17 +37,21 @@ def btc_tight(t, btc):
 
 
 def trades32(sym, shift=0, btc=None, ex=None, exL2=None, exS2=None, hold2=None, emask=None, dmask=None, dyn=None, ruleB=None,
-             rmaskB=None, exL=None, exS=None, holdL=None, holdS=None, start="2020-01-01", end=W.END):
+             rmaskB=None, exL=None, exS=None, holdL=None, holdS=None, start="2020-01-01", end=W.END, ofilt=None):
     """v3.1 TBO trades of one coin with v3.2 controls.
     ex / exL / exS: exit32 kwargs for both / long / short (over v3.0 + the failed-breakout rule A);
     exL2 / exS2 + hold2 (h) + emask (fn(t) -> (mask_l, mask_s)): the second exit set for trades filled where the mask is True;
     dmask (fn(t) -> (mask_l, mask_s)) + dyn = {'l': [DX, DL, DTP], 's': [...]}: regime-now locks / take-profit;
     ruleB (dict for rule slot B) + rmaskB (fn(t) -> mask): an extra checkpoint rule for trades filled where the mask is True;
-    holdL / holdS: hold limits (h). btc: BTC's v3.2 trades at this shift for the cascade (None for BTC itself)."""
+    holdL / holdS: hold limits (h). btc: BTC's v3.2 trades at this shift for the cascade (None for BTC itself).
+    ofilt(o, t, shift) -> o': edits the entry orders before the run (v3.2c: entry filters inside the engine; the cached
+    arrays must be copied, never modified)."""
     m = L.m1(sym)
     C.SLIP = W.SLIPS.get(sym, 0.0003)
     o, kL, kS = W.orders(sym, shift)
     n = len(m["t"]); t = m["t"]
+    if ofilt is not None:
+        o = ofilt(dict(o), t, shift)
     mm_t = t + shift if shift else t
     ones, zeros = np.ones(n, np.bool_), np.zeros(n, np.bool_)
     dflt = lambda nm, d: o[nm] if o[nm] is not None else d

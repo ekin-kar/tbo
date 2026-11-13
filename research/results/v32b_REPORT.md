@@ -1,5 +1,8 @@
 # v3.2b: the open-risk cap under size multipliers, and four follow-ups (Nov 2026, data to 2026-11-06)
 
+> **Superseded in part by `v32c_REPORT.md`:** the T2 skip below was tested on the frozen v3.1 trade list. Inside the
+> 1-minute engine (re-entries, cooldowns, cascade, VOLC) it fails E4. The exact version is a non-skip size-down (×0.25).
+
 Code: `research/crypto/studies/v32b_cap_fix_and_wild_regime.py` (stages `t1a t1 t2 t3 t4 final`).
 Engine change: `core/v31lib.money31` gains two opt-in options.
 * `pol["cap_basis"] = "base"`: the cap counts each trade's un-scaled risk.
