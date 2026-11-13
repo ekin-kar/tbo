@@ -35,6 +35,33 @@ def cfg_of(c):
 ORDER = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 SYMS = sorted((cfg_of(c)["strategy"]["symbol"] for c in cfgs), key=lambda s: (ORDER.index(s) if s in ORDER else 99, s))
 COIN = {s: s[:-4] for s in SYMS}
+STRAT = {cfg_of(c)["strategy"]["symbol"]: cfg_of(c)["strategy"] for c in cfgs}
+
+
+def stop_stage(st, sd):
+    """The trend bot's current stop stage (the most favourable one reached, as strategy.stop_level), for /status."""
+    if st.get("lock2_done"):
+        return f" (+{sd.get('lock2_to', 3.5):g}R)"
+    if st.get("lock_done"):
+        return f" (+{sd.get('lock_to', 2.0):g}R)"
+    if st.get("be_done"):
+        return " (BE)"
+    if st.get("stale_done"):
+        to = float(sd.get("stale_to", 0.0))
+        return " (BE, stale)" if to == 0 else f" ({to:+g}R, stale)"
+    if st.get("casc_done"):
+        return f" ({sd.get('casc_to', -0.25):g}R, cascade)"
+    if st.get("fb_done"):
+        return f" ({sd.get('fb_to', -0.5):g}R, failed breakout)"
+    return ""
+
+
+def volc_trade_syms():
+    """Coins on which the VOLC sleeve holds a trade (state_volc.json)."""
+    try:
+        return set(json.loads((HERE / f"state_volc{'_testnet' if TESTNET else ''}.json").read_text()).get("trades", {}))
+    except (OSError, ValueError):
+        return set()
 
 
 def pump(cfg, p):
@@ -206,30 +233,32 @@ def status_message(title="📊 <b>Status</b>"):
     last_close = now // TF_MS * TF_MS
     P = lambda s, v: notify.px(v, tick(s))
     blocks, idle, risk, upnl = [], [], 0.0, 0.0
+    vt = volc_trade_syms()
     for s in SYMS:
         st, c = state(s), COIN[s]
         mine = [o for o in orders if o.get("symbol") == s]
-        if s in pos:
+        volc_only = s in pos and s in vt and not st.get("entry_ms") and not st.get("manual")   # listed under VOLC, not here
+        if s in pos and not volc_only:
             price = x.last_price(s)
             amt, entry = pos[s]
             side = 1 if amt > 0 else -1
             pnl = amt * (price - entry)                 # (Binance's average entry; fees not included)
             entry = st.get("fill_px") or entry
             d = float(st.get("sl_dist") or 0)
-            stops = [float(o.get("triggerPrice") or 0) for o in mine
-                     if str(o.get("closePosition")).lower() == "true" or str(o.get("reduceOnly")).lower() == "true"]
+            stops = [float(o.get("triggerPrice") or 0) for o in mine if not str(o.get("clientAlgoId", "")).startswith("vc_")
+                     and (str(o.get("closePosition")).lower() == "true" or str(o.get("reduceOnly")).lower() == "true")]
             stop = (max(stops) if side > 0 else min(stops)) if stops else None
             upnl += pnl
             if stop:
                 risk += max(0.0, side * (entry - stop)) * abs(amt)
-            stage = (f" (+{st.get('lock_to', 1.5):g}R)" if st.get("lock_done") else " (BE)" if st.get("be_done") else "")
+            stage = stop_stage(st, STRAT.get(s, {}))
             held = notify.held(now - st["entry_ms"]) if st.get("entry_ms") else "?"
             blocks.append([f"<b>{c} ● {'long' if side > 0 else 'short'}</b> {notify.num(side * (price - entry) / d if d else 0, 2, sign=True)}R"
                            f" · {notify.usd(pnl, sign=True)}",
                            f"{IND}{P(s, entry)} → {P(s, price)}",
                            f"{IND}SL {P(s, stop)}{stage} · {held}" if stop else f"{IND}⚠️ <b>SL not found on Binance</b> · {held}"])
             continue
-        entries = [o for o in mine if "_in_" in str(o.get("clientAlgoId", ""))]
+        entries = [o for o in mine if str(o.get("clientAlgoId", "")).startswith("tbo_in_")]   # (not the VOLC sleeve's vc_in_)
         held_back = not entries and st.get("entry_trig") and not st.get("entry_qty")
         if entries or held_back:
             price = x.last_price(s)

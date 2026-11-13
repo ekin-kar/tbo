@@ -307,6 +307,8 @@ class Sleeve:
                     continue
                 last = self.x.last_price(sym)
                 if (side == 1 and last >= trig) or (side == -1 and last <= trig):
+                    for aid in orders.values():          # the other side's stop placed a moment ago: gone first
+                        self.cancel(aid)
                     self.st["pending"][sym] = dict(dist=dist, tp_R=dec["tp_R"], placed=close_ms, side=side, trig=trig, qty_mk=qty)
                     self.x.market(sym, bs, fmt(qty, f["step"]), client_id=self.cid("mk", sym))
                     orders = {"mk": None}
@@ -318,6 +320,8 @@ class Sleeve:
                 except BinanceError as e:
                     if e.code != -2021:
                         raise
+                    for aid in orders.values():          # the other side's stop placed a moment ago: gone first
+                        self.cancel(aid)
                     self.x.market(sym, bs, fmt(qty, f["step"]), client_id=self.cid("mk", sym))
                     self.st["pending"][sym] = dict(dist=dist, tp_R=dec["tp_R"], placed=close_ms, side=side, trig=trig, qty_mk=qty)
                     orders = {"mk": None}

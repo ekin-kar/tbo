@@ -519,5 +519,13 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
   - The post-only take-profit rejected with -5022, or returned EXPIRED (closed at market / re-placed next poll).
   - Atomic state writes, with every cross-process reader in try / except.
   - The poll check only calls `openAlgoOrders` for coins where the sleeve has waiting entry orders.
-- Tests: `dev/test_volc_edges.py` (12 cases on a stub exchange) and the full `dev/test_v32_sim.py` 2021-26 run on the
+- **Second review (user), fixed:**
+  - `run_all.py` /status showed a position held only by the VOLC sleeve as a trend-bot trade (and counted its stop in the
+    open risk), took the sleeve's waiting `vc_in_` order for a trend-bot order, and named only the BE / first-lock
+    stages. Every stage is now named from the coin's config, incl. +3.5R, stale, cascade and failed breakout.
+  - `bot.py` after a VOLC hand-over: the cap trim and the cascade re-read Binance's blended entry price. They now use the
+    bot's own fill price (`own_position`), as does `open_risk` for the other coins.
+  - `volc.py` with both sides armed: if the long stop was placed and the short went in at market, the long stop was left
+    on Binance untracked. It is now cancelled first.
+- Tests: `dev/test_volc_edges.py` (19 cases on a stub exchange) and the full `dev/test_v32_sim.py` 2021-26 run on the
   final code (unchanged: VOLC 114 / 115 entries and 112 / 115 exits in the same minute, 0 collision trades, the trend bot and its 1,152 size multipliers identical).

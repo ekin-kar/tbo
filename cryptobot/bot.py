@@ -454,6 +454,8 @@ class Bot:
                 continue
             if sym in volc and not (st or {}).get("entry_ms"):   # the VOLC sleeve's trade: outside the cap
                 continue
+            if st and st.get("own_px") and st.get("fill_px"):   # after a VOLC hand-over: that bot's own fill price
+                entry = float(st["fill_px"])
             if filled_before and st is not None:
                 e_ms = st.get("entry_ms") or 0
                 if e_ms == 0 and st.get("entry_side"):
@@ -861,7 +863,7 @@ class Bot:
                     self.save()
             if self.st.get("cap_check") and self.st.get("entry_ms"):
                 self.trim_to_cap(amt)
-                amt, entry_px = self.x.position(self.sym)
+                amt, entry_px = self.own_position()     # (after a hand-over: this bot's own fill price)
             if self.st.get("entry_ms"):                 # (place_sl may have closed it: price already past the stop)
                 self.check_breakeven(amt, entry_px)
             if self.st.get("entry_ms"):
@@ -1088,7 +1090,7 @@ class Bot:
                 "be_done", "lock_done", "lock2_done", "stale_done", "fb_done")}):
             self.save()                                 # an earlier stage already holds the stop higher
             return
-        _, entry_px = self.x.position(self.sym)
+        _, entry_px = self.own_position()               # (after a hand-over: this bot's own fill price, not Binance's blend)
         self.cancel(self.st.get("sl_id")); self.st["sl_id"] = None
         stop = self.place_sl(amt, entry_px)
         if stop:

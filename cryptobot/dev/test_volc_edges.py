@@ -8,7 +8,12 @@ volc.py edge cases on a stub exchange (no history needed), v3.2.1 audit:
   4. tie guard keys: real Binance openAlgoOrders rows (triggerPrice as a string, no "trig" key);
   5. a stop loss Binance keeps refusing: closed at market after 3 polls (never left without a stop); a take-profit error
      does not abort the poll;
-  6. one coin's exchange error does not stop the other coins being managed in the same poll.
+  6. one coin's exchange error does not stop the other coins being managed in the same poll;
+  7. both sides armed, the long stop placed, the short at market (price already past its level): the long stop is
+     cancelled first (no untracked order left on Binance);
+  8. run_all.py /status: a position held only by the VOLC sleeve is not shown / counted as a trend-bot trade, the sleeve's
+     waiting vc_in_ order is not shown as a trend-bot order, and every stop stage is named;
+  9. bot.py open_risk after a VOLC hand-over: the other bot's own fill price, not Binance's blended entry.
 
     python cryptobot/dev/test_volc_edges.py
 """
@@ -166,6 +171,60 @@ def run():
     sv.manage_trade = mt
     sv.manage()
     check("one coin's error does not stop the others", seen == ["BTCUSDT", "ETHUSDT"], seen)
+    # 7. two-sided arm: long stop placed at 110, short already past its level (price 85 <= 90): long cancelled, short at market
+    x = Stub(); x.last_price = lambda s: 85.0
+    sv = sleeve(x)
+    sv.data = lambda sym, close_ms: ("d",)
+    sv.equity = lambda: 10_000.0; sv.btc_pct = lambda eq: 5.0
+    _dec = VO.VS.decide
+    VO.VS.decide = lambda *a, **k: dict(long=110.0, short=90.0, dist=1.0, tp_R=1.5, info={})
+    try:
+        sv.on_close(1_700_000_000_000)
+    finally:
+        VO.VS.decide = _dec
+    placed = [k for k in x.algos]
+    check("two-sided arm, short at market: the placed long stop is cancelled first",
+          len(placed) == 1 and x.cancelled == placed and sv.st["orders"].get("BTCUSDT") == {"mk": None}
+          and [m[1] for m in x.markets] == ["SELL"], (placed, x.cancelled, sv.st["orders"], x.markets))
+    # 8. run_all /status
+    import run_all as RA
+    sx = Stub()
+    sx.account = lambda: {"totalMarginBalance": "10000"}
+    sx.positions = lambda: {"SOLUSDT": (5.0, 150.0), "BTCUSDT": (0.1, 60000.0)}
+    sx.last_price = lambda s: {"SOLUSDT": 151.0, "BTCUSDT": 61000.0, "ETHUSDT": 3000.0}.get(s, 1.0)
+    sx.open_algo_orders = lambda s=None: [
+        dict(symbol="SOLUSDT", clientAlgoId="vc_sl_SOL_1", side="SELL", triggerPrice="148.0", closePosition="true"),
+        dict(symbol="ETHUSDT", clientAlgoId="vc_in_ETH_1", side="BUY", triggerPrice="3100.0", quantity="1.0"),
+        dict(symbol="BTCUSDT", clientAlgoId="tbo_sl_BTC_1", side="SELL", triggerPrice="62000.0", closePosition="true")]
+    states = {"BTCUSDT": dict(entry_ms=1_699_990_000_000, fill_px=60000.0, sl_dist=600.0, lock_done=True, lock2_done=True),
+              "SOLUSDT": {}, "ETHUSDT": {}}
+    saved = (RA.exchange, RA.state, RA.volc_trade_syms, RA.panic_balance, RA.panic_lines, RA.volc_lines, RA.tick, RA.DRY)
+    RA.exchange = lambda: sx; RA.state = lambda s: states.get(s, {}); RA.volc_trade_syms = lambda: {"SOLUSDT"}
+    RA.panic_balance = lambda: None; RA.panic_lines = lambda x, now: []; RA.volc_lines = lambda x, now: ["(volc lines)"]
+    RA.tick = lambda s: 0.01; RA.DRY = False
+    try:
+        txt = RA.status_message()
+    finally:
+        RA.exchange, RA.state, RA.volc_trade_syms, RA.panic_balance, RA.panic_lines, RA.volc_lines, RA.tick, RA.DRY = saved
+    check("/status: a VOLC-only position is not a trend-bot trade", "SOL ●" not in txt, "")
+    check("/status: the sleeve's vc_in_ order is not a trend-bot order", "ETH ▲ buy stop" not in txt, "")
+    check("/status: second profit lock named", "(+3.5R)" in txt, "")
+    check("/status: the VOLC position's stop is not in the trend bot's open risk",
+          "Risk 0.0%" in txt or "· $0.00" in txt.split("Risk")[-1], txt.split("Risk")[-1][:40])
+    check("/status stage names: stale / cascade / failed breakout",
+          RA.stop_stage(dict(stale_done=True), {}) == " (BE, stale)" and RA.stop_stage(dict(casc_done=True), {"casc_to": -0.25}) == " (-0.25R, cascade)"
+          and RA.stop_stage(dict(fb_done=True, casc_done=False), {"fb_to": -0.5}) == " (-0.5R, failed breakout)")
+    # 9. bot.py open_risk after a hand-over: ETH's own fill 100.0, Binance's blended entry 101.0, stop 99.0, 2.0 ETH
+    import json as _j
+    import bot as BOT
+    d = Path(tempfile.mkdtemp())
+    (d / "portfolio.json").write_text(_j.dumps({"cap_exempt": ["BTCUSDT"]}))
+    (d / "state_ETHUSDT.json").write_text(_j.dumps(dict(entry_ms=1, fill_px=100.0, own_px=True, sl_dist=1.0)))
+    bx = Stub(); bx.positions = lambda: {"ETHUSDT": (2.0, 101.0)}
+    bx.open_algo_orders = lambda s=None: [dict(symbol="ETHUSDT", side="SELL", triggerPrice="99.0", closePosition="true")]
+    b = BOT.Bot.__new__(BOT.Bot); b.sym, b.dir, b.suffix, b.x = "BTCUSDT", d, "", bx
+    r, _ = b.open_risk()
+    check("bot open_risk after a hand-over uses the bot's own fill price", abs(r - 2.0) < 1e-9, f"risk {r} (blended entry would give 4.0)")
     print("RESULT:", "all passed" if ok else "FAILURES")
     return ok
 
