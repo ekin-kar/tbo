@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Market Regimes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f4f1;--surface:#ffffff;--ink:#18212b;--muted:#5d6874;--rule:#d9ddd6;--soft:#eceee9;--neg:#b3432f;--pos:#1d6b5b;--line:#18212b;--s1:#2a78d6;--s2:#eb6834}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;--neg:#e07a64;--pos:#4fb39a;--line:#e7eaec;--s1:#3987e5;--s2:#d95926}}
+:root[data-theme="dark"]{--bg:#12171d;--surface:#19212a;--ink:#e7eaec;--muted:#9aa5b0;--rule:#2c3640;--soft:#1f2832;--neg:#e07a64;--pos:#4fb39a;--line:#e7eaec;--s1:#3987e5;--s2:#d95926}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 16px 56px}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 22px;max-width:80ch}.lede b{color:var(--ink);font-weight:600}
+h2{font-size:20px;margin:40px 0 4px;font-weight:600}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:84ch}
+.controls{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:end;margin-bottom:12px}
+.ctl-title{font-size:13px;color:var(--muted);margin-bottom:4px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:14px;border:0;background:none;color:var(--ink);padding:8px 13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 16px 10px;position:relative}
+svg{display:block;width:100%;overflow:visible}svg text{fill:var(--muted);font-size:12px;font-family:inherit}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 18px;font-size:13px;margin:10px 0 0}
+.legend div{display:flex;gap:8px;align-items:flex-start}.legend i{flex:0 0 14px;height:14px;border-radius:3px;margin-top:3px}
+.legend small{color:var(--muted)}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+thead th{font-weight:600;color:var(--muted);font-size:13px;border-bottom:1.5px solid var(--ink)}
+tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:7px 10px;font-size:13px;display:none;z-index:3;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:92ch}ul.notes li{margin-bottom:6px}
+</style></head><body><div class="wrap">
+<h1>Crypto market regimes</h1>
+<p class="lede">Every day of BTC and ETH since 2020, sorted into regimes by three methods built on <b>7 daily features</b> (20-day move in ATR, efficiency, signed 60-day R², ATR14/ATR100, bar overlap, up / down follow-through). <b>RB</b> = readable rules, <b>TS</b> = two speeds (20-day trend × 5-day swing × volatility), <b>HM</b> = 6 clusters of the 7 features. Every threshold and cluster centre was fixed on <b>2020–23 only</b>; a day's state uses that day's close, so a trade only ever sees the state of the day before it. Then the question: does TBO v3.1 do better or worse in some regimes, and does any regime rule beat v3.1 out of sample?</p>
+<div class="controls">
+ <div><div class="ctl-title">Coin</div><div class="seg" id="coin"></div></div>
+ <div><div class="ctl-title">Method</div><div class="seg" id="clf"></div></div>
+ <div><div class="ctl-title">Period</div><div class="seg" id="per"></div></div>
+</div>
+<div class="panel"><svg id="px" viewBox="0 0 1000 380" preserveAspectRatio="none" role="img" aria-label="price coloured by regime"></svg><div class="tip" id="tip"></div></div>
+<div class="legend" id="leg"></div>
+
+<h2>TBO v3.1 trades by regime at entry</h2>
+<p class="hint">Average R per trade of the five coins' trades (and of the same rules on 14 untouched coins, HOLD_BIG) by the regime of the day before the entry. "Round trip" = share of trades that were +1.5R … +5R in profit and closed below +0.1R. Cells with fewer than 10 trades are faint.</p>
+<div class="controls"><div><div class="ctl-title">Regime of</div><div class="seg" id="cclf"></div></div></div>
+<div class="panel scroll"><table id="census"></table></div>
+
+<h2>Single features: average R by quintile</h2>
+<p class="hint">Trades of the five coins split into fifths by a feature's value at entry (lowest left). A useful feature keeps the same order in both periods; most do not. The coin's own volatility ratio (ATR14 / ATR100) is the clearest one.</p>
+<div class="panel scroll"><table id="quint"></table></div>
+
+<h2 id="cv-h">v3.1 vs v3.2 from $300 (2024 start)</h2>
+<p class="hint" id="cv-note"></p>
+<div class="panel"><svg id="cv" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg></div>
+<div class="panel" style="margin-top:12px"><svg id="dd" viewBox="0 0 1000 180" preserveAspectRatio="none"></svg></div>
+<ul class="notes" id="notes"></ul>
+</div>
+<script>
+const D=/*DATA*/null;
+const PAL={RB:{UpClean:"#1d8a5a",UpChop:"#8cc9a0",FlatCalm:"#9fb3c8",FlatWild:"#e8a35b",DownChop:"#e9a0a8",DownClean:"#c4473a",na:"#cccccc"},
+ HM:{H0:"#c4473a",H1:"#e9a0a8",H2:"#e8c35b",H3:"#9fb3c8",H4:"#8cc9a0",H5:"#1d8a5a",na:"#cccccc"}};
+const tsCol=s=>{if(s==="na")return"#cccccc";const [m,sw,v]=s.split("/");const base={Up:[29,138,90],Flat:[140,150,165],Dn:[196,71,58]}[m];const k=(sw==="up"?0.15:-0.1)+(v==="calm"?0.25:0);return`rgb(${base.map(c=>Math.round(c+(255-c)*Math.max(0,k))).join(",")})`};
+const col=(clf,s)=>clf==="TS"?tsCol(s):(PAL[clf][s]||"#999");
+let S={coin:"BTC",clf:"RB",per:"all",cclf:"RB"};
+function seg(id,opts,key,cb){const el=document.getElementById(id);el.innerHTML="";opts.forEach(([v,l])=>{const b=document.createElement("button");b.textContent=l;b.setAttribute("aria-pressed",S[key]===v);b.onclick=()=>{S[key]=v;seg(id,opts,key,cb);cb()};el.appendChild(b)})}
+function priceChart(){const d=D.coins[S.coin];let i0=0,i1=d.t.length;if(S.per==="dev")i1=d.t.findIndex(t=>t>="2024-01-01");if(S.per==="oos")i0=d.t.findIndex(t=>t>="2024-01-01");
+ const t=d.t.slice(i0,i1),c=d.c.slice(i0,i1),st=d[S.clf].slice(i0,i1);const n=t.length,W=1000,H=360,top=10;
+ const lc=c.map(Math.log),lo=Math.min(...lc),hi=Math.max(...lc);const y=v=>top+(H-top)*(1-(Math.log(v)-lo)/(hi-lo||1));const x=i=>i/(n-1)*W;
+ let s="";for(let i=0;i<n;i++)s+=`<rect x="${x(i).toFixed(1)}" y="${top}" width="${(W/n+0.6).toFixed(2)}" height="${H-top}" fill="${col(S.clf,st[i])}" opacity=".55"/>`;
+ s+=`<polyline fill="none" stroke="var(--line)" stroke-width="1.4" points="${c.map((v,i)=>x(i).toFixed(1)+","+y(v).toFixed(1)).join(" ")}"/>`;
+ for(let k=0;k<n;k+=Math.ceil(n/8))s+=`<text x="${x(k)}" y="${H+16}">${t[k].slice(0,7)}</text>`;
+ const svg=document.getElementById("px");svg.innerHTML=s;const tip=document.getElementById("tip");
+ svg.onmousemove=e=>{const r=svg.getBoundingClientRect();const i=Math.max(0,Math.min(n-1,Math.round((e.clientX-r.left)/r.width*(n-1))));tip.style.display="block";tip.style.left=(e.clientX-r.left+12)+"px";tip.style.top="8px";tip.innerHTML=`<b>${t[i]}</b> · ${c[i].toLocaleString()}<br>${S.clf}: <b>${st[i]}</b>`};
+ svg.onmouseleave=()=>tip.style.display="none";
+ const sh=D.shares[S.coin][S.clf];const leg=document.getElementById("leg");leg.innerHTML=Object.keys(sh).sort().map(k=>`<div><i style="background:${col(S.clf,k)}"></i><span><b>${k}</b> <small>${sh[k][0]}% of days 2020–23 · ${sh[k][1]}% 2024–26</small>${S.clf==="RB"&&D.desc.RB[k]?"<br><small>"+D.desc.RB[k]+"</small>":""}${S.clf==="HM"&&D.centroids[k]?"<br><small>centre: "+Object.entries(D.centroids[k]).map(([a,b])=>a+" "+b).join(", ")+" (z)</small>":""}</span></div>`).join("")}
+const f2=v=>v==null||isNaN(v)?"–":(v>=0?"+":"")+v.toFixed(2);
+function censusTable(){const rows=D.census.filter(r=>r.classifier===S.cclf);let h="<thead><tr><th>State</th><th>Side</th><th>2020–21 n</th><th>avg R</th><th>2022–23 n</th><th>avg R</th><th>2024–26 n</th><th>avg R</th><th>round trip 24–26</th><th>HOLD_BIG n</th><th>avg R</th></tr></thead><tbody>";
+ rows.forEach(r=>{const c=(n,v)=>`<td style="${n<10?"opacity:.45":""}" class="${v==null?"":v<0?"neg":"pos"}">${f2(v)}</td>`;h+=`<tr><td>${r.state}</td><td>${r.dir}</td><td>${r["2020-21_n"]}</td>${c(r["2020-21_n"],r["2020-21_avgR"])}<td>${r["2022-23_n"]}</td>${c(r["2022-23_n"],r["2022-23_avgR"])}<td>${r["2024-26_n"]}</td>${c(r["2024-26_n"],r["2024-26_avgR"])}<td>${r["2024-26_rt"]==null?"–":(r["2024-26_rt"]*100).toFixed(0)+"%"}</td><td>${r.HB_n}</td>${c(r.HB_n,r.HB_avgR)}</tr>`});
+ document.getElementById("census").innerHTML=h+"</tbody>"}
+function quintTable(){let h="<thead><tr><th>Feature</th><th>Period</th><th>Q1 (low)</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Q5 (high)</th></tr></thead><tbody>";
+ Object.entries(D.quint).forEach(([f,v])=>["dev","oos"].forEach(p=>{h+=`<tr><td>${p==="dev"?f:""}</td><td>${p==="dev"?"2020–23":"2024–26"}</td>${v[p].map(x=>`<td class="${x<0?"neg":"pos"}">${f2(x)}</td>`).join("")}</tr>`}));
+ document.getElementById("quint").innerHTML=h+"</tbody>"}
+function curves(){const C=D.curves;if(!C){document.getElementById("cv-note").textContent="(no v3.2 rule passed the gates: v3.1 stays)";return}
+ document.getElementById("cv-note").innerHTML=C.note;const keys=Object.keys(C.series);const cols=["var(--muted)","var(--s1)"];
+ const all=keys.flatMap(k=>C.series[k].bal),lo=Math.log(Math.min(...all)),hi=Math.log(Math.max(...all));const n=C.t.length;
+ const x=i=>i/(n-1)*1000,y=v=>285-(Math.log(v)-lo)/(hi-lo)*275;let s="";
+ keys.forEach((k,j)=>{s+=`<polyline fill="none" stroke="${cols[j]}" stroke-width="1.8" points="${C.series[k].bal.map((v,i)=>x(i).toFixed(1)+","+y(v).toFixed(1)).join(" ")}"/><text x="8" y="${18+j*16}" style="fill:${cols[j]}">${k}: $${Math.round(C.series[k].bal[n-1]).toLocaleString()}</text>`});
+ for(let k=0;k<n;k+=Math.ceil(n/8))s+=`<text x="${x(k)}" y="298">${C.t[k].slice(0,7)}</text>`;document.getElementById("cv").innerHTML=s;
+ const dmax=Math.max(...keys.flatMap(k=>C.series[k].dd));let d="";keys.forEach((k,j)=>{d+=`<polyline fill="none" stroke="${cols[j]}" stroke-width="1.5" points="${C.series[k].dd.map((v,i)=>x(i).toFixed(1)+","+(8+v/dmax*160).toFixed(1)).join(" ")}"/><text x="8" y="${176-j*16}" style="fill:${cols[j]}">${k}: worst drop ${Math.max(...C.series[k].dd).toFixed(1)}%</text>`});
+ document.getElementById("dd").innerHTML=d}
+function draw(){priceChart();censusTable()}
+seg("coin",Object.keys(D.coins).map(c=>[c,c]),"coin",draw);seg("clf",[["RB","RB readable"],["TS","TS two-speed"],["HM","HM clusters"]],"clf",draw);
+seg("per",[["all","2020–26"],["dev","2020–23 (fit)"],["oos","2024–26"]],"per",draw);seg("cclf",[["RB","own coin RB"],["HM","own coin HM"],["btc_RB","BTC RB"]],"cclf",censusTable);
+draw();quintTable();curves();
+document.getElementById("notes").innerHTML=(D.curves&&D.curves.notes?D.curves.notes:[]).map(x=>`<li>${x}</li>`).join("");
+</script></body></html>
