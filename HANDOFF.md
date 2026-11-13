@@ -479,3 +479,23 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
     `test_v31_sim.py`: a v3.1 difference, not looked into yet.
   - `dev/test_cap_sim.py 2022-01-01 2026-11-06` (v3.2 ladder, the x0.25 multiplier and the minimum-order floor in the expected risk): $10,000 886 entries (66 at x0.25), 79 shrunk by the cap, BTC 193/193 full size; $500 834 entries (60 at x0.25, 6 raised to Binance's minimum), 118 shrunk; $300 789 entries (58 at x0.25, 5 raised); **0 entries off the rule** at all three. The test now counts the other positions at the stop in force at the entry (a failed-breakout tighten lowers their risk, as the bot counts it) and calls a quick market close a cap close only when the bot says so.
 - Pages: every page rebuilt with v3.2 (`market_regimes.html` now plots v3.1 vs v3.2 as deployed from $300, 2024 start).
+
+## v3.3 round (Nov 2026) and v3.2.1 (VOLC tie guard, live)
+- **Research** (`research/results/v33_REPORT.md`, `studies/v33_structural_frontiers.py`, engine `core/xengine33.py` = xengine32
+  + checkpoint rule C that also acts after breakeven, parity 1,355 / 1,355): 2,005 settings on top of v3.2.
+  - Track 1A late-life lock (380): 0 pass.
+  - Track 1B zone-2 failed-extension stop (1,344): 6 pass the gates (MFE >= +2R, from 36-48 h, close < +0.75R -> stop
+    +0.25R) but **rejected (user decision)**: the 2024 drop is unchanged (26.2015%), the passers sit on the +2.0R grid
+    edge, and on the 14 untouched coins 2024-26 net turns negative (+5.4 -> -7.7 .. -19.1 units).
+  - Track 2 cut-only regime sizing (FlatWild, Q5 climax, counter-macro shorts; 120): 0 pass.
+  - Track 3 VOLC failed-breakout tighten / lock (117) and panic failed-bounce / repeat-flush (44): 0 pass.
+- **Track 0, deployed as v3.2.1 (13 Nov 2026):** the 2 "extra" live VOLC trades of the parity test (BTC 2023-04-10,
+  BNB 2023-07-24, plus BNB 2022-12-07) were exact ties. VOLC's 10-candle stop sat at the trend bot's 20-candle stop, both
+  filled in the same minute, and `volc.py` traded its part back at market (two taker fees for a 1-minute round trip).
+  - `volc.py` tie guard (`tbo_tie`, `drop_ties`): no sleeve stop where the trend bot's resting entry order on the same coin
+    and side is at the same level or nearer (buy: tbo <= volc, sell: tbo >= volc). Checked when placing at the 4h close
+    and at every poll, because `bot.py` may place its order a moment later.
+  - Parity (`cryptobot/dev/test_v32_sim.py` against the real `volc.py`, 2021-01 .. 2026-11): 23 tied sleeve stops not
+    placed, 4 earlier-candle sleeve orders cancelled at a re-armed tie, **0 collision trades**, VOLC entries **114 / 115**
+    in the same minute (the last: SOL 2022-12-11, the known one-minute tick shift), exits 112 / 115. The trend bot's
+    trades and x0.25 sizes are unchanged (1,152 / 1,152 multipliers).

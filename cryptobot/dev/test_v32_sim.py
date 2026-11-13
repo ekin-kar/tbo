@@ -8,7 +8,9 @@ bars (open-risk cap off, as test_v31_sim.py), compared with the research twin re
      differ slightly from the research's; the formula itself is also checked exactly on the research's own candles for
      every distinct daily close.);
   2. every trade's size multiplier (the bot's, at its arming close) vs the research's size_mult column;
-  3. entries and exits (same minute) as test_v31_sim.py.
+  3. entries and exits (same minute) as test_v31_sim.py;
+  4. volc.py's tie guard (v3.2.1): every sleeve stop it did not place / cancelled because the trend bot's entry order on the
+     same coin and side tied it (from volc.py's own log lines).
 
     python cryptobot/dev/test_v32_sim.py [2024-01-01] [2024-07-01]
 """
@@ -97,8 +99,24 @@ def trade_mults(sim):
     return out
 
 
+class TieLog(logging.Handler):
+    def __init__(self):
+        super().__init__(); self.rows = []
+
+    def emit(self, r):
+        m = r.getMessage()
+        if "(tie guard)" in m:
+            self.rows.append((B.utc(T31.FakeFutures.NOW[0]()) if hasattr(T31.FakeFutures, "NOW") else "", m))
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
+    ties = TieLog(); vl = logging.getLogger("volc"); vl.setLevel(logging.INFO); vl.propagate = False; vl.addHandler(ties)
+    _init = T31.FakeFutures.__init__
+
+    def _init_clock(self, *a, **k):                      # (the tie lines are stamped with the simulated time)
+        _init(self, *a, **k); T31.FakeFutures.NOW = [self.now_ms]
+    T31.FakeFutures.__init__ = _init_clock
     start = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"
     end = sys.argv[2] if len(sys.argv) > 2 else "2024-07-01"
     record()
@@ -129,3 +147,6 @@ if __name__ == "__main__":
           f"in the bots {sum(p[3] < 1 for p in pairs)}, different {len(bad)}")
     for p in bad[:10]:
         print("   differs:", p[0], C.D.to_datetime([p[1]])[0], "research", p[2], "bot", p[3])
+    print(f"volc.py tie guard: {len(ties.rows)} sleeve stop orders not placed / cancelled (the trend bot's entry order tied them)")
+    for t, m in ties.rows:
+        print("   ", t, m)

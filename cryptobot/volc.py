@@ -14,6 +14,11 @@ One coin, one position (Binance one-way mode); the trend bot always has priority
     leaving the trend bot's position as if the sleeve had not been there (research/crypto/core/v31deploy.py: the same);
   * the sleeve's trades are outside the open-risk cap (the bots skip them), sized at `share` x the ladder's BTC risk on
     the balance the bots size on (main + panic sub-account).
+  * v3.2.1 tie guard (research/results/v33_REPORT.md, Track 0): no sleeve stop where the trend bot's resting entry order on
+    the same coin and side is at a level the price reaches first or at the same time (buy: tbo <= volc, sell: tbo >=
+    volc; VOLC's 10-candle level is never beyond TBO's 20-candle one, so only exact ties): both would fill in the same
+    minute and the sleeve would trade its part straight back. Checked when placing at the 4h close and at every poll
+    (the trend bot may place its order a moment later): a tied sleeve stop is not placed / cancelled.
 Exits on Binance: stop loss (closePosition STOP_MARKET, last price) and take-profit (a reduce-only post-only LIMIT order:
 maker fee); closed at market hold_h hours after the fill.
 State in state_volc.json (the exchange is the source of truth for positions).
@@ -35,6 +40,7 @@ import volc_signal as VS                               # noqa: E402
 from binance_futures import Futures, BinanceError      # noqa: E402
 
 PREFIX = "vc"
+TBO_PREFIX = "tbo"                                     # the trend bots' order ids (bot.py PREFIX); entries contain "_in_"
 HOUR, TF = 3_600_000, 4 * 3_600_000
 log = logging.getLogger("volc")
 
@@ -155,6 +161,48 @@ class Sleeve:
         st = self.json_file(f"state_{sym}")
         return bool(st.get("entry_ms")) or bool(st.get("manual"))
 
+    def tbo_tie(self, sym, side, trig, orders=None):
+        """The trend bot's resting entry order on this coin and side if it sits at `trig` or nearer (buy: tbo <= trig, sell:
+        tbo >= trig): a sleeve stop there could only fill with or after it (v3.2.1 tie guard). Its level, or None."""
+        if orders is None:
+            try:
+                orders = self.x.open_algo_orders(sym)
+            except BinanceError as e:
+                log.warning(f"{sym[:-4]}: open orders unreadable ({e}): tie guard skipped this time")
+                return None
+        bs = "BUY" if side == 1 else "SELL"
+        for o in orders:
+            cid = str(o.get("clientAlgoId", ""))
+            if not (cid.startswith(TBO_PREFIX + "_") and "_in_" in cid) or str(o.get("side")) != bs:
+                continue
+            px = float(o.get("triggerPrice") or 0)
+            if px > 0 and ((side == 1 and px <= trig + 1e-12) or (side == -1 and px >= trig - 1e-12)):
+                return px
+        return None
+
+    def drop_ties(self, sym):
+        """Every poll while the sleeve's entry orders rest: cancel one that the trend bot's entry order now ties."""
+        ords = self.st["orders"].get(sym) or {}
+        if not (ords.get("long") or ords.get("short")) or self.dry:
+            return
+        try:
+            oo = self.x.open_algo_orders(sym)
+        except BinanceError:
+            return
+        for k, side in (("long", 1), ("short", -1)):
+            aid = ords.get(k)
+            mine = next((o for o in oo if aid and str(o.get("algoId")) == str(aid)), None)
+            if mine is None:
+                continue
+            trig = float(mine.get("triggerPrice") or 0)
+            px = self.tbo_tie(sym, side, trig, oo)
+            if px is not None:
+                log.info(f"{sym[:-4]}: the trend bot's entry order {self.P(sym, px)} ties the sleeve's {'BUY' if side == 1 else 'SELL'} "
+                         f"stop {self.P(sym, trig)}: sleeve order cancelled (tie guard)")
+                self.cancel(aid); ords.pop(k, None)
+        if not any(ords.values()):
+            self.st["orders"].pop(sym, None); self.st["pending"].pop(sym, None)
+
     def panic_triggers(self):
         return [int(t) for t, *_ in self.json_file("state_panic").get("triggers", [])]
 
@@ -232,6 +280,11 @@ class Sleeve:
                 if qty < f["min_qty"] or qty * trig < f["min_notional"]:
                     log.info(f"{sym[:-4]}: VOLC size {qty} below Binance's minimum: no order")
                     continue
+                tie = self.tbo_tie(sym, side, trig)
+                if tie is not None:
+                    log.info(f"{sym[:-4]}: the trend bot's entry order {self.P(sym, tie)} ties the sleeve's {'BUY' if side == 1 else 'SELL'} "
+                             f"stop {self.P(sym, trig)}: no sleeve order (tie guard)")
+                    continue
                 bs = "BUY" if side == 1 else "SELL"
                 log.info(f"{sym[:-4]} VOLC {bs} stop {self.P(sym, trig)} qty {fmt(qty, f['step'])} (stop {self.P(sym, trig - side * dist)}, "
                          f"risk {qty * dist:.2f} USDT)")
@@ -269,6 +322,8 @@ class Sleeve:
             if amt == 0:
                 if self.tbo_busy(sym):                  # (cannot happen without a position; kept for safety)
                     self.cancel_entries(sym)
+                else:
+                    self.drop_ties(sym)                  # the trend bot may have placed a tying order since
                 continue
             trig = {k: aid for k, aid in self.st["orders"][sym].items() if k == "mk" or self.status(aid) in ("TRIGGERED", "FINISHED")}
             ours = list(trig.values())

@@ -50,6 +50,22 @@ The archive files are the same numbers the research used (max difference 2e-16).
 With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
 (bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
 
+## v3.2.1 (13 Nov 2026): VOLC tie guard
+
+From the v3.3 research (`research/results/v33_REPORT.md`, Track 0; the rest of that 2,005-setting campaign was not
+adopted). When the VOLC sleeve's 10-candle stop sits exactly at the trend bot's 20-candle stop (same coin, same side),
+both fill in the same minute and the sleeve trades its part straight back at market: a 1-minute round trip that costs two
+taker fees. `volc.py` now places no sleeve stop where the trend bot's resting entry order on that side is at the same
+level or nearer (buy: trend bot <= sleeve, sell: trend bot >= sleeve). It checks when placing at the 4h close and at
+every poll, since the trend bot may place its order a moment later; a tied sleeve order is cancelled. A VOLC level can
+never be beyond the trend bot's, so only exact ties are affected.
+
+Parity (`dev/test_v32_sim.py`, 2021-01 .. 2026-11, the real `volc.py`): 23 tied sleeve stops not placed, **0 collision
+trades** (were 3), VOLC entries **114 / 115** in the same minute as the research (the last: SOL 2022-12-11, one minute
+apart from tick rounding), exits 112 / 115; trend bot unchanged. Logs show `(tie guard)` when it acts.
+
+**Updating a server:** `tbo_install.bat` -> **1 Update my bot** (only `volc.py` changed; no setting or key).
+
 ## v3.2 (13 Nov 2026): wild-pullback size, flat first ladder row
 
 Research: `research/results/v32_REPORT.md` (regimes: 1,490 settings), `v32b_REPORT.md` (cap counting, 4 follow-ups) and
@@ -357,14 +373,15 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 | Trades: size multiplier bot = research | 406 of 406 (32 at x0.25) | 442 of 442 (41) | 304 of 304 (28) |
 | TBO entry / exit minute | 406 / 402 of 413 | 442 / 430 of 446 | 304 / 303 of 304 |
 | VOLC entry / exit minute | 35 / 35 of 36 | 44 / 44 of 44 | 35 / 33 of 35 |
+| VOLC with the v3.2.1 tie guard | 35 / 35 of 36, 0 extra | 44 / 44 of 44, 0 extra | 35 / 33 of 35, 0 extra |
 
 - The bot's formula on the research's own daily candles is identical (largest difference 2.4e-12). The simulated
   exchange rounds old prices to today's tick (SOL 0.01, where its 2023 data moved in 0.001 steps), so on 10 Feb 2023 its
   SOL VolReg was 0.97991 vs the research's 0.98042: x0.25 for longs at that day's 6 closes in the research, not in the bots
   (no trade that day). Live, the bot reads the same Binance candles the research is built from.
 - Entry / exit differences are v3.1's: one-minute shifts from tick rounding and SOL's minute-data gaps, the backtest's stop
-  inside the fill minute. Two VOLC trades only in the bots (BTC 10 Apr 2023, BNB 24 Jul 2023) show up the same under
-  `test_v31_sim.py`: a v3.1 difference, not yet explained.
+  inside the fill minute. The VOLC trades only in the bots before v3.2.1 (BNB 7 Dec 2022, BTC 10 Apr 2023, BNB 24 Jul 2023)
+  were same-minute ties with the trend bot's entry: removed by the tie guard (see v3.2.1).
 - `dev/test_cap_sim.py 2022-01-01 2026-11-06` (v3.2 ladder, the x0.25 multiplier and the minimum-order floor in the expected risk): $10,000 886 entries (66 at x0.25), 79 shrunk by the cap, BTC 193/193 full size; $500 834 entries (60 at x0.25, 6 raised to Binance's minimum), 118 shrunk; $300 789 entries (58 at x0.25, 5 raised); **0 entries off the rule** at all three. The test now counts the other positions at the stop in force at the entry (a failed-breakout tighten lowers their risk, as the bot counts it) and calls a quick market close a cap close only when the bot says so.
 
 **v3.1 (13 Nov 2026): `dev/test_v31_sim.py <start> <end>`.** The five coin bots (`bot.py`) and the VOLC sleeve
