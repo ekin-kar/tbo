@@ -156,7 +156,8 @@ class FakeFutures:
             raise BinanceError(400, -5022, "Post Only order will be rejected.")
         oid = self.next_id; self.next_id += 1
         self.lims = getattr(self, "lims", {})
-        self.lims[oid] = dict(orderId=oid, clientOrderId=client_id, side=side, price=px, qty=float(qty), reduce=reduce_only, status="NEW")
+        self.lims[oid] = dict(orderId=oid, clientOrderId=client_id, side=side, price=px, qty=float(qty), reduce=reduce_only, status="NEW",
+                              origQty=str(float(qty)), executedQty="0")
         return {"orderId": oid}
 
     def get_order(self, sym, order_id):
@@ -193,6 +194,7 @@ class FakeFutures:
                 continue
             od["status"] = "FILLED"
             q = min(od["qty"], abs(self.pos)) if od["reduce"] else od["qty"]
+            od["executedQty"] = str(q)
             self._fill(od["side"], q, od["price"], "tp", od["clientOrderId"] if self.tag_fills else None)
 
     def _bar_algos(self, o, h, l):

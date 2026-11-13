@@ -88,7 +88,14 @@ class Sleeve:
         self.st = json.loads(self.state_path.read_text()) if self.state_path.exists() else {"trades": {}, "last_hour": 0}
 
     def save(self):
-        tmp = self.state_path.with_suffix(".tmp"); tmp.write_text(json.dumps(self.st, indent=1)); tmp.replace(self.state_path)
+        tmp = self.state_path.with_suffix(".tmp"); tmp.write_text(json.dumps(self.st, indent=1))
+        for k in range(10):                              # atomic swap; on Windows a reader holding the file open makes the
+            try:                                         # rename fail for a moment: retry
+                tmp.replace(self.state_path); break
+            except PermissionError:
+                if k == 9:
+                    raise
+                time.sleep(0.05)
 
     def tg(self, text):
         if notify.enabled():

@@ -64,7 +64,29 @@ Parity (`dev/test_v32_sim.py`, 2021-01 .. 2026-11, the real `volc.py`): 23 tied 
 trades** (were 3), VOLC entries **114 / 115** in the same minute as the research (the last: SOL 2022-12-11, one minute
 apart from tick rounding), exits 112 / 115; trend bot unchanged. Logs show `(tie guard)` when it acts.
 
-**Updating a server:** `tbo_install.bat` -> **1 Update my bot** (only `volc.py` changed; no setting or key).
+**Pre-deployment audit (13 Nov 2026), fixed in v3.2.1:**
+- **Hand-over after a take-profit fill:** when the trend bot's order filled on a coin the sleeve held, `volc.py` traded the
+  sleeve's whole quantity back at market (not reduce-only). If its take-profit limit had filled (in part) in the seconds
+  before, that part was gone and the market order would have cut into the trend bot's position. It now cancels the
+  take-profit first, reads its `executedQty`, and sends back only what the sleeve still holds.
+- **Tie guard cancel race:** a sleeve stop cancelled by the tie guard is forgotten only once Binance reports it
+  CANCELED / EXPIRED / REJECTED. If it triggered first, the fill check adopts the position with its stop loss.
+- **One coin's error no longer blocks the others:** `volc.py` manages each coin separately. An exchange error on one is
+  logged and retried next poll; key / permission errors still stop the sleeve.
+- **Stop loss refused 3 polls in a row:** closed at market (never left without a stop). A take-profit error no longer
+  aborts the poll.
+- **State files on Windows:** the atomic temp-file swap retries for a moment when a reader holds the file open (bot,
+  sleeves).
+- Checked and fine as they were:
+  - Real Binance field names (`clientAlgoId`, `side`, `triggerPrice` as a string, `algoId`), the same keys the cap
+    already reads live.
+  - The post-only take-profit rejected with -5022, or returned EXPIRED (closed at market / re-placed next poll).
+  - Atomic state writes, with every cross-process reader in try / except.
+  - The poll check only calls `openAlgoOrders` for coins where the sleeve has waiting entry orders.
+- Tests: `dev/test_volc_edges.py` (12 cases on a stub exchange) and the full `dev/test_v32_sim.py` 2021-26 run on the
+  final code (unchanged: VOLC 114 / 115 entries and 112 / 115 exits in the same minute, 0 collision trades, the trend bot and its 1,152 size multipliers identical).
+
+**Updating a server:** `tbo_install.bat` -> **1 Update my bot** (`volc.py`, `bot.py`, `panic.py` changed; no setting or key).
 
 ## v3.2 (13 Nov 2026): wild-pullback size, flat first ladder row
 
