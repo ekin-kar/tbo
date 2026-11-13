@@ -529,3 +529,41 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
     on Binance untracked. It is now cancelled first.
 - Tests: `dev/test_volc_edges.py` (19 cases on a stub exchange) and the full `dev/test_v32_sim.py` 2021-26 run on the
   final code (unchanged: VOLC 114 / 115 entries and 112 / 115 exits in the same minute, 0 collision trades, the trend bot and its 1,152 size multipliers identical).
+
+## v3.4 joint risk-grid and plateau audit (Nov 2026): the v3.2.1 settings confirmed (O1)
+- **Research:** `research/results/v34_risk_audit_REPORT.md`, transcript `v34_terminal_log.md`, study
+  `studies/v34_risk_plateau_audit.py`. Read-only on `cryptobot/`.
+- **Method:** every setting judged jointly in the exact chronological capped simulator (`v31lib._money31` through a parallel
+  numba kernel: the 5 coins share the cap in fill order, BTC exempt but counted, panic + VOLC outside). Live settings
+  reproduced exactly. Per setting: 1,000 two-year journeys, the windows from $300, and the fixed-size capped account's
+  ret / max DD in 2020-23 and 2024-26 on 41 trade lists.
+- **Stage 1** (one change at a time, inside the full portfolio):
+  - Raising the cap (1.20-1.50 × BTC) lets ETH trade alongside an open BTC trade (2024 run: 15 ETH entries skipped at
+    1.10, 4 at 1.20) but lowers ret / max DD in both eras (×0.98 to ×0.90).
+  - Differentiated alt weights help one era and hurt the other: alts stay equal.
+  - More short size hurts 2024-26 (0.65: ×0.91).
+  - VOLC / panic increases are the only near-misses (both eras, but 51-76% of the trade lists).
+- **Stage 2:** 54,000 joint settings (BTC × ETH/BTC × alt/BTC × alt pattern × short × cap/BTC × VOLC × panic units). 0 of
+  53,995 structural changes improve both eras on >= 80% of the 41 lists, so the v3.2.1 ratio structure is the era-robust
+  choice.
+- **Stage 3:** BTC dial 3.5-6.5% × 13 ladders × cap_min_fraction. Only risk LEVEL and ladder shape remain, trading drawdown
+  against money. Full risk to $25k instead of $10k: bootstrap median $28.8k -> $41.9k, at +1.1 points of dd90 and a lower
+  p10.
+- **Stage 4:** five options (current; max profit at <= current drawdown; balanced; low drawdown; high growth).
+- **Decision (user, 13 Nov 2026):** keep **O1 = the v3.2.1 settings**: the best small-account tail (p10 $7.67k, P(>= $10k)
+  87.1%) for its drawdown (2024 run 26.2%, dd90 44.4%). The alternative is O5 (BTC 5.5% with a 3-rung ladder: more money
+  and tail, +2 points of drawdown).
+- **Final verification on O1:** all on the final code (26f07bf + docs):
+  - `dev/test_volc_edges.py`: 19 / 19 pass.
+  - `dev/test_v32_sim.py` 2021-01 .. 2026-11 (5 bots + VOLC with the tie guard): size multiplier 1,152 / 1,152; TBO 1,152
+    of 1,163 same entry minute (v3.1's known categories); VOLC 114 / 115 entries and 112 / 115 exits, 0 collision trades;
+    x0.25 decisions identical except one tick-rounded SOL day without a trade.
+  - `dev/test_cap_sim.py` 2022-01 .. 2026-11: 0 entries off the rule at $300 (789 entries), $500 (834) and $10,000 (886).
+  - `dev/test_panic_sim.py`: 0 missed / 0 extra signals in 3,449 hours, trades 208 / 208, 207 the same result (the known ADA
+    2024-04-12 take-profit).
+  - Pages: all 8 rebuilt, labelled v3.2.1, numbers unchanged (whole system from $300: 2022 $2,030,648 / 24.5%, 2024 $74,343 /
+    26.2%).
+  - `risk_comparison.html`'s O1 row (2022 source) shows median $24.2k / p10 $6.43k / dd90 44.9% / P(>= $10k) 82.9%, against
+    the research bootstrap's $28.8k / $7.67k / 44.4% / 87.1%. Same idea, different horizon: the page cuts each journey at
+    24 calendar months (730.6 days); the research bootstrap (`v30lib.boot_paths`, used for every money comparison since
+    v3.0) runs all 27 four-week blocks (756 days). At ~20% median growth a month the extra 25 days are about +16%.

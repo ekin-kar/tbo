@@ -54,7 +54,7 @@ def deployed_curves(a="2024-01-01", b="2026-11-07", eq0=300.0):
     h32 = B.history(B.bot_policy(), a, b, eq0, full=True)
     ser = lambda h: dict(bal=[round(float(v), 2) for v in h["bal"]], dd=[round(float(-v), 2) for v in h["dd"]])
     lab = B.label(B.bot_policy())
-    return dict(t=[str(d.date()) for d in h32["bal"].index], series={"v3.1 (until 13 Nov 2026)": ser(h31), "v3.2 (deployed)": ser(h32)},
+    return dict(t=[str(d.date()) for d in h32["bal"].index], series={"v3.1 (until 13 Nov 2026)": ser(h31), "v3.2.1 (deployed)": ser(h32)},
                 note=(f"TBO v3.2 = v3.1 + the wild-pullback size (x0.25 when the coin's daily ATR14 / ATR100 >= 0.98 and the last 5 days "
                       f"moved >= 0.25 ATR against the order, at its 4h arming close), ladder {lab}. v3.1: ladder 5.7 / 3.8 / 0.79% -> "
                       f"4.75 / 3.135 / 0.79% from $1,000 -> 2.375 / 1.615 / 0.40% from $10,000. Whole system (TBO + panic + VOLC), "

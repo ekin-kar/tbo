@@ -50,6 +50,25 @@ The archive files are the same numbers the research used (max difference 2e-16).
 With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
 (bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
 
+## v3.4 (13 Nov 2026): joint risk and plateau audit, the current settings kept
+
+`research/results/v34_risk_audit_REPORT.md` tested the risk settings jointly, never coin by coin. 54,000 settings of BTC
+risk, ETH / BTC, alt / BTC, alt weights, short multiplier, cap / BTC, VOLC share and panic units went through the exact
+capped simulator. Each got 1,000 two-year journeys and an era check: better ret / max DD in 2020-23 AND 2024-26 on >= 80%
+of 41 trade lists.
+- No change to the ratios survives the era check:
+  - a bigger cap lets ETH trade next to BTC but lowers ret / max DD in both eras;
+  - different alt weights help one era and hurt the other;
+  - more short size hurts 2024-26.
+- What remains (the BTC risk level, the ladder's shape) only trades drawdown against money.
+- **Kept (user decision): the current `portfolio.json` and configs (O1)**:
+  - BTC 5% / ETH 3.3% / alts 0.83% / cap 5.5% below $10,000;
+  - 2.5% / 1.7% / 0.42% / 2.75% from $10,000;
+  - shorts × 0.5, VOLC 0.25 × the BTC risk, panic 3 units (extra pool 0.75, max 2 open).
+- From $300: 2022 run $2.03M (drop 24.5%), 2024 run $74.3k (26.2%), bootstrap median $28.8k / bad 1-in-10 $7.67k / 1-in-10
+  drop 44.4%, P(>= $10k in 2 years) 87.1%.
+- No bot change.
+
 ## v3.2.1 (13 Nov 2026): VOLC tie guard
 
 From the v3.3 research (`research/results/v33_REPORT.md`, Track 0; the rest of that 2,005-setting campaign was not
