@@ -1,5 +1,5 @@
 {
-  "risk_pct": 4.75,
+  "risk_pct": 5.0,
   "short_risk_mult": 0.5,
   "max_leverage": 12,
   "exchange_leverage": 25,
@@ -40,6 +40,9 @@
     "fb_cool": true,
     "casc_src": "",
     "casc_R": -0.5,
-    "casc_to": -0.25
+    "casc_to": -0.25,
+    "vr_mult": 0.25,
+    "vr_min": 0.98,
+    "vr_chg5": -0.25
   }
 }

@@ -5,6 +5,8 @@ Open-risk cap test: the coin bots (bot.py, live configs) run together on ONE sim
   * BTC (exempt) always trades its full size
   * any other coin: risk = its normal risk if it fits under cap x equity together with the risk (not yet at
     breakeven) of the coins that filled before it, otherwise the room left (or no trade if < cap_min_fraction fits)
+  * v3.2: "normal risk" x the wild-pullback multiplier the bot chose at the arming close (x0.25 or 1), the cap counting the
+    actual (scaled) risk; a x0.25 order below the exchange minimum (while the full one would trade) = the minimum order
 
     python cryptobot/dev/test_cap_sim.py [2024-01-01] [2024-07-01]
     CAPSIM_PORTFOLIO=other.json CAPSIM_EQ=500 python cryptobot/dev/test_cap_sim.py ...   # another portfolio file / balance
@@ -24,6 +26,32 @@ import bot as B                                      # noqa: E402
 import strategy as S                                 # noqa: E402
 from replay import C                                 # noqa: E402
 from test_bot_sim import FakeFutures, FakeOIHistory  # noqa: E402
+
+SIZED = []
+_size0 = B.Bot.size
+
+
+def _size(self, sl_dist, price, side=1, quiet=False, mult=1.0):     # records the multiplier of every sized order
+    SIZED.append((self.sym, int(self.x.now_ms()), side, float(mult)))
+    return _size0(self, sl_dist, price, side, quiet, mult)
+
+
+B.Bot.size = _size
+CLOSES = []                                            # (sym, minute, why) of every close the bots made at market
+_close0 = B.Bot.close_position
+
+
+def _close(self, amt, why, tg_why=None):
+    CLOSES.append((self.sym, int(self.x.now_ms()) // 60_000, str(why)))
+    return _close0(self, amt, why, tg_why)
+
+
+B.Bot.close_position = _close
+
+
+def mult_of(tr):
+    m = [x[3] for x in SIZED if x[0] == tr["sym"] and x[2] == tr["dir"] and x[1] <= tr["t"] * 60_000 + 59_999]
+    return m[-1] if m else 1.0
 
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 EQ = float(os.environ.get("CAPSIM_EQ", 10_000))
@@ -94,6 +122,7 @@ def trades_of(fx):
     for tr in out:                                         # first stop = risk at entry; a later stop at entry = breakeven
         sls = [(t, trig) for t, trig in fx.sl_log if tr["t"] <= t <= tr["exit"]]
         tr["stop"] = sls[0][1] if sls else np.nan
+        tr["sls"] = sls
         be = [t for t, trig in sls[1:] if abs(trig - tr["entry"]) <= 0.002 * tr["entry"]]
         tr["be"] = be[0] if be else tr["exit"]
     return out
@@ -112,7 +141,20 @@ if __name__ == "__main__":
     lg = logging.getLogger("tbo"); lg.setLevel(logging.INFO); lg.propagate = False; lg.addHandler(Count())
     start = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"
     end = sys.argv[2] if len(sys.argv) > 2 else "2024-07-01"
-    fxs, pf = run(start, end)
+    cache_f = os.environ.get("CAPSIM_SAVE")              # optional: keep the simulated fills (re-check without re-running)
+    if cache_f and os.path.exists(cache_f):
+        import pickle
+        saved = pickle.load(open(cache_f, "rb"))
+        fills, sl_logs, SIZED[:], pf = saved[:4]
+        CLOSES[:] = saved[4] if len(saved) > 4 else []
+        fxs = []
+        for sym, fl, sl in zip(COINS, fills, sl_logs):
+            f = FakeFutures.__new__(FakeFutures); f.sym, f.fills, f.sl_log = sym, fl, sl; fxs.append(f)
+    else:
+        fxs, pf = run(start, end)
+        if cache_f:
+            import pickle
+            pickle.dump(([fx.fills for fx in fxs], [fx.sl_log for fx in fxs], list(SIZED), pf, list(CLOSES)), open(cache_f, "wb"))
     print(f"balance {EQ:,.0f}, portfolio {PF.name}: " + ", ".join(f"{s[:-4]} {coin_risk(pf, s, json.loads((HERE / f'config_{s[:-4].lower()}.json').read_text()))[0]:g}%" for s in COINS)
           + f", cap {coin_risk(pf, 'ETHUSDT', {'risk_pct': 0})[1]:g}%")
     ex, mf = set(pf["cap_exempt"]), pf.get("cap_min_fraction", 0.25)
@@ -123,18 +165,32 @@ if __name__ == "__main__":
         dist = abs(tr["entry"] - tr["stop"])
         c = cfg[tr["sym"]]
         rp, cp = coin_risk(pf, tr["sym"], c); cap = cp / 100
-        want = EQ * rp / 100 * (c.get("short_risk_mult", 1) if tr["dir"] < 0 else 1)
+        vm = mult_of(tr); tr["vm"] = vm
+        full_want = EQ * rp / 100 * (c.get("short_risk_mult", 1) if tr["dir"] < 0 else 1)
+        want = full_want * vm
         lev_cap = EQ * c["max_leverage"] / tr["entry"] * dist                     # risk at the leverage size cap
+        fi = FakeFutures.exchange_info(None, tr["sym"]); st_ = max(fi["step"], fi["mkt_step"])
+        okq = lambda q: q >= fi["min_qty"] and q * tr["entry"] >= fi["min_notional"]
+        q_min = max(fi["min_qty"], np.ceil(fi["min_notional"] / tr["entry"] / st_ - 1e-9) * st_)
+        floor_ = vm < 1 and not okq(np.floor(min(want, lev_cap) / dist / st_ + 1e-9) * st_) and okq(np.floor(min(full_want, lev_cap) / dist / st_ + 1e-9) * st_)
         have = (tr["qty"] - tr["cut"]) * dist
-        if tr["how"] == "market" and tr["exit"] - tr["t"] <= 2 and not np.isnan(tr["stop"]):
-            have = 0.0; tr["closed_at_once"] = True     # closed right after the fill (the cap had no room)
-        others = sum(abs(o["entry"] - o["stop"]) * (o["qty"] - o["cut"]) for o in T[:i]
+        why = [w for s_, t_, w in CLOSES if s_ == tr["sym"] and tr["t"] <= t_ <= tr["exit"]]
+        cap_close = any("open-risk cap" in w for w in why) if CLOSES else len(tr["sls"]) <= 1   # (old saved runs: stop never moved)
+        if tr["how"] == "market" and tr["exit"] - tr["t"] <= 2 and not np.isnan(tr["stop"]) and cap_close:
+            have = 0.0; tr["closed_at_once"] = True     # closed right after the fill, its stop never moved (the cap had no room)
+
+        def stop_at(o, t):                              # the other position's stop in force at this entry (a failed-breakout
+            st = [trig for ts_, trig in o["sls"] if ts_ <= t]   # or cascade tighten lowers its risk, as the bot counts it)
+            return st[-1] if st else o["stop"]
+        others = sum(abs(o["entry"] - stop_at(o, tr["t"])) * (o["qty"] - o["cut"]) for o in T[:i]
                      if o["sym"] != tr["sym"] and o["exit"] > tr["t"] and o["be"] > tr["t"])
         exp = want
         if tr["sym"] not in ex:
             room = cap * EQ - others
             exp = want if want <= room else (room if room > mf * want else 0.0)
         exp = min(exp, lev_cap)
+        if floor_ and q_min * dist <= lev_cap and (tr["sym"] in ex or q_min * dist <= cap * EQ - others):
+            exp = q_min * dist; tr["floor"] = True                                # v3.2: raised to the minimum order
         step = max(FakeFutures.exchange_info(None, tr["sym"])["step"], 1e-12) * dist
         ok = (abs(have - exp) <= 0.06 * exp + 2 * step) if exp > 0 else have <= 2 * step
         n_short += have < 0.94 * min(want, lev_cap); n_full += not (have < 0.94 * min(want, lev_cap))
@@ -144,9 +200,12 @@ if __name__ == "__main__":
           f"cut after the fill: {sum(1 for tr in T if tr['cut'] > 0)}, closed at once after the fill: {sum(1 for tr in T if tr.get('closed_at_once'))}")
     btc = [tr for tr in T if tr["sym"] == "BTCUSDT"]
     cb = cfg["BTCUSDT"]
-    full = [(tr["qty"] - tr["cut"]) * abs(tr["entry"] - tr["stop"]) >= 0.94 * min(EQ * coin_risk(pf, "BTCUSDT", cb)[0] / 100 * (cb["short_risk_mult"] if tr["dir"] < 0 else 1),
+    full = [(tr["qty"] - tr["cut"]) * abs(tr["entry"] - tr["stop"]) >= 0.94 * min(EQ * coin_risk(pf, "BTCUSDT", cb)[0] / 100 * (cb["short_risk_mult"] if tr["dir"] < 0 else 1) * tr.get("vm", 1),
                                                                           EQ * cb["max_leverage"] / tr["entry"] * abs(tr["entry"] - tr["stop"])) for tr in btc]
-    print(f"BTC entries: {len(btc)}, full size: {sum(full)} (exempt from the cap)")
+    print(f"BTC entries: {len(btc)}, full size: {sum(full)} (exempt from the cap; x0.25 wild-pullback entries count as full when "
+          f"at x0.25 of the full size: {sum(1 for tr in btc if tr.get('vm', 1) < 1)})")
+    print(f"v3.2 wild-pullback entries at x0.25: {sum(1 for tr in T if tr.get('vm', 1) < 1)}; raised to the exchange minimum: "
+          f"{sum(1 for tr in T if tr.get('floor'))}")
     print("cap actions:", counts)
     print(f"entries off the rule (> 6% from the expected risk): {len(bad)}")
     for b in bad[:20]:

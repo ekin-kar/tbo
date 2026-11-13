@@ -135,7 +135,7 @@ def volc_rows():
 
 
 def combined_TR(ev):
-    X = np.r_[B.TR, volc_rows()] if ev is None or not len(ev) else np.r_[B.TR, volc_rows(), sleeve_rows(ev)]
+    X = np.r_[B.TR, B.cols7(volc_rows())] if ev is None or not len(ev) else np.r_[B.TR, B.cols7(volc_rows()), B.cols7(sleeve_rows(ev))]
     return X[np.lexsort((X[:, 5], X[:, 0]))]
 
 

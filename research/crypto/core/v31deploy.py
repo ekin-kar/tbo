@@ -198,7 +198,7 @@ def volc_rows(V, share=VOLC_SHARE):
 
 
 def money_rows(T, V, with_volc=True):
-    A = W.with_sleeve(W.rows(T), W.sleeve30())
+    A = W.with_sleeve(W.rows(T, mult=T.size_mult.to_numpy() if "size_mult" in T else None), W.sleeve30())   # (v3.2 size column)
     if with_volc and len(V):
         A = np.r_[A, volc_rows(V)]; A = A[np.lexsort((A[:, 5], A[:, 0]))]
     return A

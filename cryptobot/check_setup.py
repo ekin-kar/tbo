@@ -109,6 +109,17 @@ for c in cfgs:
                      f"min {f['min_qty']:g} / ${f['min_notional']:g})" + ("" if okq else " -> too small: this trade would be skipped"), warn=not okq)
             if okq and qr * dist < 0.75 * eq * risk * m:
                 res(False, f"{side}: rounding cuts the risk to ${qr * dist:.2f} of ${eq * risk * m:.2f} (step {f['step']:g})", warn=True)
+        if p.vr_mult < 1.0:                             # v3.2 wild-pullback size (decided at each 4h arming close)
+            k1 = [k for k in x.klines(sym, "1d", 1500) if k[5] < x.now_ms()][-1499:]
+            vr, chg5 = S.vol_regime([k[2] for k in k1], [k[3] for k in k1], [k[4] for k in k1])
+            if vr is None:
+                res(False, f"v3.2 wild-pullback size: only {len(k1)} daily candles (need 101): not applied yet", warn=True)
+            else:
+                now_ = [sd for sd, s_ in (("longs", 1), ("shorts", -1)) if S.size_mult(p, s_, vr, chg5) < 1.0]
+                q_ = max(f["min_qty"], int(f["min_notional"] / px / max(f["step"], f["mkt_step"]) + 1 - 1e-9) * max(f["step"], f["mkt_step"]))
+                res(True, f"v3.2 wild-pullback size: daily ATR14/ATR100 {vr:.3f} (>= {p.vr_min:g}?), 5-day move {chg5:+.2f} ATR -> "
+                          + (f"{' and '.join(now_)} armed today at x{p.vr_mult:g} risk" if now_ else "full size today")
+                          + f"; a x{p.vr_mult:g} order below Binance's minimum is raised to {q_:g} {sym[:-4]} (${q_ * px:,.0f})")
         try:
             sc = x.symbol_config(sym); mt = str(sc.get("marginType", "?")).upper()
             res(mt in ("CROSSED", "CROSS"), f"margin type {mt}" + ("" if mt in ("CROSSED", "CROSS") else " (recommended: cross)"), warn=True)

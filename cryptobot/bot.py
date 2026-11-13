@@ -39,9 +39,10 @@ from binance_futures import Futures, BinanceError      # noqa: E402
 from oi_history import OIHistory                       # noqa: E402
 import notify                                          # noqa: E402
 
-VERSION = "3.1"
+VERSION = "3.2"
 PREFIX = "tbo"                 # clientAlgoId / clientOrderId prefix of this bot's orders
-N4H, N1D = 1000, 500           # candles fetched (the parity test uses the same windows)
+N4H, N1D = 1000, 1499          # candles fetched (the parity test uses the same windows); v3.2: 1,499 closed daily candles
+                               # (Binance's maximum) so the daily ATR100 of the wild-pullback size has converged as the research
 log = logging.getLogger("tbo")
 
 
@@ -127,7 +128,8 @@ class Bot:
             side, q, d = (1 if amt > 0 else -1), abs(amt), self.st.get("sl_dist") or 0.0
             eq = self.equity()
             risk = q * abs(entry_px - stop)
-            want = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0)
+            vm = float(self.st.get("vr_mult") or 1.0)
+            want = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0) * vm
             lvl, e_ms = self.st.get("fill_lvl") or 0.0, self.st.get("entry_ms") or self.x.now_ms()
             rows = [f"{'📈' if side > 0 else '📉'} <b>{self.coin} {'long' if side > 0 else 'short'} opened</b>",
                     f"Entry <b>{self.P(entry_px)}</b>" + (f" · level {self.P(lvl)}, slippage {side * (entry_px / lvl - 1) * 100:+.3f}%" if lvl else ""),
@@ -147,6 +149,10 @@ class Bot:
                 rows.append(f"If a {self.p.casc_src[:-4]} trade in the same direction is stopped out, stop to {self.p.casc_to:g}R")
             rows.append(f"Size {notify.esc(fmt(q, self.f['step']))} {self.coin} = {notify.usd(q * entry_px)} ({q * entry_px / eq:.1f}× the balance)")
             rows.append(f"Risk <b>{notify.usd(risk)}</b> = {risk / eq * 100:.2f}% of {notify.usd(eq)}")
+            if vm < 1.0:
+                vi = self.st.get("vr_info") or {}
+                rows.append(f"Wild pullback (daily ATR14/ATR100 {vi.get('vr', 0):.2f}, 5 days {vi.get('chg5', 0) * side:+.2f} ATR in its "
+                            f"direction): size ×{vm:g} (v3.2)")
             rows.append(f"Opened {notify.when(e_ms)} · time exit {notify.when(e_ms + self.p.max_hold_h * 3600_000)} ({notify.tz_label()})")
             pf = self.portfolio()
             if self.sym in pf.get("cap_exempt", []):
@@ -263,6 +269,11 @@ class Bot:
         k1 = [k for k in self.x.klines(self.sym, "1d", N1D + 1) if k[5] < now][-N1D:]
         return k4, k1
 
+    def regime_seen(self, close_ms, vr, chg5):
+        """v3.2: the wild-pullback inputs at this 4h close (logged; dev/test_v32_sim.py records them)."""
+        if vr is not None:
+            log.debug(f"daily ATR14/ATR100 {vr:.4f}, 5-day move {chg5:+.3f} ATR14 (last closed day)")
+
     def my_algo_orders(self):
         return [o for o in self.x.open_algo_orders(self.sym) if str(o.get("clientAlgoId", "")).startswith(PREFIX)]
 
@@ -274,17 +285,27 @@ class Bot:
         except BinanceError as e:
             log.debug(f"cancel {algo_id}: {e.msg} (already gone)")
 
-    def size(self, sl_dist, price, side=1, quiet=False):
-        """(quantity, cap note, no_room). Raises if the cap applies and the account cannot be read."""
+    def size(self, sl_dist, price, side=1, quiet=False, mult=1.0):
+        """(quantity, cap note, no_room). Raises if the cap applies and the account cannot be read.
+        mult: v3.2 wild-pullback size (x vr_mult). The cap counts the actual (scaled) risk, as the research. A scaled order
+        that the exchange minimum would drop while the full-size one would trade is raised to the minimum order (the
+        trade must still be taken), if it fits the cap and the leverage limit."""
         eq = self.equity()
-        want = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0)
-        risk, note = self.capped(eq, want)
+        base = eq * self.risk_now(eq) * (self.short_mult if side < 0 else 1.0)
+        risk, note = self.capped(eq, base * mult)
         if risk <= 0:
             return 0.0, note, True
-        qty = risk / sl_dist
-        qty = min(qty, eq * self.max_lev / price, self.f["mkt_max"])
-        qty = floor_step(qty, max(self.f["step"], self.f["mkt_step"]))
-        if qty < self.f["min_qty"] or qty * price < self.f["min_notional"]:
+        step = max(self.f["step"], self.f["mkt_step"])
+        lev_max = min(eq * self.max_lev / price, self.f["mkt_max"])
+        ok = lambda q: q >= self.f["min_qty"] and q * price >= self.f["min_notional"]
+        qty = floor_step(min(risk / sl_dist, lev_max), step)
+        if not ok(qty) and mult < 1.0 and ok(floor_step(min(base / sl_dist, lev_max), step)):
+            q_min = max(self.f["min_qty"], ceil_step(self.f["min_notional"] / price, step))
+            if q_min <= lev_max and self.capped(eq, q_min * sl_dist)[0] >= q_min * sl_dist * (1 - 1e-9):
+                log.info(f"wild-pullback size x{mult:g} is below the exchange minimum: raised to the minimum order "
+                         f"{fmt(q_min, self.f['step'])} (risk {q_min * sl_dist:.2f} USDT)")
+                return q_min, note, False
+        if not ok(qty):
             if not quiet:
                 log.debug(f"size {qty} below the exchange minimum (equity {eq:.2f}): no order")
             return 0.0, note, False
@@ -562,6 +583,8 @@ class Bot:
         h, l, c = [k[2] for k in k4], [k[3] for k in k4], [k[4] for k in k4]
         weekday = datetime.fromtimestamp((open_ms + self.p.tf_min * 60_000) / 1000, timezone.utc).weekday()
         dec = S.decide(self.p, h, l, c, [k[4] for k in k1], weekday, [k[2] for k in k1], [k[3] for k in k1])
+        vr, chg5 = S.vol_regime([k[2] for k in k1], [k[3] for k in k1], [k[4] for k in k1])   # v3.2 (last closed day)
+        self.regime_seen(open_ms + self.p.tf_min * 60_000, vr, chg5)
         amt, entry_px = self.own_position()
         if amt != 0 and not self.st.get("entry_ms") and not self.st.get("manual") and not self.dry:
             # a fill in the last seconds before this close (or found after a restart): adopt it (stop loss!) while the entry
@@ -659,16 +682,21 @@ class Bot:
                 if not (trig > 0 and dec.sl_dist > 0 and math.isfinite(trig)):
                     log.warning(f"invalid level {trig} / stop distance {dec.sl_dist}: no order")
                     continue
+                vm = S.size_mult(self.p, side, vr, chg5)  # v3.2 wild-pullback size, fixed at this arming close
+                self.st.update(vr_mult=vm, vr_info=dict(vr=vr, chg5=chg5, t=close_ms))
+                if vm < 1.0:
+                    log.info(f"wild pullback (daily ATR14/ATR100 {vr:.3f} >= {self.p.vr_min:g}, 5-day move {side * chg5:+.2f} ATR "
+                             f"<= {self.p.vr_chg5:g} for this {'long' if side == 1 else 'short'}): risk x{vm:g}")
                 if self.cooling():                      # v3.0 cooldown after a loss: the order waits until it ends
                     cu = int(self.st["cool_until"])
-                    self.st["cool_order"] = dict(side=side, trig=trig, sl_dist=dec.sl_dist, expire=close_ms + self.p.tf_min * 60_000)
+                    self.st["cool_order"] = dict(side=side, trig=trig, sl_dist=dec.sl_dist, expire=close_ms + self.p.tf_min * 60_000, mult=vm)
                     log.info(f"cooldown until {utc(cu)} UTC: {'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])} "
                              f"placed then if this candle's order is still valid")
                     status = (f"{'▲ buy' if side == 1 else '▼ sell'} stop {self.P(trig)} waits: cooldown after a loss until "
                               f"{notify.when(cu)}" + (" (after this candle: no order)" if cu >= self.st["cool_order"]["expire"] else ""))
                     break
                 try:
-                    qty, note, no_room = self.size(dec.sl_dist, trig, side)
+                    qty, note, no_room = self.size(dec.sl_dist, trig, side, mult=vm)
                 except Exception as e:                  # cap on but the account cannot be read: add no risk blind
                     log.warning(f"open risk unavailable ({e}): no new entry order this candle")
                     break
@@ -690,9 +718,10 @@ class Bot:
                          f"risk {qty * dec.sl_dist:.2f} USDT, valid until the next 4h close)")
                 self.st.update(sl_dist=dec.sl_dist, entry_side=side, entry_from=open_ms + self.p.tf_min * 60_000)
                 eq_ = self.equity()
-                want_ = eq_ * self.risk_now(eq_) * (self.short_mult if side < 0 else 1.0)
+                want_ = eq_ * self.risk_now(eq_) * (self.short_mult if side < 0 else 1.0) * vm
                 status = (f"{'▲ buy' if side == 1 else '▼ sell'} stop {self.P(trig)} · stop loss {self.P(trig - side * dec.sl_dist)} "
                           f"({dec.sl_dist / trig * 100:.2f}%) · risk {notify.usd(qty * dec.sl_dist)}"
+                          + (f" (×{vm:g}: wild pullback)" if vm < 1.0 else "")
                           + (f" (shrunk to {qty * dec.sl_dist / want_ * 100:.0f}% by the open-risk cap)" if "shrunk" in (note or "") else ""))
                 if self.dry:
                     break
@@ -882,14 +911,14 @@ class Bot:
         if self.cooling(now) or self.paused():
             return
         self.st.pop("cool_order", None)
-        side, trig, dist = co["side"], co["trig"], co["sl_dist"]
+        side, trig, dist, vm = co["side"], co["trig"], co["sl_dist"], float(co.get("mult", 1.0))
         try:
-            qty, note, no_room = self.size(dist, trig, side)
+            qty, note, no_room = self.size(dist, trig, side, mult=vm)
         except Exception as e:
             log.warning(f"open risk unavailable ({e}): no entry order after the cooldown this candle")
             self.save()
             return
-        self.st.update(sl_dist=dist, entry_side=side, entry_from=now)
+        self.st.update(sl_dist=dist, entry_side=side, entry_from=now, vr_mult=vm)
         if no_room:
             log.info(f"cooldown over, but the open-risk cap is full: {'BUY' if side == 1 else 'SELL'} stop {fmt(trig, self.f['tick'])} waits for room")
             self.st.update(entry_trig=trig, entry_qty=0.0); self.save()
@@ -933,7 +962,7 @@ class Bot:
                 self.st.update(entry_trig=0.0); self.save()
                 return
         try:
-            qty, note, _ = self.size(self.st["sl_dist"], trig, side, quiet=True)
+            qty, note, _ = self.size(self.st["sl_dist"], trig, side, quiet=True, mult=float(self.st.get("vr_mult") or 1.0))
         except Exception as e:
             log.warning(f"open risk unavailable ({e}): entry order left as it is")
             return

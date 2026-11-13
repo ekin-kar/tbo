@@ -13,7 +13,8 @@ COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "ADAUSDT"]
 CFG = {s: json.load(open(C.ROOT / "cryptobot" / f"config_{s[:-4].lower()}.json")) for s in COINS}
 PF = json.load(open(C.ROOT / "cryptobot" / "portfolio.json"))
 import os
-TAG = os.environ.get("BOT_TRADES", "v31")            # v31 = live rules from 13 Nov 2026 (build_trades.py v31); v30 = 6-12 Nov 2026;
+TAG = os.environ.get("BOT_TRADES", "v32")            # v32 = live rules from 13 Nov 2026 (build_trades.py v32: v3.1 + the wild-pullback
+                                                     # size, column size_mult = TR column 6); v31 = 13 Nov 2026 (v3.1) (build_trades.py v31); v30 = 6-12 Nov 2026;
                                                      # v28nov = v2.8 to 2026-11-06
 ALL = pickle.load(open(C.D.CACHE / f"portfolio_trades_{TAG}.pkl", "rb"))
 T = pd.concat([ALL[(s, 0.0003)] for s in COINS])
@@ -21,7 +22,14 @@ T = T.assign(_c=T.sym.map({s: i for i, s in enumerate(COINS)})).sort_values(["en
 # (same-minute entries: coin order BTC, ETH, BNB, SOL, ADA, as the statistics page)
 MIN = 60_000_000_000
 _m = lambda col: T[col].values.astype("datetime64[m]").astype(np.int64)
-TR = np.c_[_m("entry_time"), _m("exit_time"), _m("be_time"), T.dir.values, T.R.values, T.sym.map({s: i for i, s in enumerate(COINS)}).values]
+TR = np.c_[_m("entry_time"), _m("exit_time"), _m("be_time"), T.dir.values, T.R.values, T.sym.map({s: i for i, s in enumerate(COINS)}).values,
+           T.size_mult.values if "size_mult" in T else np.ones(len(T))]   # col 6: v3.2 size multiplier (1 = full size)
+
+
+def cols7(a):
+    """Rows with the size column (6-column sleeve rows get x 1)."""
+    a = np.asarray(a, float)
+    return a if a.shape[1] >= 7 else np.c_[a, np.ones(len(a))]
 MON = 30.44 * 1440
 BLK = 28 * 1440
 
@@ -68,11 +76,13 @@ def row_at(pol, eq):
 
 
 def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
-    """x: rows (entry, exit, be, dir, R, coin) in minutes, any time origin. deposit: added every MON minutes after the
+    """x: rows (entry, exit, be, dir, R, coin[, size mult]) in minutes, any time origin. The size multiplier (v3.2) scales
+    the trade's risk before the open-risk cap, so the cap counts the actual risk (as bot.py). deposit: added every MON minutes after the
     first trade's month start (journeys use origin 0). keep: 'events' -> (t, balance, worst) list, 'trades' -> per-trade
     amounts. Returns dict(final, dd (worst-case, %), ddc (closed, %), top, low, invested, reach{level: t}, ...)."""
     ev = []
-    for i, (e, xx, be, d, R, c) in enumerate(x):
+    for i, row in enumerate(x):
+        e, xx, be = row[0], row[1], row[2]
         ev += [(e, 1, i), (max(be, e + 1e-3), 0, i), (max(xx, e + 2e-3), 2, i)]
     rank = {2: 0, 0: 1, 1: 2}
     ev.sort(key=lambda z: (z[0], rank[z[1]]))
@@ -89,10 +99,10 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
                 if deposit:
                     eq += deposit; inv += deposit; pk += deposit; pkc += deposit
                 nxt += MON
-        e, xx, be, d, R, c = x[i]; c = int(c)
+        e, xx, be, d, R, c = x[i][:6]; c = int(c); sm = x[i][6] if len(x[i]) > 6 else 1.0
         if kind == 1:
             fr, rk, cap = row_at(pol, eq)
-            amt = eq * rk[c] / 100 * pol["mult"] * (pol["smult"] if d < 0 and c < 5 else 1.0)   # (sleeves: no short factor)
+            amt = eq * rk[c] / 100 * pol["mult"] * (pol["smult"] if d < 0 and c < 5 else 1.0) * sm   # (sleeves: no short factor)
             if full is not None:
                 full[i] = (amt, eq)
             if cap > 0 and c not in pol["exempt"]:
@@ -100,7 +110,8 @@ def run(x, pol, eq0=200.0, end=None, deposit=0.0, levels=(), keep=None):
                 if amt > room:
                     amt = room if room > pol["minf"] * amt else 0.0
             if amt > 0:
-                opn[i] = [amt, False]
+                opn[i] = [amt, c >= 5]                    # sleeves (coin 5 / 6): never in the cap room or the worst case
+                                                          # (v3.2 fix: they were counted for the instant of their entry)
             else:
                 skipped += 1
         elif kind == 0 and i in opn:
@@ -156,7 +167,7 @@ def window_full(a, b):
     """TBO rows of the window first (same order as window(), so history()'s trade table still lines up), sleeves after."""
     xb, t0, t1 = window(a, b)
     S = sleeve_rows()
-    return np.r_[xb, S[(S[:, 0] >= t0) & (S[:, 0] < t1)]], t0, t1, len(xb)
+    return np.r_[cols7(xb), cols7(S[(S[:, 0] >= t0) & (S[:, 0] < t1)])], t0, t1, len(xb)
 
 
 def window(a, b):

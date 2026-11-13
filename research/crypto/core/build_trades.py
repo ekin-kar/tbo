@@ -5,6 +5,8 @@ exit_time, be_time, dir, R, hours) and cache/trade_prices_<tag>.pkl (entry, exit
     python build_trades.py check     # rebuild without the lock and compare with v24 (must be identical)
     python build_trades.py v26       # with the profit lock
     python build_trades.py v28       # + the OI-low filter (the live rules v2.8)
+    python build_trades.py v32       # TBO v3.2 (live from 13 Nov 2026; botsim's default): v3.1's trade list + the wild-pullback
+                                     # size (column size_mult, core/v32deploy.py); also writes cache/volc_trades_v32.pkl
     python build_trades.py v31       # TBO v3.1 (live from 13 Nov 2026; botsim's default): v3.0 + failed-breakout stop tighten,
                                      # BTC stop-out cascade and the VOLC sleeve on the same coins (core/v31deploy.py, the
                                      # research twin of cryptobot/); also writes cache/volc_trades_v31.pkl
@@ -66,10 +68,26 @@ def build_v31():
           round(float(V.R.sum()), 1), "R")
 
 
+def build_v32():
+    os.environ["BOT_TRADES"] = "v31"                 # (botsim is imported on the way, by the panic sleeve: not the list being built)
+    import v32deploy as D
+    T, V, it = D.build()
+    if it < 0:
+        raise SystemExit("v31deploy did not settle")
+    cols = ["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours", "size_mult", "vr", "chg5"]
+    pickle.dump({(s, 0.0003): T[T.sym == s][cols].reset_index(drop=True) for s in COINS}, open(C.D.CACHE / "portfolio_trades_v32.pkl", "wb"))
+    T[["sym", "entry_time", "entry", "exit", "sl_dist", "reason"]].to_pickle(C.D.CACHE / "trade_prices_v32.pkl")
+    V.to_pickle(C.D.CACHE / "volc_trades_v32.pkl")
+    print("v32", len(T), "TBO trades;", int((T.size_mult < 1).sum()), "at x", D.SIZE["vr_mult"], "| VOLC", len(V), "trades",
+          round(float(V.R.sum()), 1), "R")
+
+
 if __name__ == "__main__":
     tag = sys.argv[1] if len(sys.argv) > 1 else "check"
     if tag == "v31":
         build_v31(); raise SystemExit
+    if tag == "v32":
+        build_v32(); raise SystemExit
     with Pool(3) as p:
         res = dict(p.map(build, [(s, tag) for s in COINS]))
     cols = ["sym", "entry_time", "exit_time", "be_time", "dir", "R", "hours"]

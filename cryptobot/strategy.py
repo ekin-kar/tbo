@@ -36,6 +36,11 @@ Rules (4-hour candles, UTC, Binance last price), v2 defaults:
                an open trade of this coin in the same direction that filled in that minute or earlier gets its stop
                raised to entry + casc_to x dist (the most favourable stage still wins, so a trade at breakeven is untouched).
   Time exit  : closed max_hold_h hours after the fill. No take profit.
+  Wild pull- : (v3.2) at the 4h close that arms the entry order: if the coin's last CLOSED daily candle has
+  back size    VolReg = ATR14 / ATR100 >= vr_min AND side x Chg5 <= vr_chg5 (Chg5 = (C - C[5 days earlier]) / ATR14:
+               the last 5 days moved against the order's side), the order's risk is x vr_mult (the trade is still
+               taken: its cooldown, the BTC cascade and the VOLC hand-over stay as with a full-size trade).
+               As research/crypto/core/crypto_regimes.py (daily candles, cTrader ATR); research/results/v32c_REPORT.md.
 
 Indicators match research/engine/indicators.py (cTrader style): EMA seeded with the first value,
 ATR = exponential smoothing of the true range seeded with the true range of bar 1.
@@ -83,6 +88,9 @@ class Params:
     casc_src: str = ""           # v3.1 cascade: the coin whose stop-outs tighten this coin's open trades ("" = off)
     casc_R: float = -0.5         # ... when its trade closed below this R (net of costs)
     casc_to: float = -0.25       # ... stop to entry + casc_to x dist
+    vr_mult: float = 1.0         # v3.2 wild-pullback size: risk x vr_mult (1 = off) when, at the arming close,
+    vr_min: float = 0.98         # ... the coin's daily ATR14 / ATR100 >= vr_min
+    vr_chg5: float = -0.25       # ... and side x (5-day close change / ATR14) <= vr_chg5
 
     def to_dict(self):
         return asdict(self)
@@ -109,6 +117,27 @@ def atr(h, l, c, n):
     for i in range(2, len(h)):
         out[i] = out[i - 1] + a * (tr[i - 1] - out[i - 1])
     return out
+
+
+def vol_regime(daily_high, daily_low, daily_close):
+    """(VolReg, Chg5) of the last CLOSED daily candle (oldest first), exactly as crypto_regimes.daily(): VolReg = ATR14 /
+    ATR100, Chg5 = (close - close 5 candles earlier) / ATR14. (None, None) with fewer than 101 candles (the research's
+    ATR100 warm-up: the first 100 days have no VolReg)."""
+    c = np.asarray(daily_close, float)
+    if len(c) < 101:
+        return None, None
+    h, l = np.asarray(daily_high, float), np.asarray(daily_low, float)
+    a14, a100 = atr(h, l, c, 14)[-1], atr(h, l, c, 100)[-1]
+    if not (a14 > 0 and a100 > 0):
+        return None, None
+    return float(a14 / a100), float((c[-1] - c[-6]) / a14)
+
+
+def size_mult(p: "Params", side, vr, chg5):
+    """v3.2: the entry order's risk multiplier (vr_mult in a wild pullback against the order's side, else 1)."""
+    if p.vr_mult >= 1.0 or vr is None or chg5 is None or not (np.isfinite(vr) and np.isfinite(chg5)):
+        return 1.0
+    return float(p.vr_mult) if (vr >= p.vr_min and side * chg5 <= p.vr_chg5) else 1.0
 
 
 def trend_side(daily_close, ema_n, slope_d=0):

@@ -32,7 +32,7 @@ tr:hover>td{background:var(--soft)}.neg{color:var(--neg)}.pos{color:var(--pos)}
 ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:92ch}ul.notes li{margin-bottom:6px}
 </style></head><body><div class="wrap">
 <h1>Crypto market regimes</h1>
-<p class="lede">Every day of BTC and ETH since 2020, sorted into regimes by three methods built on <b>7 daily features</b> (20-day move in ATR, efficiency, signed 60-day R², ATR14/ATR100, bar overlap, up / down follow-through). <b>RB</b> = readable rules, <b>TS</b> = two speeds (20-day trend × 5-day swing × volatility), <b>HM</b> = 6 clusters of the 7 features. Every threshold and cluster centre was fixed on <b>2020–23 only</b>; a day's state uses that day's close, so a trade only ever sees the state of the day before it. Then the question: does TBO v3.1 do better or worse in some regimes, and does any regime rule beat v3.1 out of sample?</p>
+<p class="lede">Every day of BTC and ETH since 2020, sorted into regimes by three methods built on <b>7 daily features</b> (20-day move in ATR, efficiency, signed 60-day R², ATR14/ATR100, bar overlap, up / down follow-through). <b>RB</b> = readable rules, <b>TS</b> = two speeds (20-day trend × 5-day swing × volatility), <b>HM</b> = 6 clusters of the 7 features. Every threshold and cluster centre was fixed on <b>2020–23 only</b>; a day's state uses that day's close, so a trade only ever sees the state of the day before it. Then the question: does TBO v3.2 do better or worse in some regimes, and does any regime rule beat v3.1 out of sample?</p>
 <div class="controls">
  <div><div class="ctl-title">Coin</div><div class="seg" id="coin"></div></div>
  <div><div class="ctl-title">Method</div><div class="seg" id="clf"></div></div>
@@ -41,7 +41,7 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:92ch}ul.n
 <div class="panel"><svg id="px" viewBox="0 0 1000 380" preserveAspectRatio="none" role="img" aria-label="price coloured by regime"></svg><div class="tip" id="tip"></div></div>
 <div class="legend" id="leg"></div>
 
-<h2>TBO v3.1 trades by regime at entry</h2>
+<h2>TBO v3.2 trades by regime at entry</h2>
 <p class="hint">Average R per trade of the five coins' trades (and of the same rules on 14 untouched coins, HOLD_BIG) by the regime of the day before the entry. "Round trip" = share of trades that were +1.5R … +5R in profit and closed below +0.1R. Cells with fewer than 10 trades are faint.</p>
 <div class="controls"><div><div class="ctl-title">Regime of</div><div class="seg" id="cclf"></div></div></div>
 <div class="panel scroll"><table id="census"></table></div>
@@ -50,7 +50,7 @@ ul.notes{color:var(--muted);font-size:14px;padding-left:18px;max-width:92ch}ul.n
 <p class="hint">Trades of the five coins split into fifths by a feature's value at entry (lowest left). A useful feature keeps the same order in both periods; most do not. The coin's own volatility ratio (ATR14 / ATR100) is the clearest one.</p>
 <div class="panel scroll"><table id="quint"></table></div>
 
-<h2 id="cv-h">v3.1 vs v3.2 from $300 (2024 start)</h2>
+<h2 id="cv-h">v3.1 vs TBO v3.2 as deployed, from $300 (2024 start)</h2>
 <p class="hint" id="cv-note"></p>
 <div class="panel"><svg id="cv" viewBox="0 0 1000 300" preserveAspectRatio="none"></svg></div>
 <div class="panel" style="margin-top:12px"><svg id="dd" viewBox="0 0 1000 180" preserveAspectRatio="none"></svg></div>

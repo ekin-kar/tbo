@@ -22,7 +22,7 @@ POL = BS.bot_policy()
 
 
 def build(start):
-    h = BS.history(POL, start, "2026-11-07", START, full=True)       # v3.1: balance = TBO + panic + VOLC; trade lists = TBO
+    h = BS.history(POL, start, "2026-11-07", START, full=True)       # v3.2: balance = TBO + panic + VOLC; trade lists = TBO
     cv = h["events"].rename(columns={"bal": "equity"}); tk = h["trades"]
     tk = tk.sort_values("exit_time").copy()
     tk["kind"] = np.where(tk.R > 0.2, "win", np.where(tk.R < -0.2, "loss", "be"))

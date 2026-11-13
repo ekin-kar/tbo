@@ -1,4 +1,4 @@
-# TBO v3.1: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve on 12 coins + VOLC sleeve (Binance USD-M futures)
+# TBO v3.2: trend-breakout bot (BTC, ETH, BNB, SOL, ADA) + panic sleeve on 12 coins + VOLC sleeve (Binance USD-M futures)
 
 ## Strategy (v2.0, Oct 2026) - long AND short
 
@@ -19,10 +19,11 @@
 | Cooldown (v3.0) | After a trade on a coin closed below **-0.5R** (a stop-out), that coin takes **no new entry for 16 hours** (`cool_h` / `cool_R`); the 4h order of a close inside the cooldown waits and is placed when it ends (until that candle's order expires; at market if the price is already past the level, as the backtest) |
 | Failed-breakout stop (v3.1) | From **8 hours** after the fill, at every hourly close: a trade that has been **+0.9R** in favour but never +1.5R and is now **below -0.2R** gets its stop moved to **-0.5R** (once); the 16 h cooldown follows that trade whatever its result (`fb_h` / `fb_mfe` / `fb_thr` / `fb_to` / `fb_cool`) |
 | BTC cascade (v3.1) | When a **BTC** trade closes below **-0.5R** (after costs), every open ETH / BNB / SOL / ADA trade in the **same direction** that filled in that minute or earlier gets its stop raised to **-0.25R** (a trade already at breakeven or locked is untouched); read from BTC's state file within seconds (`casc_src` / `casc_R` / `casc_to`) |
+| Wild-pullback size (v3.2) | At the 4h close that arms the entry order: if the coin's last closed **daily** candle has **ATR14 / ATR100 >= 0.98** (volatility already expanded) and the last **5 days moved >= 0.25 ATR14 against the order** (down for a long, up for a short), the order's risk is **x 0.25**. The trade is still taken, so its cooldown, the BTC cascade and the VOLC hand-over work as with a full-size trade. A x0.25 order under Binance's minimum (while the full one would trade) is raised to the minimum order if it fits the cap and leverage (`vr_mult` / `vr_min` / `vr_chg5`; `vr_mult` 1 = off). See "v3.2" below |
 | Exit | stop (initial, failed-breakout, cascade, breakeven, lock, stale), or **120 hours (5 days)** after the fill. No take profit |
 | Size | `risk_pct` of equity lost if the stop is hit; notional capped at `max_leverage` x equity (5x: at 2% risk the median is 1.4x, max 4.2x) |
-| Risk ladder (v3.1 = v3.0 x 0.95) | `portfolio.json`: BTC 5.7% / ETH 3.8% / alts 0.7885% under $1,000; 4.75% / 3.135% / 0.7885% to $10,000; 2.375% / 1.615% / 0.399% above (v3.0: 6 / 4 / 0.83, 5 / 3.3 / 0.83, 2.5 / 1.7 / 0.42). See "v3.1" and "Risk ladder" below |
-| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (v3.1: 6.27% of equity under $1,000, 5.225% to $10,000, 2.6125% above). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
+| Risk ladder (v3.2) | `portfolio.json`: **BTC 5% / ETH 3.3% / alts 0.83% from $300 to $10,000** (the first row, under $1,000, at the $1,000-10,000 risks), **2.5% / 1.7% / 0.42% above** (= the v3.0 ladder with its first row flattened; v3.1 was v3.0 x 0.95: 5.7 / 3.8 / 0.79% under $1,000). See "v3.2" and "Risk ladder" below |
+| Open-risk cap (v2.5) | `portfolio.json`: the risk of all open positions not yet at breakeven may not exceed **1.1 x the BTC risk** of the ladder step (v3.2: 5.5% of equity up to $10,000, 2.75% above; it counts each trade's actual risk, so a x0.25 trade takes a quarter of the room). A new ETH / BNB / SOL / ADA trade that would go over is made smaller to fit, or not taken if less than a quarter fits. **BTC is exempt** (always full size), but its open risk counts for the others. See below |
 
 About 5 trades a month (long and short), median hold 17 h, average 38 h.
 
@@ -48,6 +49,44 @@ Parity (`dev/test_oi_low.py`): live `strategy.oi_rank` vs the research's rank at
 The archive files are the same numbers the research used (max difference 2e-16). First start: ~90 files per coin (~30 s).
 With the panic sleeve (v2.8 bot + sleeve, from $300): 2022 $826.9k / 28.2% (bot alone $461.6k / 39.4%), 2024 $60.4k / 36.1%
 (bot alone $41.6k / 40.5%). All pages in `reports/` are rebuilt on the v2.8 trades (`build_trades.py v28`).
+
+## v3.2 (13 Nov 2026): wild-pullback size, flat first ladder row
+
+Research: `research/results/v32_REPORT.md` (regimes: 1,490 settings), `v32b_REPORT.md` (cap counting, 4 follow-ups) and
+`v32c_REPORT.md` (the exact-engine re-test that picked this rule, and the ladder). Live twin
+`research/crypto/core/v32deploy.py` (`build_trades.py v32`, botsim's default). Adopted (user decision, 13 Nov 2026):
+1. **Wild-pullback size** (`strategy.vol_regime` / `size_mult`, `bot.py` `size(mult=...)`): see the table above. Decided once
+   at the 4h close that arms the order (kept for a cooldown release and for the per-minute cap resize), from the 1,499 last
+   closed daily candles (the bot now fetches Binance's maximum so the daily ATR100 has converged, as in the research). The
+   trade is taken at x0.25 instead of skipped: skipping it inside the 1-minute engine let later full-size re-entries in and
+   failed the money gate (2024 drop 32.0% vs 31.5%); taking it small keeps every cooldown, cascade and VOLC hand-over of
+   v3.1, so the trend bot's trade list is exactly v3.1's (1,355 trades, 116 of them at x0.25).
+2. **Ladder** (`portfolio.json`): the v3.0 ladder at k = 1.00 with its first row (under $1,000) at the $1,000-10,000 risks:
+   BTC 5 / 5 / 2.5%, ETH 3.3 / 3.3 / 1.7%, alts 0.83 / 0.83 / 0.42%, cap 5.5 / 5.5 / 2.75%. Small accounts no longer take
+   the extra 1.2x risk under $1,000 (every $300-start window and every 2-year journey began there); from $1,000 the risks
+   are v3.0's (v3.1: x 0.95). The panic and VOLC sleeves follow the ladder's BTC risk.
+
+| From $300 (research account; 1,000 two-year journeys from 2022) | v3.1 (x 0.95) | **v3.2 as deployed** |
+|---|---|---|
+| 2022 start | $1.215M, drop 23.4% | **$2.031M, drop 24.5%** |
+| 2024 start | $70.8k, drop 31.5% | **$74.3k, drop 26.2%** |
+| 15 Sep - 6 Nov 2026: from $300 / inside the 2024 run | drop 34.4% / 16.0% | **26.6% / 14.2%** |
+| 1 Oct - 6 Nov 2026 from $300 | -26.0% (drop 29.1%) | **-22.0% (drop 24.6%)** |
+| Losing months of the 2024 run | 11 of 35 | **11 of 35** |
+| P(>= $10,000 after 2 years) | 83.4% | **87.1%** |
+| Bootstrap median / 1-in-10 low / 1-in-10 drop | $26.4k / $6.63k / 49.5% | **$28.8k / $7.67k / 44.4%** |
+
+The 2022 drop is 1.1 points higher (from $10,000 the risks are v3.0's, not x 0.95); everything else is better. Inside the
+2024 run the autumn-2026 chop cost 14.2% at a ~$67k balance; the 26.6% is a $300 start in the first ladder row. On the 14
+coins the bot does not trade the rule helps in 2020-23 and lowers the 2024-26 drop, but its 2024-26 net there is slightly
+negative: watch it.
+
+**Updating a server to v3.2:** on this PC run `tbo_install.bat` -> **1 Update my bot** (pulls `main`, sends the bot folder
+without keys / state / logs, runs `vds_setup.sh`, restarts the service), then **2 Check my setup**: each coin now shows a
+"v3.2 wild-pullback size" line (today's daily ATR14/ATR100, 5-day move, and whether longs / shorts would be armed at x0.25).
+No new key or setting is needed. The new `portfolio.json` applies at the next sizing. Open trades carry on unchanged; the
+first x0.25 decision is made at the next 4h close. To switch the rule off: `"vr_mult": 1.0` in the `config_*.json` files and
+restart.
 
 ## v3.1 (13 Nov 2026): failed-breakout stop, BTC cascade, VOLC sleeve, risk x 0.95
 
@@ -308,6 +347,25 @@ How the bot applies it (the order is sized at the 4h close, before it fills, so 
 - `portfolio.json` is read every time: an edit applies without a restart. Delete it (or set 0) to turn the cap off.
 
 ## Parity tests
+
+**v3.2 (13 Nov 2026): `dev/test_v32_sim.py <start> <end>`** (the v3.1 test plus the wild-pullback size; research twin
+`research/crypto/core/v32deploy.py`, `build_trades.py v32`). Run 2021-01 .. 2026-11 in three parts:
+
+| | 2021-22 | 2023-24 | 2025 - 6 Nov 2026 |
+|---|---|---|---|
+| 4h closes checked (ATR14/ATR100, 5-day move, x0.25 for longs and shorts) | 21,748: 0 differ | 21,930: 6 differ (one SOL day, see below) | 20,220: 0 differ |
+| Trades: size multiplier bot = research | 406 of 406 (32 at x0.25) | 442 of 442 (41) | 304 of 304 (28) |
+| TBO entry / exit minute | 406 / 402 of 413 | 442 / 430 of 446 | 304 / 303 of 304 |
+| VOLC entry / exit minute | 35 / 35 of 36 | 44 / 44 of 44 | 35 / 33 of 35 |
+
+- The bot's formula on the research's own daily candles is identical (largest difference 2.4e-12). The simulated
+  exchange rounds old prices to today's tick (SOL 0.01, where its 2023 data moved in 0.001 steps), so on 10 Feb 2023 its
+  SOL VolReg was 0.97991 vs the research's 0.98042: x0.25 for longs at that day's 6 closes in the research, not in the bots
+  (no trade that day). Live, the bot reads the same Binance candles the research is built from.
+- Entry / exit differences are v3.1's: one-minute shifts from tick rounding and SOL's minute-data gaps, the backtest's stop
+  inside the fill minute. Two VOLC trades only in the bots (BTC 10 Apr 2023, BNB 24 Jul 2023) show up the same under
+  `test_v31_sim.py`: a v3.1 difference, not yet explained.
+- `dev/test_cap_sim.py 2022-01-01 2026-11-06` (v3.2 ladder, the x0.25 multiplier and the minimum-order floor in the expected risk): $10,000 886 entries (66 at x0.25), 79 shrunk by the cap, BTC 193/193 full size; $500 834 entries (60 at x0.25, 6 raised to Binance's minimum), 118 shrunk; $300 789 entries (58 at x0.25, 5 raised); **0 entries off the rule** at all three. The test now counts the other positions at the stop in force at the entry (a failed-breakout tighten lowers their risk, as the bot counts it) and calls a quick market close a cap close only when the bot says so.
 
 **v3.1 (13 Nov 2026): `dev/test_v31_sim.py <start> <end>`.** The five coin bots (`bot.py`) and the VOLC sleeve
 (`volc.py`) run together on ONE simulated account fed with 1m history (cap off, so every trade the rules allow is taken).

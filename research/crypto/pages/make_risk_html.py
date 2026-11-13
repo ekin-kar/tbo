@@ -1,6 +1,6 @@
 """reports/risk_comparison.html (+ plan_ladder_plus50.html preset): $300 over 24 months with different risk profiles
 (the bot's risk ladder and flat risks, all with the open-risk cap, BTC exempt) and monthly deposits, simulated from random
-4-week blocks of the real v3.1 trades: the whole system (TBO on BTC ETH BNB SOL ADA, shorts x0.5, + the panic and VOLC
+4-week blocks of the real v3.2 trades: the whole system (TBO on BTC ETH BNB SOL ADA, shorts x0.5, + the panic and VOLC
 sleeves at their live sizes relative to the BTC risk). Sizing: botsim.py (= the bot), full_policy."""
 import sys, pathlib; sys.path[:0] = [str(pathlib.Path(__file__).resolve().parents[1] / d) for d in ("core", "studies")]  # research/crypto layout
 import json

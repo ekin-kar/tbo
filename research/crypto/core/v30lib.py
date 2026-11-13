@@ -308,7 +308,7 @@ def parity():
         be_ok = (x.be_time.values == ref.be_time.values).mean() if len(x) == len(ref) else np.nan
         out.append((s, len(x), len(ref), same, be_ok))
     pol = base_policy()
-    A = with_sleeve(np.c_[B.TR, np.ones(len(B.TR))])
+    A = with_sleeve(np.c_[B.TR[:, :6], np.ones(len(B.TR))])
     for a in ("2022-01-01", "2024-01-01"):
         r1 = money_nb(window(A, a), pol); r2 = L.money_window(A[:, :6], a, END, pol)
         out.append((a, r1["final"], r2["final"], abs(r1["final"] - r2["final"]) < 1e-6 * r2["final"], r1["dd"] - r2["dd"]))
