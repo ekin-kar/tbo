@@ -707,3 +707,9 @@ set as the symbol leverage), `poll_s`, and the strategy block (keep the tested v
   on the last price (`workingType=CONTRACT_PRICE`), as in the backtest.
 - Not yet run against the real API from here (the research machine cannot reach Binance): **run testnet /
   a small live size first** and check the first fills and stop losses on the Binance app.
+
+## v3.5 research (14 Nov 2026): no change to the bot
+
+A further 3,634-setting campaign (VOLC on the 7 extra DEV12 coins with a slot-capped pool, plus 7 new strategy archetypes) found nothing
+that passes the standalone, plateau / out-of-universe and coupled-portfolio gates against v3.2.1. Nothing in `cryptobot/` changed; the live
+settings stay v3.2.1 (VOLC on the core 5 only). Details: `research/results/v35_REPORT.md`.

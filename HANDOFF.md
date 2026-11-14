@@ -567,3 +567,14 @@ by `research/crypto/core/panic_sleeve.py`, `pages/make_panic_html.py`, `cryptobo
     the research bootstrap's $28.8k / $7.67k / 44.4% / 87.1%. Same idea, different horizon: the page cuts each journey at
     24 calendar months (730.6 days); the research bootstrap (`v30lib.boot_paths`, used for every money comparison since
     v3.0) runs all 27 four-week blocks (756 days). At ~20% median growth a month the extra 25 days are about +16%.
+
+## v3.5 research campaign (14 Nov 2026): nothing adopted, v3.2.1 (O1, commit 17a6ce1) stays final
+
+Branch `v35-research` (merged to main as docs and research only; `cryptobot/` and `reports/` unchanged). Study:
+`research/crypto/studies/v35_new_strategies_and_volc_extra.py`; results `research/results/v35_REPORT.md`, `v35_terminal_log.md`, `v35_*.csv`.
+3,634 settings scored against O1 in the exact capped simulator (parity: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot
+$28,770 / $7,672 / 44.43%): 136 VOLC extra-pool settings (7 extra coins x share x max_extra_open x ranking x inside/outside the cap) +
+3,498 settings of 7 new archetypes (trend-pullback, squeeze exhaustion, euphoria blow-off, Monday box, CME fade, laggard catch-up,
+post-panic continuation). **0 pass G1 + G2 + G3.** VOLC on the extra coins: era ratio never > 1 in both eras (best phase share 49%),
+and out of universe (HOLD_BIG 14) it earns +0.3R, PF 1.00 in 2024-26. Only lead: post-panic continuation (passes G3, fails G1 / G2,
+~45 trades per era): re-test on live data in 6-12 months. Gate note: G1 needs >= 30 trades per era (a first pass flagged 1-2-trade cells).
