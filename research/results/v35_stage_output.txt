@@ -1,0 +1,355 @@
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+[check] money harness reproduces O1: m_2022 2,030,647.52, dd_2022 24.51, m_2024 74,343.33, dd_2024 26.20, boot_med 28,770.12, boot_p10 7,672.12, boot_dd90 44.43
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+[check] money harness reproduces O1: m_2022 2,030,647.52, dd_2022 24.51, m_2024 74,343.33, dd_2024 26.20, boot_med 28,770.12, boot_p10 7,672.12, boot_dd90 44.43
+[check] empty sleeve rows change nothing: True
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+
+=== T1: live-exact 4h VOLC on the 7 extra DEV12 coins (v33 engine; no TBO conflict) ===
+              group      sym  n_dev  net_dev  pf_dev  dd_dev  avg_dev  n_oos  net_oos  pf_oos  dd_oos  avg_oos
+             EXTRA7  XRPUSDT     23   16.623   3.376   2.455    0.723     22    8.602   1.897   2.295    0.391
+             EXTRA7 DOGEUSDT     20    7.124   1.790   3.330    0.356     20    0.046   1.004   7.933    0.002
+             EXTRA7 AVAXUSDT     14    9.342   3.028   2.286    0.667      6   -4.053   0.260   5.476   -0.675
+             EXTRA7 LINKUSDT      6   -1.511   0.655   3.226   -0.252      9    5.111   2.510   1.170    0.568
+             EXTRA7  DOTUSDT      9   -0.210   0.964   3.648   -0.023     12    9.509   3.865   1.128    0.792
+             EXTRA7  LTCUSDT      8    3.476   2.006   2.286    0.435     13   -1.944   0.784   3.780   -0.150
+             EXTRA7  TRXUSDT      9   -0.731   0.883   2.951   -0.081     13    0.828   1.105   2.988    0.064
+              CORE5  BTCUSDT     11    1.981   1.320   2.626    0.180     13    2.079   1.284   2.448    0.160
+              CORE5  ETHUSDT     13    0.134   1.017   4.231    0.010     10   -1.388   0.769   3.741   -0.139
+              CORE5  BNBUSDT     11   -0.983   0.866   4.981   -0.089     10    1.452   1.305   1.392    0.145
+              CORE5  SOLUSDT     12    9.925   4.900   1.081    0.827      6    8.374     inf   0.000    1.396
+              CORE5  ADAUSDT     15   10.830   3.320   2.397    0.722     14   -0.672   0.923   5.094   -0.048
+      EXTRA7 pooled      ALL     89   34.113   1.841   4.247    0.383     95   18.099   1.353   8.813    0.191
+CORE5 pooled (live)      ALL     62   21.887   1.762   6.062    0.353     53    9.845   1.367   5.094    0.186
+[T1] HOLD_BIG BCHUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG XLMUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG SUIUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG HBARUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG 1000SHIBUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG 1000PEPEUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG NEARUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG UNIUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG ETCUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG APTUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG AAVEUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG ATOMUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG FILUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] HOLD_BIG ICPUSDT: skipped (FileNotFoundError: [Errno 2] No such file or directory: '/mnt/c/Users/Eko/Deskt)
+[T1] audit done [7s]
+[T1] pool N=1 rank=fill: n 128  dev 64 net 22.2R dd 4.2  oos 63 net 11.0R dd 7.7
+[T1] pool N=1 rank=squeeze: n 100  dev 47 net 15.7R dd 4.3  oos 52 net 10.7R dd 5.5
+[T1] pool N=1 rank=oi: n 101  dev 49 net 19.3R dd 5.4  oos 51 net 12.2R dd 4.8
+[T1] pool N=1 rank=tight_oi: n 103  dev 50 net 17.7R dd 4.3  oos 52 net 13.6R dd 4.8
+[T1] pool N=2 rank=fill: n 163  dev 80 net 29.0R dd 5.2  oos 82 net 17.6R dd 7.5
+[T1] pool N=2 rank=squeeze: n 146  dev 69 net 23.7R dd 5.2  oos 76 net 14.1R dd 7.8
+[T1] pool N=2 rank=oi: n 147  dev 71 net 26.5R dd 5.2  oos 75 net 13.0R dd 7.1
+[T1] pool N=2 rank=tight_oi: n 147  dev 69 net 23.8R dd 6.3  oos 77 net 13.0R dd 7.1
+[T1] pool N=3 rank=fill: n 177  dev 86 net 29.9R dd 5.2  oos 90 net 18.7R dd 5.7
+[T1] pool N=3 rank=squeeze: n 166  dev 79 net 30.1R dd 5.2  oos 86 net 20.5R dd 5.7
+[T1] pool N=3 rank=oi: n 164  dev 77 net 24.8R dd 5.2  oos 86 net 15.6R dd 5.9
+[T1] pool N=3 rank=tight_oi: n 164  dev 77 net 24.8R dd 6.3  oos 86 net 18.1R dd 5.9
+[T1] pool N=4 rank=fill: n 183  dev 88 net 32.6R dd 5.2  oos 94 net 19.2R dd 6.9
+[T1] pool N=4 rank=squeeze: n 175  dev 83 net 30.8R dd 6.3  oos 91 net 20.0R dd 6.9
+[T1] pool N=4 rank=oi: n 177  dev 84 net 29.7R dd 5.2  oos 92 net 16.4R dd 7.1
+[T1] pool N=4 rank=tight_oi: n 177  dev 84 net 27.0R dd 6.3  oos 92 net 18.9R dd 7.1
+[T1] pool N=7 rank=all: n 185  dev 89 net 34.1R dd 4.2  oos 95 net 18.1R dd 8.8
+[T1] money for pool (1, 'fill') done [24s]
+[T1] money for pool (1, 'squeeze') done [30s]
+[T1] money for pool (1, 'oi') done [36s]
+[T1] money for pool (1, 'tight_oi') done [42s]
+[T1] money for pool (2, 'fill') done [48s]
+[T1] money for pool (2, 'squeeze') done [54s]
+[T1] money for pool (2, 'oi') done [59s]
+[T1] money for pool (2, 'tight_oi') done [65s]
+[T1] money for pool (3, 'fill') done [71s]
+[T1] money for pool (3, 'squeeze') done [77s]
+[T1] money for pool (3, 'oi') done [83s]
+[T1] money for pool (3, 'tight_oi') done [88s]
+[T1] money for pool (4, 'fill') done [94s]
+[T1] money for pool (4, 'squeeze') done [100s]
+[T1] money for pool (4, 'oi') done [106s]
+[T1] money for pool (4, 'tight_oi') done [112s]
+[T1] money for pool (7, 'all') done [118s]
+ N     rank  share  inside_cap      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  p_10k  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+ 2     fill   0.35       False 1964741.731   25.830 79601.148   26.260 30916.005  8405.407     43.990  0.882      1.009      0.981      0.488  False    False False
+ 2     fill   0.35        True 1953386.794   25.830 78730.742   26.260 30731.363  8400.998     44.155  0.881      1.009      0.980      0.488  False    False False
+ 2  squeeze   0.35       False 1924043.869   25.830 78447.029   26.260 30677.073  8313.698     43.990  0.878      1.008      0.979      0.488  False    False False
+ 2  squeeze   0.35        True 1912924.139   25.830 77589.242   26.260 30580.823  8267.280     44.155  0.877      1.008      0.978      0.488  False    False False
+ 2     fill   0.50       False 2073319.976   26.395 81912.774   26.300 31694.733  8631.888     43.749  0.891      1.013      0.973      0.439  False    False False
+ 2     fill   0.50        True 2053012.598   26.395 80510.462   26.300 31480.709  8617.227     43.914  0.888      1.013      0.971      0.439  False    False False
+ 2  squeeze   0.50       False 2012268.582   26.395 80232.403   26.300 31296.024  8673.778     43.989  0.883      1.011      0.971      0.439  False    False False
+ 2  squeeze   0.50        True 1992559.179   26.395 78858.858   26.300 30929.862  8651.241     44.015  0.880      1.011      0.969      0.439  False    False False
+ 2     fill   0.75       False 2265471.400   27.332 85840.903   26.374 32723.310  9485.439     43.712  0.895      1.020      0.960      0.415  False    False False
+ 2     fill   0.75        True 2225961.082   27.332 83412.180   26.374 32390.537  9218.905     43.712  0.894      1.019      0.957      0.415  False    False False
+ 2  squeeze   0.75       False 2166221.608   27.332 83241.232   26.374 31879.035  9275.051     44.081  0.891      1.016      0.957      0.366  False    False False
+ 2  squeeze   0.75        True 2128442.229   27.332 80886.062   26.374 31408.326  9170.544     44.153  0.890      1.016      0.954      0.366  False    False False
+ 2     fill   1.00       False 2306436.940   28.266 91255.694   26.456 33483.794 10270.824     43.350  0.902      1.026      0.948      0.341  False    False False
+ 2  squeeze   1.00       False 2172801.730   28.266 86288.912   26.456 33375.283  9613.227     44.040  0.896      1.022      0.944      0.341  False    False False
+ 2     fill   1.00        True 2248783.479   28.266 86334.330   26.456 33033.970  9924.830     43.469  0.899      1.025      0.944      0.341  False    False False
+ 2  squeeze   1.00        True 2118488.716   28.266 82902.860   26.456 32239.863  9281.521     44.040  0.894      1.021      0.939      0.341  False    False False
+ 3  squeeze   0.35       False 1985568.788   25.830 80344.288   26.260 31074.373  8642.340     43.990  0.883      1.009      0.982      0.293  False    False False
+ 1     fill   0.35       False 1893680.168   25.088 78010.370   26.201 30344.265  8050.522     44.202  0.879      1.007      0.978      0.293  False    False False
+ 1     fill   0.35        True 1888313.351   25.088 77592.492   26.201 30322.456  8046.257     44.202  0.879      1.007      0.977      0.293  False    False False
+ 1     fill   0.50       False 1967471.060   25.339 79606.297   26.201 30974.552  8275.352     44.100  0.885      1.010      0.969      0.293  False    False False
+ 1     fill   0.50        True 1956423.749   25.339 78870.660   26.201 30666.023  8266.557     44.100  0.882      1.010      0.968      0.293  False    False False
+ 4  squeeze   0.35       False 1988700.943   25.830 80097.103   26.260 31048.606  8626.479     44.155  0.884      1.010      0.982      0.268  False    False False
+ 4     fill   0.35       False 2000960.712   25.830 79761.731   26.260 31058.160  8460.711     44.155  0.885      1.010      0.982      0.268  False    False False
+ 4 tight_oi   0.35       False 1951604.408   25.830 79908.587   26.260 30656.555  8606.721     44.155  0.882      1.009      0.981      0.268  False    False False
+ 3     fill   0.35       False 1975554.704   25.830 79642.493   26.260 30775.160  8341.952     43.990  0.885      1.009      0.981      0.268  False    False False
+[T1] settings passing G3: 0 of 136; passing the era gate alone: 0
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+
+=== T2: trend-pullback resumption (inside the 20-bar channel, TBO flat, exit if TBO fills) ===
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+
+=== T4a: Monday-00:00 weekend-compression box breakout (TBO flat on the coin) ===
+
+=== T3a: forced short-squeeze exhaustion (short after a spike with falling OI and a bearish hour) ===
+[T2] 432 settings x 12 coins [230s]; G1a (net > 0 and PF >= 1.25 in both eras): 0; with plateau >= 0.6: 0
+[T2] no setting passes G1a; the 3 closest by min(PF dev, PF oos) get the money run for the record
+                        id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+pb_n6_d1.75_r1.5_tp1.5_h48   0.15 False      0.0 2037179.546   25.328 91084.909   29.230 29559.627  7491.780     44.426      0.908      1.023      0.024  False    False False
+pb_n6_d1.75_r1.5_tp1.5_h48   0.25 False      0.0 2017535.604   27.073 90558.018   31.209 30141.455  7305.328     45.640      0.834      1.040      0.000  False    False False
+pb_n6_d1.75_r1.5_tp1.5_h48   0.40 False      0.0 1939212.542   30.674 88222.089   34.117 30632.990  6605.958     48.990      0.742      0.970      0.000  False    False False
+pb_n6_d1.75_r1.5_tp1.5_h36   0.15 False      0.0 2048779.046   25.462 89201.932   29.230 29251.587  7435.280     44.442      0.913      1.019      0.122  False    False False
+pb_n6_d1.75_r1.5_tp1.5_h36   0.25 False      0.0 2040467.653   27.291 87609.024   31.209 30162.504  7352.259     45.329      0.840      1.032      0.049  False    False False
+pb_n6_d1.75_r1.5_tp1.5_h36   0.40 False      0.0 1984318.476   29.994 84020.055   34.117 29862.575  6687.290     48.275      0.752      0.960      0.000  False    False False
+pb_n6_d1.75_r1.5_tp2.0_h36   0.15 False      0.0 1995841.723   24.909 87250.182   29.927 29083.058  7414.556     45.148      0.901      1.049      0.098  False    False False
+pb_n6_d1.75_r1.5_tp2.0_h36   0.25 False      0.0 1947690.980   26.396 84330.541   32.353 29750.391  6967.869     46.748      0.823      1.019      0.000  False    False False
+pb_n6_d1.75_r1.5_tp2.0_h36   0.40 False      0.0 1829933.376   32.892 78808.134   35.904 28617.513  6149.562     51.177      0.728      0.893      0.000  False    False False
+[T2] G3 passes: 0 of 9 money runs
+[T3a] 648 settings x 12 coins [187s]; G1a (net > 0 and PF >= 1.25 in both eras): 46; with plateau >= 0.6: 0
+                                    id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be1.5   0.15 False    0.157 2142850.026   24.460 74762.483   26.201 29091.170  7775.091     44.429      1.002      0.996      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be1.5   0.25 False    0.157 2171301.463   24.430 75042.208   26.201 29545.958  7814.518     44.392      1.003      0.993      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be1.5   0.40 False    0.157 2254259.001   24.388 75462.231   26.201 29850.872  7857.532     44.132      1.005      0.989      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be1.5   0.15 False    0.204 2070244.776   24.471 74657.646   26.201 29090.348  7747.719     44.429      1.002      0.997      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be1.5   0.25 False    0.204 2153489.987   24.448 74867.353   26.201 29260.157  7796.540     44.429      1.003      0.995      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be1.5   0.40 False    0.204 2224913.484   24.416 75182.158   26.201 29615.695  7828.877     44.284      1.004      0.992      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be2.0   0.15 False    0.157 2078085.484   24.460 74762.483   26.201 29203.707  7775.091     44.429      1.002      0.996      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be2.0   0.25 False    0.157 2167042.269   24.430 75042.208   26.201 29516.497  7814.518     44.392      1.003      0.993      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp2.0_be2.0   0.40 False    0.157 2247214.173   24.388 75462.231   26.201 29804.182  7857.532     44.132      1.005      0.989      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be2.0   0.15 False    0.204 2068410.123   24.471 74657.646   26.201 29207.674  7747.719     44.429      1.001      0.997      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be2.0   0.25 False    0.204 2150316.118   24.448 74867.353   26.201 29227.760  7796.540     44.429      1.002      0.995      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp2.0_be2.0   0.40 False    0.204 2180483.696   24.416 75182.158   26.201 29615.695  7828.877     44.284      1.004      0.992      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp3.0_be1.5   0.15 False    0.204 2060317.930   24.496 74529.972   26.201 29086.734  7741.401     44.429      1.001      0.997      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp3.0_be1.5   0.25 False    0.204 2074213.666   24.490 74654.465   26.201 29312.744  7789.935     44.429      1.002      0.994      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl4.0_tp3.0_be1.5   0.40 False    0.204 2157888.492   24.483 74841.302   26.201 29507.454  7818.292     44.427      1.003      0.991      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp3.0_be1.5   0.15 False    0.157 2067260.100   24.493 74592.212   26.201 29152.037  7765.176     44.429      1.001      0.996      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp3.0_be1.5   0.25 False    0.157 2085828.174   24.486 74758.249   26.201 29344.181  7805.704     44.429      1.002      0.993      0.756  False     True False
+sq_L8_z2.5_oi0.05_h8_sl3.0_tp3.0_be1.5   0.40 False    0.157 2177136.557   24.477 75007.477   26.201 29669.466  7843.397     44.295      1.004      0.988      0.756  False     True False
+[T3a] G3 passes: 0 of 18 money runs
+
+=== T3b: euphoria blow-off (OI surge + premium + prior-low break with falling OI) ===
+[T3b] 972 settings x 12 coins [317s]; G1a (net > 0 and PF >= 1.25 in both eras): 54; with plateau >= 0.6: 0
+                                    id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.15 False    0.134 2035672.156   24.506 74359.434   26.201 28758.866  7697.051     44.427      1.001        1.0        1.0   True    False False
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.25 False    0.134 2039025.853   24.506 74370.170   26.201 28780.507  7713.690     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.40 False    0.134 2044062.308   24.506 74386.273   26.201 28790.091  7738.678     44.416      1.002        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.15 False    0.134 2035672.156   24.506 74359.434   26.201 28758.866  7697.051     44.427      1.001        1.0        1.0   True    False False
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.25 False    0.134 2039025.853   24.506 74370.170   26.201 28780.507  7713.690     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.40 False    0.134 2044062.308   24.506 74386.273   26.201 28790.091  7738.678     44.416      1.002        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp2.0   0.15 False    0.134 2033996.489   24.506 74354.067   26.201 28774.274  7688.738     44.428      1.000        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp2.0   0.25 False    0.134 2036230.886   24.506 74361.224   26.201 28766.807  7699.824     44.427      1.001        1.0        1.0   True    False False
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp2.0   0.40 False    0.134 2039585.109   24.506 74371.959   26.201 28781.199  7716.465     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp3.0   0.15 False    0.134 2033996.489   24.506 74354.067   26.201 28774.274  7688.738     44.428      1.000        1.0        1.0   True     True  True
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp3.0   0.25 False    0.134 2036230.886   24.506 74361.224   26.201 28766.807  7699.824     44.427      1.001        1.0        1.0   True    False False
+eu_L4_z2.0_oi0.15_pz2.5_h4_sl3.0_tp3.0   0.40 False    0.134 2039585.109   24.506 74371.959   26.201 28781.199  7716.465     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.15 False    0.141 2033117.367   24.506 74359.434   26.201 28758.866  7678.112     44.427      1.000        1.0        1.0   True    False False
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.25 False    0.141 2034764.421   24.506 74370.170   26.201 28780.507  7682.106     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp2.0   0.40 False    0.141 2037235.737   24.506 74386.273   26.201 28786.739  7688.099     44.416      1.001        1.0        1.0   True     True  True
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.15 False    0.141 2033117.367   24.506 74359.434   26.201 28758.866  7678.112     44.427      1.000        1.0        1.0   True    False False
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.25 False    0.141 2034764.421   24.506 74370.170   26.201 28780.507  7682.106     44.425      1.001        1.0        1.0   True     True  True
+eu_L4_z2.5_oi0.15_pz2.5_h4_sl2.0_tp3.0   0.40 False    0.141 2037235.737   24.506 74386.273   26.201 28786.739  7688.099     44.416      1.001        1.0        1.0   True     True  True
+[T3b] G3 passes: 12 of 18 money runs
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+
+=== T4a: Monday-00:00 weekend-compression box breakout (TBO flat on the coin) ===
+
+=== T5a: BTC-confirmed laggard catch-up (market buy of the cleanest compressed laggard after BTC's 20-bar breakout run) ===
+
+=== T3a: forced short-squeeze exhaustion (short after a spike with falling OI and a bearish hour) ===
+[T5a] 96 settings [138s]; G1a 0, with plateau 0
+[T5a] no setting passes G1a; the 3 closest by min(PF dev, PF oos) get the money run for the record
+                              id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h24   0.15 False      0.0 2147483.509   23.723 74522.458   26.201 29103.593  7771.743     44.553      1.004      1.001      0.683  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h24   0.25 False      0.0 2218064.495   23.200 74620.045   26.201 29317.361  7862.900     44.693      1.006      1.002      0.585  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h24   0.40 False      0.0 1861505.250   22.417 74733.505   26.201 29865.331  8003.116     44.644      1.010      1.004      0.512  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h36   0.15 False      0.0 2147483.509   23.723 74522.458   26.201 29103.593  7771.743     44.553      1.003      1.001      0.683  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h36   0.25 False      0.0 2218064.495   23.200 74620.045   26.201 29317.361  7862.900     44.693      1.005      1.002      0.585  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h36   0.40 False      0.0 1861505.250   22.417 74733.505   26.201 29865.331  8003.116     44.644      1.009      1.004      0.488  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h48   0.15 False      0.0 2147483.509   23.723 74522.458   26.201 29103.593  7771.743     44.553      1.003      1.001      0.683  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h48   0.25 False      0.0 2218064.495   23.200 74620.045   26.201 29317.361  7862.900     44.693      1.005      1.002      0.585  False    False False
+lag_a0.75_q0.7_x0.0_n1_tp1.5_h48   0.40 False      0.0 1861505.250   22.417 74733.505   26.201 29865.331  8003.116     44.644      1.008      1.004      0.463  False    False False
+[T5a] G3 passes: 0 of 9 money runs
+
+=== T5b: post-panic secondary continuation (12-24 h after a panic v3.0 entry) ===
+[T3a] 648 settings x 12 coins [197s]; G1a (net > 0 and PF >= 1.25 in both eras): 0; with plateau >= 0.6: 0
+[T3a] no setting passes G1a; the 3 closest by min(PF dev, PF oos) get the money run for the record
+                                     id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+sq_L8_z2.5_oi0.12_h12_sl4.0_tp3.0_be2.0   0.15 False      0.0 2047859.860   24.506 74343.331   26.201 28770.119  7672.123     44.429      1.000      1.000        0.0  False    False False
+sq_L8_z2.5_oi0.12_h12_sl4.0_tp3.0_be2.0   0.25 False      0.0 2053403.587   24.506 74343.331   26.201 29011.311  7672.123     44.429      1.001      1.000        0.0  False    False False
+sq_L8_z2.5_oi0.12_h12_sl4.0_tp3.0_be2.0   0.40 False      0.0 2123480.660   24.506 74343.331   26.201 29071.456  7672.123     44.429      1.001      1.000        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be1.5   0.15 False      0.0 2008160.937   23.849 73827.161   26.385 28355.530  7550.233     44.517      0.998      1.000        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be1.5   0.25 False      0.0 1986982.518   23.412 73475.877   26.507 28372.242  7518.817     44.498      0.996      1.000        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be1.5   0.40 False      0.0 2013420.868   23.422 72938.451   26.690 28316.358  7475.730     44.590      0.994      0.996        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be2.0   0.15 False      0.0 2008160.937   23.849 73827.161   26.385 28355.530  7550.233     44.517      0.998      1.000        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be2.0   0.25 False      0.0 1986982.518   23.412 73475.877   26.507 28372.242  7518.817     44.498      0.996      1.000        0.0  False    False False
+ sq_L4_z1.5_oi0.05_h4_sl2.0_tp2.0_be2.0   0.40 False      0.0 2013420.868   23.422 72938.451   26.690 28316.358  7475.730     44.590      0.994      0.996        0.0  False    False False
+[T3a] G3 passes: 0 of 9 money runs
+
+=== T3b: euphoria blow-off (OI surge + premium + prior-low break with falling OI) ===
+[T5b] 324 settings x 12 coins [61s]; G1a (net > 0 and PF >= 1.25 in both eras): 10; with plateau >= 0.6: 0
+                                    id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+pp_dh12_b1.0_cont_long_h36_sl3.0_tp2.0   0.15 False    0.188 1882480.433   24.506 77492.950   26.201 29671.203  8055.276     44.253      1.005      1.006      1.000   True    False False
+pp_dh12_b1.0_cont_long_h36_sl3.0_tp2.0   0.25 False    0.188 1968611.956   24.506 79547.603   26.201 30568.678  8365.325     44.011      1.008      1.010      1.000   True    False False
+pp_dh12_b1.0_cont_long_h36_sl3.0_tp2.0   0.40 False    0.188 2122177.088   24.506 82548.240   26.201 31645.863  8874.059     43.808      1.012      1.016      0.976   True     True  True
+pp_dh12_b1.0_cont_long_h36_sl2.0_tp2.0   0.15 False    0.188 1903336.719   24.506 78451.128   26.201 29937.333  8127.425     44.022      1.005      1.008      0.976   True    False False
+pp_dh12_b1.0_cont_long_h36_sl2.0_tp2.0   0.25 False    0.188 2003452.820   24.506 81079.050   26.201 30709.952  8692.345     43.916      1.008      1.014      0.976   True    False False
+pp_dh12_b1.0_cont_long_h36_sl2.0_tp2.0   0.40 False    0.188 2178357.084   24.506 84819.258   26.201 32469.777  9508.085     43.549      1.013      1.022      0.976   True     True  True
+pp_dh12_b1.0_cont_long_h24_sl2.0_tp2.0   0.15 False    0.125 1890007.743   24.506 77636.298   26.201 30087.627  8103.590     44.081      1.005      1.006      0.951   True    False False
+pp_dh12_b1.0_cont_long_h24_sl2.0_tp2.0   0.25 False    0.125 1991733.426   24.506 79676.392   26.201 30475.234  8520.455     43.916      1.009      1.011      0.951   True    False False
+pp_dh12_b1.0_cont_long_h24_sl2.0_tp2.0   0.40 False    0.125 2158201.451   24.506 82474.156   26.201 31720.775  9317.106     43.410      1.014      1.017      0.951   True     True  True
+pp_dh12_b1.0_cont_long_h24_sl3.0_tp2.0   0.15 False    0.125 1872007.008   24.506 76793.577   26.201 29685.504  8053.973     44.252      1.005      1.004      1.000   True    False False
+pp_dh12_b1.0_cont_long_h24_sl3.0_tp2.0   0.25 False    0.125 1971346.626   24.506 78331.440   26.201 30223.139  8403.508     43.989      1.008      1.007      1.000   True    False False
+pp_dh12_b1.0_cont_long_h24_sl3.0_tp2.0   0.40 False    0.125 2127394.517   24.506 80482.088   26.201 31227.749  8918.213     43.623      1.013      1.012      1.000   True     True  True
+pp_dh12_b0.5_cont_long_h36_sl3.0_tp2.0   0.15 False    0.281 2250642.830   24.689 76780.211   26.201 29600.666  7931.944     44.453      1.003      1.005      0.707  False    False False
+pp_dh12_b0.5_cont_long_h36_sl3.0_tp2.0   0.25 False    0.281 1918432.950   24.814 78297.385   26.201 30302.890  8179.641     44.326      1.005      1.009      0.683  False    False False
+pp_dh12_b0.5_cont_long_h36_sl3.0_tp2.0   0.40 False    0.281 2035072.019   25.005 80393.785   26.201 31604.706  8517.908     44.009      1.008      1.014      0.659  False     True False
+pp_dh18_b1.0_cont_long_h36_sl2.0_tp3.0   0.15 False    0.083 2301528.863   24.894 78876.834   26.201 29707.760  8286.304     44.152      1.004      1.008      0.683  False     True False
+pp_dh18_b1.0_cont_long_h36_sl2.0_tp3.0   0.25 False    0.083 1964622.859   25.161 81802.729   26.201 31151.781  8611.174     43.950      1.007      1.013      0.683  False    False False
+pp_dh18_b1.0_cont_long_h36_sl2.0_tp3.0   0.40 False    0.083 2084694.866   25.575 86011.626   26.201 32228.126  8717.351     44.036      1.011      1.021      0.659  False     True False
+[T5b] G3 passes: 4 of 18 money runs
+[T3b] 972 settings x 12 coins [325s]; G1a (net > 0 and PF >= 1.25 in both eras): 0; with plateau >= 0.6: 0
+[T3b] no setting passes G1a; the 3 closest by min(PF dev, PF oos) get the money run for the record
+                                     id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+eu_L8_z2.0_oi0.08_pz2.0_h12_sl3.0_tp2.0   0.15 False      0.0 2045762.434   25.455 92045.124   26.179 29218.886  7771.981     44.272      1.001      0.993      0.488  False     True False
+eu_L8_z2.0_oi0.08_pz2.0_h12_sl3.0_tp2.0   0.25 False      0.0 2056624.013   26.083 90517.587   26.179 29456.314  7779.018     44.166      1.002      0.989      0.415  False     True False
+eu_L8_z2.0_oi0.08_pz2.0_h12_sl3.0_tp2.0   0.40 False      0.0 2079208.162   27.018 89880.350   26.179 29368.221  7916.187     44.410      1.004      0.982      0.390  False     True False
+ eu_L8_z2.5_oi0.08_pz1.5_h8_sl3.0_tp2.0   0.15 False      0.0 2057389.986   24.485 82626.524   26.500 28801.732  7652.819     44.332      1.000      1.009      0.634  False    False False
+ eu_L8_z2.5_oi0.08_pz1.5_h8_sl3.0_tp2.0   0.25 False      0.0 2068853.830   24.472 93063.280   26.715 28992.021  7586.000     44.493      1.000      1.015      0.634  False    False False
+ eu_L8_z2.5_oi0.08_pz1.5_h8_sl3.0_tp2.0   0.40 False      0.0 2149926.020   24.456 93027.724   27.037 29770.500  7578.162     44.425      1.000      1.024      0.634  False    False False
+eu_L8_z2.0_oi0.12_pz1.5_h12_sl3.0_tp3.0   0.15 False      0.0 1985942.044   27.271 82429.239   26.500 29179.835  7492.684     44.124      1.001      1.025      0.488  False    False False
+eu_L8_z2.0_oi0.12_pz1.5_h12_sl3.0_tp3.0   0.25 False      0.0 1964701.739   29.074 92474.360   26.715 29250.717  7533.053     44.057      1.002      1.042      0.366  False    False False
+eu_L8_z2.0_oi0.12_pz1.5_h12_sl3.0_tp3.0   0.40 False      0.0 1931746.797   31.717 92015.163   27.037 29260.740  7781.306     44.166      0.943      1.061      0.122  False    False False
+[T3b] G3 passes: 0 of 9 money runs
+[T4a] 972 settings x 12 coins [1028s]; G1a (net > 0 and PF >= 1.25 in both eras): 17; with plateau >= 0.6: 0
+                                   id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+mb_c0.6_oi0.02_v8_trend_box_tp2.5_h12   0.15 False    0.121 1967269.093   23.334 80093.875   26.201 29869.824  7765.346     45.079      1.006      0.924      0.415  False    False False
+mb_c0.6_oi0.02_v8_trend_box_tp2.5_h12   0.25 False    0.121 1992754.041   22.556 83960.767   26.201 31136.116  7953.092     45.806      1.005      0.880      0.268  False    False False
+mb_c0.6_oi0.02_v8_trend_box_tp2.5_h12   0.40 False    0.121 2243577.570   21.920 82958.313   26.201 32210.240  8602.517     47.317      0.922      0.822      0.098  False    False False
+mb_c0.6_oi0.02_v8_trend_box_tp2.0_h12   0.15 False    0.102 1936508.329   23.614 80221.402   26.201 29958.732  7781.201     45.016      1.005      0.924      0.415  False    False False
+mb_c0.6_oi0.02_v8_trend_box_tp2.0_h12   0.25 False    0.102 2118353.371   23.022 84186.210   26.201 30699.226  8040.383     45.884      1.003      0.880      0.268  False    False False
+mb_c0.6_oi0.02_v8_trend_box_tp2.0_h12   0.40 False    0.102 2154355.491   22.138 82596.391   26.201 31799.036  8510.395     47.531      0.918      0.822      0.098  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h12   0.15 False    0.102 1925278.111   23.594 79637.943   26.201 29961.786  7745.457     45.196      1.004      0.923      0.366  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h12   0.25 False    0.102 2097457.751   22.994 83159.875   26.201 30426.384  7737.800     46.134      1.002      0.878      0.244  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h12   0.40 False    0.102 2119364.583   22.107 92144.014   26.201 31346.014  8263.860     47.513      0.916      0.819      0.098  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.5_h12   0.15 False    0.121 1957040.536   23.315 79168.977   26.201 30069.760  7775.746     45.155      1.005      0.922      0.390  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.5_h12   0.25 False    0.121 1974628.692   22.529 82354.632   26.201 30687.505  7881.455     45.938      1.004      0.877      0.244  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.5_h12   0.40 False    0.121 2208730.510   21.953 88870.535   26.201 31990.285  8287.546     47.484      0.919      0.818      0.098  False    False False
+ mb_c0.6_oi0.0_v8_trend_box_tp2.5_h12   0.15 False    0.082 2041721.473   25.248 85832.429   26.201 30855.256  7869.661     46.622      1.006      0.827      0.171  False    False False
+ mb_c0.6_oi0.0_v8_trend_box_tp2.5_h12   0.25 False    0.082 2111060.599   25.761 84562.449   26.201 32561.481  8257.227     48.952      1.001      0.743      0.049  False    False False
+ mb_c0.6_oi0.0_v8_trend_box_tp2.5_h12   0.40 False    0.082 2436303.463   27.320 94541.656   27.320 33419.278  8104.625     51.628      0.905      0.647      0.024  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h36   0.15 False    0.061 1960936.031   20.678 79857.302   26.201 30112.254  7778.729     45.331      1.004      0.923      0.000  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h36   0.25 False    0.061 1973708.352   20.514 83529.845   26.201 30484.223  7938.700     46.201      0.992      0.878      0.000  False    False False
+mb_c0.6_oi0.02_v8_trend_atr_tp2.0_h36   0.40 False    0.061 2186810.459   24.087 82508.755   26.201 31672.293  8338.994     48.561      0.903      0.819      0.000  False    False False
+[T4a] G3 passes: 0 of 18 money runs
+
+=== T4b: weekend thin-book stop-hunt fade toward the Friday 20:00 UTC price ===
+[T4b] 54 settings x 12 coins [54s]; G1a (net > 0 and PF >= 1.25 in both eras): 0; with plateau >= 0.6: 0
+[T4b] no setting passes G1a; the 3 closest by min(PF dev, PF oos) get the money run for the record
+                       id  share    G1  plateau      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+ cme_z2.0_oi0.06_2R_sl2.0   0.15 False      0.0 2044783.793   24.491 85151.556   28.554 31435.916  8184.375     45.777      1.013      0.911      0.073  False    False False
+ cme_z2.0_oi0.06_2R_sl2.0   0.25 False      0.0 2120163.663   24.783 81295.507   30.106 32164.659  8073.513     46.891      1.022      0.839      0.000  False    False False
+ cme_z2.0_oi0.06_2R_sl2.0   0.40 False      0.0 2434702.458   27.357 74192.610   32.410 34487.621  7973.708     50.105      1.035      0.750      0.000  False    False False
+cme_z2.0_oi0.045_2R_sl2.0   0.15 False      0.0 2048164.879   23.513 83132.237   30.313 31636.416  7871.856     46.621      1.015      0.861      0.000  False    False False
+cme_z2.0_oi0.045_2R_sl2.0   0.25 False      0.0 2132320.934   23.154 77713.226   33.021 32721.431  7550.410     48.821      1.025      0.770      0.000  False    False False
+cme_z2.0_oi0.045_2R_sl2.0   0.40 False      0.0 2443963.030   27.207 85264.797   37.036 34072.739  7141.791     53.728      1.039      0.665      0.000  False    False False
+cme_z2.0_oi0.03_r75_sl2.0   0.15 False      0.0 1889886.842   22.581 84200.773   28.604 30335.070  7676.338     46.562      1.009      0.880      0.000  False    False False
+cme_z2.0_oi0.03_r75_sl2.0   0.25 False      0.0 1982801.256   22.251 79409.034   30.179 31038.499  7724.924     48.876      1.015      0.796      0.000  False    False False
+cme_z2.0_oi0.03_r75_sl2.0   0.40 False      0.0 2096218.179   27.207 84609.955   32.499 31074.233  7343.233     52.438      0.991      0.696      0.000  False    False False
+[T4b] G3 passes: 0 of 9 money runs
+[base] O1 re-run: 2022 $2,030,648 / 24.51%, 2024 $74,343 / 26.20%, boot $28,770 / $7,672 / 44.43%
+
+=== T1: live-exact 4h VOLC on the 7 extra DEV12 coins (v33 engine; no TBO conflict) ===
+              group      sym  n_dev  net_dev  pf_dev  dd_dev  avg_dev  n_oos  net_oos  pf_oos  dd_oos  avg_oos
+             EXTRA7  XRPUSDT     23   16.623   3.376   2.455    0.723     22    8.602   1.897   2.295    0.391
+             EXTRA7 DOGEUSDT     20    7.124   1.790   3.330    0.356     20    0.046   1.004   7.933    0.002
+             EXTRA7 AVAXUSDT     14    9.342   3.028   2.286    0.667      6   -4.053   0.260   5.476   -0.675
+             EXTRA7 LINKUSDT      6   -1.511   0.655   3.226   -0.252      9    5.111   2.510   1.170    0.568
+             EXTRA7  DOTUSDT      9   -0.210   0.964   3.648   -0.023     12    9.509   3.865   1.128    0.792
+             EXTRA7  LTCUSDT      8    3.476   2.006   2.286    0.435     13   -1.944   0.784   3.780   -0.150
+             EXTRA7  TRXUSDT      9   -0.731   0.883   2.951   -0.081     13    0.828   1.105   2.988    0.064
+              CORE5  BTCUSDT     11    1.981   1.320   2.626    0.180     13    2.079   1.284   2.448    0.160
+              CORE5  ETHUSDT     13    0.134   1.017   4.231    0.010     10   -1.388   0.769   3.741   -0.139
+              CORE5  BNBUSDT     11   -0.983   0.866   4.981   -0.089     10    1.452   1.305   1.392    0.145
+              CORE5  SOLUSDT     12    9.925   4.900   1.081    0.827      6    8.374     inf   0.000    1.396
+              CORE5  ADAUSDT     15   10.830   3.320   2.397    0.722     14   -0.672   0.923   5.094   -0.048
+      EXTRA7 pooled      ALL     89   34.113   1.841   5.168    0.383     95   18.099   1.353   6.883    0.191
+CORE5 pooled (live)      ALL     62   21.887   1.762   4.559    0.353     53    9.845   1.367   8.769    0.186
+[T1] HOLD_BIG pooled VOLC (live params): n_dev 162.00, net_dev -16921054135037596587096998412288.00, pf_dev 0.00, dd_dev 16921054135037594335297184727040.00, avg_dev -104450951450849363603434242048.00, n_oos 115.00, net_oos 0.32, pf_oos 1.00, dd_oos 18.89, avg_oos 0.00, corr_tbo 0.13, boot_pos 0.06
+[T1] audit done [205s]
+[T1] pool N=1 rank=fill: n 128  dev 64 net 22.2R dd 4.2  oos 63 net 11.0R dd 7.7
+[T1] pool N=1 rank=squeeze: n 100  dev 47 net 15.7R dd 4.3  oos 52 net 10.7R dd 5.5
+[T1] pool N=1 rank=oi: n 101  dev 49 net 19.3R dd 5.4  oos 51 net 12.2R dd 4.8
+[T1] pool N=1 rank=tight_oi: n 103  dev 50 net 17.7R dd 4.3  oos 52 net 13.6R dd 4.8
+[T1] pool N=2 rank=fill: n 163  dev 80 net 29.0R dd 5.2  oos 82 net 17.6R dd 7.5
+[T1] pool N=2 rank=squeeze: n 146  dev 69 net 23.7R dd 5.2  oos 76 net 14.1R dd 7.8
+[T1] pool N=2 rank=oi: n 147  dev 71 net 26.5R dd 5.2  oos 75 net 13.0R dd 7.1
+[T1] pool N=2 rank=tight_oi: n 147  dev 69 net 23.8R dd 6.3  oos 77 net 13.0R dd 7.1
+[T1] pool N=3 rank=fill: n 177  dev 86 net 29.9R dd 5.2  oos 90 net 18.7R dd 5.9
+[T1] pool N=3 rank=squeeze: n 166  dev 79 net 30.1R dd 5.2  oos 86 net 20.5R dd 5.9
+[T1] pool N=3 rank=oi: n 164  dev 77 net 24.8R dd 5.2  oos 86 net 15.6R dd 5.7
+[T1] pool N=3 rank=tight_oi: n 164  dev 77 net 24.8R dd 6.3  oos 86 net 18.1R dd 5.7
+[T1] pool N=4 rank=fill: n 183  dev 88 net 32.6R dd 5.2  oos 94 net 19.2R dd 6.9
+[T1] pool N=4 rank=squeeze: n 175  dev 83 net 30.8R dd 6.3  oos 91 net 20.0R dd 6.9
+[T1] pool N=4 rank=oi: n 177  dev 84 net 29.7R dd 5.2  oos 92 net 16.4R dd 6.9
+[T1] pool N=4 rank=tight_oi: n 177  dev 84 net 27.0R dd 6.3  oos 92 net 18.9R dd 6.9
+[T1] pool N=7 rank=all: n 185  dev 89 net 34.1R dd 5.2  oos 95 net 18.1R dd 6.9
+[T1] money for pool (1, 'fill') done [221s]
+[T1] money for pool (1, 'squeeze') done [227s]
+[T1] money for pool (1, 'oi') done [233s]
+[T1] money for pool (1, 'tight_oi') done [239s]
+[T1] money for pool (2, 'fill') done [244s]
+[T1] money for pool (2, 'squeeze') done [249s]
+[T1] money for pool (2, 'oi') done [255s]
+[T1] money for pool (2, 'tight_oi') done [261s]
+[T1] money for pool (3, 'fill') done [267s]
+[T1] money for pool (3, 'squeeze') done [272s]
+[T1] money for pool (3, 'oi') done [278s]
+[T1] money for pool (3, 'tight_oi') done [284s]
+[T1] money for pool (4, 'fill') done [290s]
+[T1] money for pool (4, 'squeeze') done [296s]
+[T1] money for pool (4, 'oi') done [302s]
+[T1] money for pool (4, 'tight_oi') done [307s]
+[T1] money for pool (7, 'all') done [313s]
+ N     rank  share  inside_cap      m_2022  dd_2022    m_2024  dd_2024  boot_med  boot_p10  boot_dd90  p_10k  era_x_dev  era_x_oos  era_phase  E_era  E_money    G3
+ 2     fill   0.35       False 1964741.731   25.830 79601.148   26.260 30916.005  8405.407     43.990  0.882      1.009      0.981      0.488  False    False False
+ 2     fill   0.35        True 1953386.794   25.830 78730.742   26.260 30731.363  8400.998     44.155  0.881      1.009      0.980      0.488  False    False False
+ 2  squeeze   0.35       False 1924043.869   25.830 78447.029   26.260 30677.073  8313.698     43.990  0.878      1.008      0.979      0.488  False    False False
+ 2  squeeze   0.35        True 1912924.139   25.830 77589.242   26.260 30580.823  8267.280     44.155  0.877      1.008      0.978      0.488  False    False False
+ 2     fill   0.50       False 2073319.976   26.395 81912.774   26.300 31694.733  8631.888     43.749  0.891      1.013      0.973      0.439  False    False False
+ 2     fill   0.50        True 2053012.598   26.395 80510.462   26.300 31480.709  8617.227     43.914  0.888      1.013      0.971      0.439  False    False False
+ 2  squeeze   0.50       False 2012268.582   26.395 80232.403   26.300 31296.024  8673.778     43.989  0.883      1.011      0.971      0.439  False    False False
+ 2  squeeze   0.50        True 1992559.179   26.395 78858.858   26.300 30929.862  8651.241     44.015  0.880      1.011      0.969      0.439  False    False False
+ 2     fill   0.75       False 2265471.400   27.332 85840.903   26.374 32723.310  9485.439     43.712  0.895      1.020      0.960      0.415  False    False False
+ 2     fill   0.75        True 2225961.082   27.332 83412.180   26.374 32390.537  9218.905     43.712  0.894      1.019      0.957      0.415  False    False False
+ 2  squeeze   0.75       False 2166221.608   27.332 83241.232   26.374 31879.035  9275.051     44.081  0.891      1.016      0.957      0.366  False    False False
+ 2  squeeze   0.75        True 2128442.229   27.332 80886.062   26.374 31408.326  9170.544     44.153  0.890      1.016      0.954      0.366  False    False False
+ 2     fill   1.00       False 2306436.940   28.266 91255.694   26.456 33483.794 10270.824     43.350  0.902      1.026      0.948      0.341  False    False False
+ 2  squeeze   1.00       False 2172801.730   28.266 86288.912   26.456 33375.283  9613.227     44.040  0.896      1.022      0.944      0.341  False    False False
+ 2     fill   1.00        True 2248783.479   28.266 86334.330   26.456 33033.970  9924.830     43.469  0.899      1.025      0.944      0.341  False    False False
+ 2  squeeze   1.00        True 2118488.716   28.266 82902.860   26.456 32239.863  9281.521     44.040  0.894      1.021      0.939      0.341  False    False False
+ 3  squeeze   0.35       False 1985568.788   25.830 80344.288   26.260 31074.373  8642.340     43.990  0.883      1.009      0.982      0.293  False    False False
+ 1     fill   0.35       False 1893680.168   25.088 78010.370   26.201 30344.265  8050.522     44.202  0.879      1.007      0.978      0.293  False    False False
+ 1     fill   0.35        True 1888313.351   25.088 77592.492   26.201 30322.456  8046.257     44.202  0.879      1.007      0.977      0.293  False    False False
+ 1     fill   0.50       False 1967471.060   25.339 79606.297   26.201 30974.552  8275.352     44.100  0.885      1.010      0.969      0.293  False    False False
+ 1     fill   0.50        True 1956423.749   25.339 78870.660   26.201 30666.023  8266.557     44.100  0.882      1.010      0.968      0.293  False    False False
+ 4  squeeze   0.35       False 1988700.943   25.830 80097.103   26.260 31048.606  8626.479     44.155  0.884      1.010      0.982      0.268  False    False False
+ 4     fill   0.35       False 2000960.712   25.830 79761.731   26.260 31058.160  8460.711     44.155  0.885      1.010      0.982      0.268  False    False False
+ 4 tight_oi   0.35       False 1951604.408   25.830 79908.587   26.260 30656.555  8606.721     44.155  0.882      1.009      0.981      0.268  False    False False
+ 3     fill   0.35       False 1975554.704   25.830 79642.493   26.260 30775.160  8341.952     43.990  0.885      1.009      0.981      0.268  False    False False
+[T1] settings passing G3: 0 of 136; passing the era gate alone: 0
